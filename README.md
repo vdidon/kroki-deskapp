@@ -208,6 +208,17 @@ Plugins du dépôt (`plugins/`) :
 Écrire un plugin : [doc/plugin-protocol.md](doc/plugin-protocol.md) (protocole
 v1, exemples commentés, empaquetage par `python pack_plugin.py`).
 
+## Skill Claude Code
+
+[`skills/kroki-desk/`](skills/kroki-desk/SKILL.md) est un skill
+[Claude Code](https://docs.claude.com/en/docs/claude-code) qui écrit des
+documents Markdown destinés à Kroki Desk : choix du moteur parmi ceux que
+l'application rend réellement (sonde `/v1/health` de l'API locale), syntaxe
+par moteur, validation des diagrammes contre l'API locale, liens
+`fichier#fragment` stables. Il sait aussi ouvrir un document dans Kroki Desk
+installé à une référence précise (`\label`, titre, ligne). Pour l'utiliser,
+copier le dossier dans `~/.claude/skills/`.
+
 ## Build
 
 Prérequis minimal : Rust stable. Il n'y a pas de bundler frontend, aucune étape
