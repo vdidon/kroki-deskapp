@@ -13,6 +13,7 @@
 import { invoke, listen, convertFileSrc } from "./app.js";
 import { docIsDark } from "./theme.js";
 import { sanitizeAnchors } from "./anchors.js";
+import { t } from "./i18n.js";
 
 /// Capacités servables par cet hôte (négociation `initialize`, §6.1). Doit
 /// rester en phase avec `HOST_CAPABILITIES` (src-tauri/src/plugins.rs).
@@ -114,13 +115,13 @@ class PluginHost {
       URL.revokeObjectURL(blobUrl);
     }
     this.worker.onmessage = (e) => this.onMessage(e.data);
-    this.worker.onerror = (e) => this.abort(new Error(e?.message || "erreur du worker"));
+    this.worker.onerror = (e) => this.abort(new Error(e?.message || t("runtime_ui.worker_error")));
 
     await new Promise((resolve, reject) => {
       this.readyResolve = resolve;
       this.readyReject = reject;
       this.readyTimer = setTimeout(
-        () => reject(new Error("délai de chargement dépassé")),
+        () => reject(new Error(t("runtime_ui.load_timeout"))),
         TIMEOUTS.initialize,
       );
     });
@@ -141,7 +142,7 @@ class PluginHost {
     }
     if (m.method === "worker/error") {
       clearTimeout(this.readyTimer);
-      this.readyReject?.(new Error(m.params?.message || "chargement du plugin impossible"));
+      this.readyReject?.(new Error(m.params?.message || t("runtime_ui.load_failed")));
       return;
     }
     if (m.id != null && ("result" in m || "error" in m)) {
@@ -150,7 +151,7 @@ class PluginHost {
       this.pending.delete(m.id);
       clearTimeout(p.timer);
       if ("error" in m) {
-        const err = new Error(m.error?.message || "erreur du plugin");
+        const err = new Error(m.error?.message || t("runtime_ui.plugin_error"));
         err.code = m.error?.code || "internal";
         err.remote = true; // erreur *retournée* par le plugin : pas une panne
         p.reject(err);
@@ -179,7 +180,7 @@ class PluginHost {
       if (!this.activeDirs.has(dir)) {
         reply(null, {
           code: "denied",
-          message: "lecture hors du traitement d'une requête de l'hôte",
+          message: t("runtime_ui.read_denied"),
         });
         return;
       }
@@ -191,8 +192,11 @@ class PluginHost {
         });
         reply({ text });
       } catch (err) {
-        const msg = String(err);
-        reply(null, { code: /introuvable/i.test(msg) ? "not-found" : "denied", message: msg });
+        // `{code, message}` (plugin_read_sibling) : le code ne dépend pas de la langue.
+        reply(null, {
+          code: err?.code === "not-found" ? "not-found" : "denied",
+          message: String(err?.message ?? err),
+        });
       }
       return;
     }
@@ -202,13 +206,13 @@ class PluginHost {
   request(method, params) {
     return new Promise((resolve, reject) => {
       if (!this.worker) {
-        reject(new Error("worker arrêté"));
+        reject(new Error(t("runtime_ui.worker_stopped")));
         return;
       }
       const id = this.nextId++;
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(Object.assign(new Error(`délai dépassé (${method})`), { timeout: true }));
+        reject(Object.assign(new Error(t("runtime_ui.timeout", { method })), { timeout: true }));
       }, TIMEOUTS[method] ?? 30000);
       this.pending.set(id, { resolve, reject, timer });
       this.worker.postMessage({ kd: 1, id, method, params });
@@ -244,7 +248,7 @@ class PluginHost {
 
 async function call(info, method, params, dir) {
   if (broken.has(info.id)) {
-    throw new Error(`plugin « ${info.id} » en panne : ${broken.get(info.id)}`);
+    throw new Error(t("runtime_ui.broken", { id: info.id, reason: broken.get(info.id) }));
   }
   let host = hosts.get(info.id);
   if (!host) {
@@ -440,7 +444,7 @@ export async function pluginRenderFence(info, { lang, source, options, dir }) {
   );
   const format = r?.format;
   if (format !== "svg" && format !== "html" && format !== "markdown") {
-    throw new Error(`format de rendu inattendu : ${JSON.stringify(format)}`);
+    throw new Error(t("runtime_ui.unexpected_format", { format: JSON.stringify(format) }));
   }
   return { format, content: String(r?.content ?? "") };
 }
@@ -469,7 +473,7 @@ export function degradedDocMarkdown(title, reason, source) {
   return [
     `# ${title}`,
     "",
-    `> ⚠️ **Rendu indisponible** — ${String(reason?.message || reason)}`,
+    `> ${t("runtime_ui.degraded", { reason: String(reason?.message || reason) })}`,
     "",
     fence,
     source,

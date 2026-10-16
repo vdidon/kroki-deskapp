@@ -2,6 +2,7 @@
 
 import { invoke, state } from "./app.js";
 import { showToast } from "./session.js";
+import { t, applyLocale, onLocaleChange } from "./i18n.js";
 
 const tabsEl = document.getElementById("tabs");
 const tabbarEl = document.getElementById("tabbar");
@@ -20,7 +21,8 @@ function buildTab(tab) {
 
   const close = document.createElement("button");
   close.className = "tab-close";
-  close.title = "Fermer (Ctrl+W)";
+  close.dataset.i18nTitle = "tabs.close"; // retraduit par applyLocale(tabsEl) au changement de langue
+  close.title = t("tabs.close");
   close.textContent = "×";
   el.appendChild(close);
 
@@ -133,6 +135,9 @@ export function initTabbar() {
     if (tabEl) invoke("close_tab", { docId: Number(tabEl.dataset.id) });
   });
   initTabMenu();
+  // Les croix des onglets sont construites par le JS : le HTML statique n'est
+  // pas concerné par applyLocale(document), on leur applique donc à part.
+  onLocaleChange(() => applyLocale(tabsEl));
 }
 
 // --- Menu contextuel d'onglet (clic droit) ---
@@ -155,11 +160,11 @@ async function copyText(text) {
     const ok = document.execCommand("copy");
     ta.remove();
     if (!ok) {
-      showToast("Impossible de copier le chemin.", true);
+      showToast(t("tabs.copy_failed"), true);
       return;
     }
   }
-  showToast("Chemin copié.");
+  showToast(t("tabs.path_copied"));
 }
 
 function closeTabMenu() {

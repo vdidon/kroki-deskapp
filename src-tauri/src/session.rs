@@ -94,7 +94,7 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
             report(
                 app,
                 target_label,
-                format!("Session « {name} » illisible : {e}"),
+                tr!("sessionfile.unreadable", name = name, error = e),
                 true,
             );
             return;
@@ -104,9 +104,11 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
         report(
             app,
             target_label,
-            format!(
-                "Session « {name} » : version {} non prise en charge (attendu {SESSION_VERSION})",
-                parsed.version
+            tr!(
+                "sessionfile.version",
+                name = name,
+                version = parsed.version,
+                expected = SESSION_VERSION
             ),
             true,
         );
@@ -131,7 +133,11 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
             .map(|raw| match resolve_entry(raw, &base) {
                 Ok(p) => Some(p),
                 Err(reason) => {
-                    skipped.push(format!("{raw} ({reason})"));
+                    skipped.push(tr!(
+                        "sessionfile.skipped_entry",
+                        path = raw,
+                        reason = reason
+                    ));
                     None
                 }
             })
@@ -147,7 +153,7 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
             match manager::create_window(app, None, None) {
                 Ok(l) => l,
                 Err(e) => {
-                    skipped.push(format!("fenêtre {} ({e})", i + 1));
+                    skipped.push(tr!("sessionfile.skipped_window", n = i + 1, error = e));
                     continue;
                 }
             }
@@ -174,15 +180,20 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
     }
     let mut detail: Vec<String> = skipped.iter().take(REPORT_DETAIL_MAX).cloned().collect();
     if skipped.len() > REPORT_DETAIL_MAX {
-        detail.push(format!("… +{}", skipped.len() - REPORT_DETAIL_MAX));
+        detail.push(tr!(
+            "sessionfile.more",
+            count = skipped.len() - REPORT_DETAIL_MAX
+        ));
     }
     report(
         app,
         front,
-        format!(
-            "Session « {name} » : {opened} onglet(s) ouvert(s), {} ignoré(s) — {}",
-            skipped.len(),
-            detail.join(" · ")
+        tr!(
+            "sessionfile.report",
+            name = name,
+            count = opened,
+            skipped = skipped.len(),
+            details = detail.join(" · ")
         ),
         true,
     );
@@ -192,21 +203,21 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
 fn resolve_entry(raw: &str, base: &Path) -> Result<PathBuf, String> {
     let raw = raw.trim();
     if raw.is_empty() {
-        return Err("chemin vide".into());
+        return Err(tr!("sessionfile.reason.empty"));
     }
     // `\` toléré à la lecture (fichier écrit à la main sous Windows).
     let normalized = raw.replace('\\', "/");
     let p = PathBuf::from(&normalized);
     let abs = if p.is_absolute() { p } else { base.join(p) };
-    let canon = dunce::canonicalize(&abs).map_err(|_| "introuvable".to_string())?;
+    let canon = dunce::canonicalize(&abs).map_err(|_| tr!("sessionfile.reason.not_found"))?;
     if !canon.is_file() {
-        return Err("pas un fichier".into());
+        return Err(tr!("sessionfile.reason.not_file"));
     }
     if is_session_file(&canon) {
-        return Err("session imbriquée ignorée".into());
+        return Err(tr!("sessionfile.reason.nested"));
     }
     if !manager::is_supported_doc(&canon) {
-        return Err("extension non prise en charge".into());
+        return Err(tr!("sessionfile.reason.unsupported"));
     }
     Ok(canon)
 }
@@ -290,7 +301,7 @@ pub fn write_session(
     };
     let json = serde_json::to_string_pretty(&file).map_err(|e| e.to_string())?;
     std::fs::write(dest, format!("{json}\n"))
-        .map_err(|e| format!("Impossible d'écrire {} : {e}", dest.display()))
+        .map_err(|e| tr!("error.file.write", path = dest.display(), error = e))
 }
 
 /// Chemin portable : relatif au dossier du `.kdws` si un préfixe est commun

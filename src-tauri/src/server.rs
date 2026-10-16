@@ -38,11 +38,16 @@ pub fn apply_settings(app: &AppHandle, enabled: bool, port: u16) {
                 for req in server.incoming_requests() {
                     let app = app.clone();
                     // Un thread par requête : les rendus peuvent être longs (JVM…).
-                    std::thread::spawn(move || handle(&app, req));
+                    // API technique lue par des outils : toujours en anglais, quelle
+                    // que soit la langue de l'interface (la surcharge est par thread,
+                    // d'où son installation ici, sur le thread qui sert la requête).
+                    std::thread::spawn(move || {
+                        crate::i18n::in_reference_language(|| handle(&app, req))
+                    });
                 }
             });
         }
-        Err(e) => eprintln!("[serveur] port {port} indisponible : {e}"),
+        Err(e) => eprintln!("[server] port {port} unavailable: {e}"),
     }
 }
 
@@ -81,11 +86,11 @@ fn decode_get_payload(payload: &str) -> Result<String, String> {
     let bytes = base64::engine::general_purpose::URL_SAFE
         .decode(payload)
         .or_else(|_| base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload))
-        .map_err(|e| format!("base64 invalide : {e}"))?;
+        .map_err(|e| format!("invalid base64: {e}"))?;
     let mut out = String::new();
     flate2::read::ZlibDecoder::new(&bytes[..])
         .read_to_string(&mut out)
-        .map_err(|e| format!("décompression impossible : {e}"))?;
+        .map_err(|e| format!("decompression failed: {e}"))?;
     Ok(out)
 }
 
@@ -111,7 +116,7 @@ fn handle(app: &AppHandle, mut req: tiny_http::Request) {
         (Method::Post, 0) => {
             let mut body = String::new();
             if req.as_reader().read_to_string(&mut body).is_err() {
-                Err("corps illisible".into())
+                Err("unreadable body".into())
             } else {
                 match serde_json::from_str::<serde_json::Value>(&body) {
                     Ok(v) => {
@@ -119,19 +124,19 @@ fn handle(app: &AppHandle, mut req: tiny_http::Request) {
                         let source = v["diagram_source"].as_str().unwrap_or_default().to_string();
                         let fmt = v["output_format"].as_str().unwrap_or("svg").to_string();
                         if dtype.is_empty() || source.is_empty() {
-                            Err("diagram_type et diagram_source sont requis".into())
+                            Err("diagram_type and diagram_source are required".into())
                         } else {
                             Ok((dtype, fmt, source))
                         }
                     }
-                    Err(e) => Err(format!("JSON invalide : {e}")),
+                    Err(e) => Err(format!("invalid JSON: {e}")),
                 }
             }
         }
         (Method::Post, 1 | 2) => {
             let mut body = String::new();
             if req.as_reader().read_to_string(&mut body).is_err() {
-                Err("corps illisible".into())
+                Err("unreadable body".into())
             } else {
                 let fmt = segments.get(1).cloned().unwrap_or_else(|| "svg".into());
                 Ok((segments[0].clone(), fmt, body))
@@ -145,7 +150,7 @@ fn handle(app: &AppHandle, mut req: tiny_http::Request) {
                 200,
                 "text/plain; charset=utf-8",
                 format!(
-                    "Kroki Desk — API locale compatible Kroki (rendu intégré).\n{}\n",
+                    "Kroki Desk — local Kroki-compatible API (built-in rendering).\n{}\n",
                     engine::supported_summary()
                 ),
             );
@@ -163,7 +168,7 @@ fn handle(app: &AppHandle, mut req: tiny_http::Request) {
             respond(req, 200, "application/json", health_body());
             return;
         }
-        _ => Err("route inconnue — POST /, POST /{type}/svg ou GET /{type}/svg/{payload}".into()),
+        _ => Err("unknown route — POST /, POST /{type}/svg or GET /{type}/svg/{payload}".into()),
     };
 
     let (dtype, fmt, source) = match parsed {
@@ -178,7 +183,7 @@ fn handle(app: &AppHandle, mut req: tiny_http::Request) {
             req,
             400,
             "text/plain; charset=utf-8",
-            format!("Seul le format svg est supporté (demandé : {fmt})"),
+            format!("Only the svg format is supported (requested: {fmt})"),
         );
         return;
     }

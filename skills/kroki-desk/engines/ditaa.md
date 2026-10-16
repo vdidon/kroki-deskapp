@@ -1,8 +1,7 @@
 # Ditaa
 
 > ☕ **Requires a JRE/JDK on the machine.** Kroki Desk embeds the jar but shells out
-> to `java`; with no Java installed the block errors out (the app's message: "nécessite Java, qui n'a pas
-> été trouvé sur ce poste" — requires Java, which was not found on this machine). Check with `java -version` — `/v1/health` lists this type
+> to `java`; with no Java installed the block errors out ("requires Java, which was not found on this machine"). Check with `java -version` — `/v1/health` lists this type
 > even when Java is missing. Fallback without Java: `mermaid` or `d2`.
 
 **API ID**: `ditaa` | **Output**: SVG, PNG | **Best for**: Converting ASCII art into clean diagrams

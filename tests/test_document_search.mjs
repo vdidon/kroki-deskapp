@@ -168,7 +168,8 @@ try {
   check(".* : 3 codes trouvés", (await state()).count === "1/3", (await state()).count);
   await setQuery("a(");
   st = await state();
-  check("motif invalide : message d'erreur", st.count.includes("invalide"), st.count);
+  // Indépendant de la langue de l'interface : « invalide » (fr) ou « Invalid » (en).
+  check("motif invalide : message d'erreur", /invalid/i.test(st.count), st.count);
   check("motif invalide : champ en rouge", st.invalid === true);
   check("motif invalide : surlignage effacé", st.all === 0);
   await toggle("find", "regex");

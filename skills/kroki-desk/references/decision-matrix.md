@@ -144,7 +144,7 @@ Text-to-drawing engines.
 Not all engines support all output formats. SVG is universally supported. Check this table when a specific format is required.
 
 > ⚠ **Kroki Desk renders SVG only.** Its embedded pipeline produces SVG, and its local
-> API rejects any other format with `Seul le format svg est supporté`. The PNG/JPEG/PDF/TXT
+> API rejects any other format with `Only the svg format is supported`. The PNG/JPEG/PDF/TXT
 > columns below describe *upstream Kroki servers*, not the app. In Kroki Desk, ask for
 > a raster only through the app's own HTML export, or supply the file yourself.
 

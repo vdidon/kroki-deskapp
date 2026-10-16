@@ -48,7 +48,7 @@ pub async fn render(
         .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
     {
-        return Err(format!("Type de diagramme invalide : {dtype}"));
+        return Err(tr!("kroki.invalid_type", dtype = dtype));
     }
     let server = server.trim_end_matches('/');
 
@@ -70,11 +70,11 @@ pub async fn render(
         .await
         .map_err(|e| {
             if e.is_timeout() {
-                format!("Délai dépassé en contactant le serveur Kroki ({server})")
+                tr!("kroki.timeout", server = server)
             } else if e.is_connect() {
-                format!("Impossible de joindre le serveur Kroki ({server}) — vérifiez la connexion ou l'URL dans les réglages")
+                tr!("kroki.unreachable", server = server)
             } else {
-                format!("Erreur réseau Kroki : {e}")
+                tr!("kroki.network_error", error = e)
             }
         })?;
 
@@ -82,10 +82,14 @@ pub async fn render(
     let body = resp
         .text()
         .await
-        .map_err(|e| format!("Réponse Kroki illisible : {e}"))?;
+        .map_err(|e| tr!("kroki.unreadable_response", error = e))?;
 
     if !status.is_success() {
-        return Err(format!("Kroki a répondu {status} :\n{}", body.trim()));
+        return Err(tr!(
+            "kroki.http_status",
+            status = status,
+            body = body.trim()
+        ));
     }
     Ok(body)
 }

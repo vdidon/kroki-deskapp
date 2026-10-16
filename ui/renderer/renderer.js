@@ -7,8 +7,14 @@
 // n'attend pas le parse de ~6 Mo de JS, et un document n'amorce que les moteurs
 // qu'il utilise réellement.
 
+import { t, initI18n } from "./i18n.js";
+
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
+
+// Exposé au parseur erd (script classique, hors modules) : ses messages d'erreur
+// suivent la langue de l'interface comme ceux d'ici.
+window.rendererT = t;
 
 // ---------- chargement à la demande des vendors ----------
 // Injecte un <script> classique (non-module) et résout au chargement. Mémoïsé
@@ -21,7 +27,7 @@ function loadScript(src) {
       const s = document.createElement("script");
       s.src = src;
       s.onload = () => resolve();
-      s.onerror = () => reject(new Error(`chargement échoué : ${src}`));
+      s.onerror = () => reject(new Error(t("renderer.script_load_failed", { src })));
       document.head.appendChild(s);
     });
     SCRIPTS.set(src, p);
@@ -91,7 +97,7 @@ function parseJsonStrict(source, label) {
   try {
     return JSON.parse(source);
   } catch (e) {
-    throw new Error(`${label} : la source doit être du JSON valide — ${e.message}`);
+    throw new Error(t("renderer.json_invalid", { label, detail: e.message }));
   }
 }
 
@@ -109,7 +115,7 @@ async function renderWavedrom(source) {
     const render = wd.renderWaveForm || wd.RenderWaveForm;
     render.call(wd, idx, obj, "WaveDrom_Display_");
     const svg = el.querySelector("svg") || el.firstElementChild;
-    if (!svg) throw new Error("WaveDrom n'a rien produit");
+    if (!svg) throw new Error(t("renderer.wavedrom_empty"));
     return svg.outerHTML;
   } finally {
     el.remove();
@@ -123,7 +129,7 @@ async function renderBytefield(source) {
   await loadInOrder("./shim-pre.js", "./vendor/bytefield-svg.js", "./shim-post.js");
   const fn = window.__bytefield;
   if (typeof fn !== "function") {
-    throw new Error("bytefield-svg n'a pas pu être initialisé");
+    throw new Error(t("renderer.engine_init", { name: "bytefield-svg" }));
   }
   return fn(source);
 }
@@ -164,7 +170,7 @@ async function d2CompileRender(source, options) {
 async function renderDbml(source) {
   await loadScript("./vendor/dbml.js");
   if (typeof window.dbmlToDot !== "function") {
-    throw new Error("dbml-renderer n'a pas pu être initialisé");
+    throw new Error(t("renderer.engine_init", { name: "dbml-renderer" }));
   }
   const dot = window.dbmlToDot(source);
   return renderGraphviz(dot, { engine: "dot" });
@@ -174,7 +180,7 @@ async function renderDbml(source) {
 async function renderErd(source) {
   await loadScript("./erd.js");
   if (typeof window.erdToDot !== "function") {
-    throw new Error("le parseur erd n'a pas pu être initialisé");
+    throw new Error(t("renderer.erd_init"));
   }
   return renderGraphviz(window.erdToDot(source), { engine: "dot" });
 }
@@ -190,7 +196,7 @@ async function renderBpmn(source) {
   await loadScript("./vendor/bpmn-viewer.min.js");
   const Bpmn = window.BpmnJS;
   if (typeof Bpmn !== "function") {
-    throw new Error("bpmn-js n'a pas pu être initialisé");
+    throw new Error(t("renderer.engine_init", { name: "bpmn-js" }));
   }
   const container = document.createElement("div");
   container.style.cssText =
@@ -259,7 +265,7 @@ function fixExcalidrawFonts(svg) {
 async function renderExcalidraw(source) {
   const scene = parseJsonStrict(source, "Excalidraw");
   if (!scene || !Array.isArray(scene.elements)) {
-    throw new Error("Excalidraw : JSON de scène invalide (clé 'elements' attendue)");
+    throw new Error(t("renderer.excalidraw_invalid_scene"));
   }
   const { exportToSvg, restore } = await getExcalidraw();
   const data = restore(
@@ -296,14 +302,18 @@ const ENGINES = {
   bpmn: renderBpmn,
 };
 
+// Catalogue avant le premier job : les erreurs levées par les moteurs sont
+// traduites à la volée (`initI18n` n'échoue jamais — repli sur les clés).
+await initI18n();
+
 await listen("render-job", async (e) => {
   const { id, dtype, source, options } = e.payload;
   try {
     const engine = ENGINES[dtype];
-    if (!engine) throw new Error(`moteur inconnu : ${dtype}`);
+    if (!engine) throw new Error(t("renderer.unknown_engine", { type: dtype }));
     const svg = await engine(source, options || {});
     if (typeof svg !== "string" || !svg.includes("<svg")) {
-      throw new Error(`le moteur ${dtype} n'a pas produit de SVG`);
+      throw new Error(t("renderer.no_svg", { type: dtype }));
     }
     await invoke("render_job_done", { id, svg, error: null });
   } catch (err) {

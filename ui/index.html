@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en" data-i18n-pending>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -20,111 +20,115 @@
   <header id="tabbar">
     <!-- Avant #tabs dans le DOM : le float ne raccourcit que les lignes qui le suivent. -->
     <div id="tabbar-actions">
-      <button id="btn-open" title="Ouvrir un fichier (Ctrl+O)">
+      <button id="btn-open" title="Open a file (Ctrl+O)" data-i18n-title="toolbar.open">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.25a.25.25 0 0 0-.25-.25H8.06a1.75 1.75 0 0 1-1.237-.513L5.298 2.973a.25.25 0 0 0-.177-.073ZM0 2.75C0 1.784.784 1 1.75 1h3.371c.464 0 .91.184 1.238.513l1.525 1.514a.25.25 0 0 0 .176.073h6.19c.966 0 1.75.784 1.75 1.75v8.4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 13.25Z"/></svg>
       </button>
-      <button id="btn-save-session" title="Enregistrer la session (fenêtres et onglets ouverts → fichier .kdws)">
+      <button id="btn-save-session" title="Save session (open windows and tabs → .kdws file)"
+              data-i18n-title="toolbar.save_session">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M7.122.392a1.75 1.75 0 0 1 1.756 0l5.003 2.902c.83.481.83 1.68 0 2.162L8.878 8.358a1.75 1.75 0 0 1-1.756 0L2.119 5.456a1.251 1.251 0 0 1 0-2.162ZM8.125 1.69a.248.248 0 0 0-.25 0l-4.63 2.685 4.63 2.685a.248.248 0 0 0 .25 0l4.63-2.685ZM1.601 7.789a.75.75 0 0 1 1.025-.273l5.249 3.044a.248.248 0 0 0 .25 0l5.249-3.044a.75.75 0 0 1 .752 1.298l-5.248 3.044a1.75 1.75 0 0 1-1.756 0L1.874 8.814a.75.75 0 0 1-.273-1.025Zm0 3.5a.75.75 0 0 1 1.025-.273l5.249 3.044a.248.248 0 0 0 .25 0l5.249-3.044a.75.75 0 0 1 .752 1.298l-5.248 3.044a1.75 1.75 0 0 1-1.756 0l-5.248-3.044a.75.75 0 0 1-.273-1.025Z"/></svg>
       </button>
-      <button id="btn-search" title="Rechercher dans les documents ouverts (Ctrl+Maj+F)">
+      <button id="btn-search" title="Search in open documents (Ctrl+Shift+F)" data-i18n-title="toolbar.search">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/></svg>
       </button>
-      <button id="btn-refresh" title="Rafraîchir tous les onglets">
+      <button id="btn-refresh" title="Refresh all tabs" data-i18n-title="toolbar.refresh">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z"/></svg>
       </button>
-      <button id="btn-new-window" title="Nouvelle fenêtre (Ctrl+Maj+N)">
+      <button id="btn-new-window" title="New window (Ctrl+Shift+N)" data-i18n-title="toolbar.new_window">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M3.75 1h8.5A2.75 2.75 0 0 1 15 3.75v8.5A2.75 2.75 0 0 1 12.25 15h-8.5A2.75 2.75 0 0 1 1 12.25v-8.5A2.75 2.75 0 0 1 3.75 1Zm0 1.5c-.69 0-1.25.56-1.25 1.25v8.5c0 .69.56 1.25 1.25 1.25h8.5c.69 0 1.25-.56 1.25-1.25v-8.5c0-.69-.56-1.25-1.25-1.25ZM8 4.75c.414 0 .75.336.75.75v1.75H10.5a.75.75 0 0 1 0 1.5H8.75v1.75a.75.75 0 0 1-1.5 0V8.75H5.5a.75.75 0 0 1 0-1.5h1.75V5.5c0-.414.336-.75.75-.75Z"/></svg>
       </button>
-      <button id="btn-info" title="Informations">
+      <button id="btn-info" title="Information" data-i18n-title="toolbar.info">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
       </button>
-      <button id="btn-settings" title="Réglages">
+      <button id="btn-settings" title="Settings" data-i18n-title="toolbar.settings">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M8 0a8.2 8.2 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63.27.385.506.792.704 1.218.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294a6.214 6.214 0 0 1 0 .772c-.01.147.039.246.088.294l.814.806c.475.469.679 1.216.364 1.891a7.977 7.977 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a5.909 5.909 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8.006 8.006 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a5.738 5.738 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8.12 8.12 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6.214 6.214 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a7.92 7.92 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071.214-.143.437-.272.668-.386.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03 7.53.01 7.764 0 8 0Zm-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189-.173.086-.34.183-.5.29-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045-.22.312-.412.644-.573.99-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a4.709 4.709 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19.162.346.353.677.573.989.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27.161.107.328.204.501.29.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189.173-.086.34-.183.5-.29.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045.22-.313.411-.644.573-.99.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a4.709 4.709 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.464 6.464 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.44 4.44 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8Z"/></svg>
       </button>
     </div>
     <div id="tabs"></div>
   </header>
-  <div id="tab-menu" hidden role="menu" aria-label="Actions de l'onglet">
-    <button role="menuitem" data-action="copy-path">Copier le chemin</button>
-    <button role="menuitem" data-action="reveal">Afficher dans l'explorateur de fichiers</button>
+  <div id="tab-menu" hidden role="menu" aria-label="Tab actions" data-i18n-aria-label="tabs.menu_aria">
+    <button role="menuitem" data-action="copy-path" data-i18n="tabs.copy_path">Copy path</button>
+    <button role="menuitem" data-action="reveal" data-i18n="tabs.reveal">Show in file explorer</button>
     <hr role="separator">
-    <button role="menuitem" data-action="detach">Détacher dans une nouvelle fenêtre</button>
+    <button role="menuitem" data-action="detach" data-i18n="tabs.detach">Detach into a new window</button>
     <hr role="separator">
-    <button role="menuitem" data-action="left">Fermer les onglets à gauche</button>
-    <button role="menuitem" data-action="right">Fermer les onglets à droite</button>
-    <button role="menuitem" data-action="others">Fermer les autres onglets</button>
+    <button role="menuitem" data-action="left" data-i18n="tabs.close_left">Close tabs to the left</button>
+    <button role="menuitem" data-action="right" data-i18n="tabs.close_right">Close tabs to the right</button>
+    <button role="menuitem" data-action="others" data-i18n="tabs.close_others">Close other tabs</button>
   </div>
   <main id="content">
     <div id="view-actions" hidden>
-      <button id="btn-toc" type="button" aria-expanded="false" title="Sommaire">
+      <button id="btn-toc" type="button" aria-expanded="false" title="Table of contents"
+              data-i18n-title="toolbar.toc">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm3.75-1.5a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Zm0 5a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Zm0 5a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5ZM3 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm-1 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
       </button>
       <button id="btn-source-toggle" type="button" aria-pressed="false"
-              title="Afficher le code source (lecture seule)">
+              title="Show source code (read-only)">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M4.72 3.22a.75.75 0 0 1 1.06 1.06L2.06 8l3.72 3.72a.75.75 0 1 1-1.06 1.06L.47 8.53a.75.75 0 0 1 0-1.06Zm6.56 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 1 1-1.06-1.06L13.94 8l-3.72-3.72a.75.75 0 0 1 0-1.06Z"/></svg>
       </button>
       <button id="btn-derived" type="button" aria-pressed="false" hidden
-              title="Markdown intermédiaire du plugin (build debug)">
+              title="Plugin intermediate Markdown (debug build)" data-i18n-title="toolbar.derived">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor"
              stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 2C4.5 2 4.5 3.5 4.5 5S3 7 2.5 8c.5 1 2 1.5 2 3s0 3 1.5 3M10 2c1.5 0 1.5 1.5 1.5 3S13 7 13.5 8c-.5 1-2 1.5-2 3s0 3-1.5 3M8 6v4"/>
         </svg>
       </button>
       <button id="btn-fit-width" type="button" aria-pressed="false"
-              title="Étendre le contenu à toute la largeur">
+              title="Stretch content to full width">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor"
              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M2 3.5v9M14 3.5v9M5 5.5 2.5 8 5 10.5M11 5.5 13.5 8 11 10.5M3 8h10"/>
         </svg>
       </button>
       <button id="btn-export" type="button"
-              title="Exporter le rendu (page HTML autonome)">
+              title="Export the rendered view (standalone HTML page)" data-i18n-title="toolbar.export">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M2.75 14a.75.75 0 0 1 0-1.5h10.5a.75.75 0 0 1 0 1.5ZM7.25 7.689V1.75a.75.75 0 0 1 1.5 0v5.939l2.22-2.219a.749.749 0 1 1 1.06 1.06l-3.5 3.5a.749.749 0 0 1-1.06 0l-3.5-3.5a.749.749 0 1 1 1.06-1.06l2.22 2.219Z"/></svg>
       </button>
     </div>
-    <nav id="toc-panel" hidden aria-label="Sommaire"></nav>
-    <div id="search-panel" hidden aria-label="Recherche dans les documents ouverts">
+    <nav id="toc-panel" hidden aria-label="Table of contents" data-i18n-aria-label="toc.title"></nav>
+    <div id="search-panel" hidden aria-label="Search in open documents"
+         data-i18n-aria-label="searchpanel.aria_label">
       <div class="search-row">
         <div class="search-field">
           <input id="search-input" type="text" spellcheck="false" autocomplete="off"
-                 placeholder="Rechercher dans les onglets…" />
+                 placeholder="Search in tabs…" data-i18n-placeholder="searchpanel.placeholder" />
           <div class="search-opts" id="search-opts">
             <button type="button" data-opt="case" aria-pressed="false"
-                    title="Respecter la casse">Aa</button>
+                    title="Match case" data-i18n-title="searchpanel.opt_case">Aa</button>
             <button type="button" data-opt="word" aria-pressed="false"
-                    title="Mot entier"><span class="opt-word">ab</span></button>
+                    title="Whole word" data-i18n-title="searchpanel.opt_word"><span class="opt-word">ab</span></button>
             <button type="button" data-opt="regex" aria-pressed="false"
-                    title="Utiliser une expression régulière">.*</button>
+                    title="Use regular expression" data-i18n-title="searchpanel.opt_regex">.*</button>
           </div>
         </div>
         <button id="search-close" type="button" class="search-btn"
-                title="Fermer la recherche (Échap)"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg></button>
+                title="Close search (Esc)" data-i18n-title="searchpanel.close"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg></button>
       </div>
       <div id="search-status"></div>
       <div id="search-results"></div>
     </div>
     <!-- Recherche dans le document affiché (Ctrl+F, cf. js/docsearch.js) :
          remplace la barre de recherche native de la webview. -->
-    <div id="find-bar" hidden role="search" aria-label="Recherche dans le document">
+    <div id="find-bar" hidden role="search" aria-label="Search in document"
+         data-i18n-aria-label="findbar.aria_label">
       <div class="search-field">
         <input id="find-input" type="text" spellcheck="false" autocomplete="off"
-               placeholder="Rechercher" />
+               placeholder="Search" data-i18n-placeholder="findbar.placeholder" />
         <div class="search-opts" id="find-opts">
           <button type="button" data-opt="case" aria-pressed="false"
-                  title="Respecter la casse">Aa</button>
+                  title="Match case" data-i18n-title="searchpanel.opt_case">Aa</button>
           <button type="button" data-opt="word" aria-pressed="false"
-                  title="Mot entier"><span class="opt-word">ab</span></button>
+                  title="Whole word" data-i18n-title="searchpanel.opt_word"><span class="opt-word">ab</span></button>
           <button type="button" data-opt="regex" aria-pressed="false"
-                  title="Utiliser une expression régulière">.*</button>
+                  title="Use regular expression" data-i18n-title="searchpanel.opt_regex">.*</button>
         </div>
       </div>
       <div id="find-count" class="find-count"></div>
       <button id="find-prev" type="button" class="search-btn"
-              title="Occurrence précédente (Maj+Entrée)"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M3.22 10.53a.749.749 0 0 1 0-1.06l4.25-4.25a.749.749 0 0 1 1.06 0l4.25 4.25a.749.749 0 1 1-1.06 1.06L8 6.811 4.28 10.53a.749.749 0 0 1-1.06 0Z"/></svg></button>
+              title="Previous match (Shift+Enter)" data-i18n-title="findbar.prev"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M3.22 10.53a.749.749 0 0 1 0-1.06l4.25-4.25a.749.749 0 0 1 1.06 0l4.25 4.25a.749.749 0 1 1-1.06 1.06L8 6.811 4.28 10.53a.749.749 0 0 1-1.06 0Z"/></svg></button>
       <button id="find-next" type="button" class="search-btn"
-              title="Occurrence suivante (Entrée)"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.719a.749.749 0 0 1 1.06 0Z"/></svg></button>
+              title="Next match (Enter)" data-i18n-title="findbar.next"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.719a.749.749 0 0 1 1.06 0Z"/></svg></button>
       <button id="find-close" type="button" class="search-btn"
-              title="Fermer (Échap)"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg></button>
+              title="Close (Esc)" data-i18n-title="findbar.close"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg></button>
     </div>
     <div id="views"></div>
     <!-- Repères des occurrences de Ctrl+F sur la barre de défilement (cf.
@@ -132,43 +136,43 @@
     <div id="find-ruler" hidden aria-hidden="true"></div>
     <div id="empty-state">
       <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="6" cy="6" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="12" cy="18" r="2.6"/><path d="M8.4 6.8 15.6 6.8M7.2 8.2 10.9 15.9M16.8 8.2 13.1 15.9"/></svg>
-      <div class="empty-title">Glissez-déposez un fichier Markdown</div>
-      <div class="empty-hint">ou <button id="btn-open-empty" class="linklike">ouvrez un fichier</button></div>
+      <div class="empty-title" data-i18n="welcome.title">Drag and drop a Markdown file</div>
+      <div class="empty-hint" data-i18n-html="welcome.open_hint">or <button id="btn-open-empty" class="linklike">open a file</button></div>
       <!-- Aide-mémoire des raccourcis : le miroir de `initShortcuts` (js/main.js),
            du clic molette de js/tabs.js et de la molette Ctrl de #content.
            Tout raccourci ajouté là-bas se déclare ici. -->
       <div class="empty-shortcuts">
         <section>
-          <h3>Fichiers et fenêtres</h3>
+          <h3 data-i18n="welcome.section_files">Files and windows</h3>
           <dl>
-            <dt><kbd>Ctrl</kbd>+<kbd>O</kbd></dt><dd>Ouvrir un fichier</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>W</kbd></dt><dd>Fermer l'onglet, ou la fenêtre si vide</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>N</kbd></dt><dd>Nouvelle fenêtre</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>Tab</kbd></dt><dd>Onglet suivant</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>Tab</kbd></dt><dd>Onglet précédent</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>O</kbd></dt><dd data-i18n="shortcut.open">Open a file</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>W</kbd></dt><dd data-i18n="shortcut.close_tab">Close the tab, or the window if empty</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd>N</kbd></dt><dd data-i18n="shortcut.new_window">New window</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Tab</kbd></dt><dd data-i18n="shortcut.next_tab">Next tab</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd>Tab</kbd></dt><dd data-i18n="shortcut.prev_tab">Previous tab</dd>
           </dl>
         </section>
         <section>
-          <h3>Recherche</h3>
+          <h3 data-i18n="welcome.section_search">Search</h3>
           <dl>
-            <dt><kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd>Rechercher dans le document</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>F</kbd></dt><dd>Rechercher dans tous les onglets</dd>
-            <dt><kbd>F3</kbd> <kbd>Ctrl</kbd>+<kbd>G</kbd> <kbd>Entrée</kbd></dt><dd>Occurrence suivante</dd>
-            <dt><kbd>Maj</kbd>+<kbd>F3</kbd> <kbd>Maj</kbd>+<kbd>Entrée</kbd></dt><dd>Occurrence précédente</dd>
-            <dt><kbd>Échap</kbd></dt><dd>Fermer la recherche ou le sommaire</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd data-i18n="shortcut.find">Search in the document</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd>F</kbd></dt><dd data-i18n="shortcut.find_all">Search in all tabs</dd>
+            <dt><kbd>F3</kbd> <kbd>Ctrl</kbd>+<kbd>G</kbd> <kbd data-i18n="shortcut.key_enter">Enter</kbd></dt><dd data-i18n="shortcut.next_match">Next match</dd>
+            <dt><kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd>F3</kbd> <kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd data-i18n="shortcut.key_enter">Enter</kbd></dt><dd data-i18n="shortcut.prev_match">Previous match</dd>
+            <dt><kbd data-i18n="shortcut.key_esc">Esc</kbd></dt><dd data-i18n="shortcut.close_search">Close the search or the table of contents</dd>
           </dl>
         </section>
         <section>
-          <h3>Affichage</h3>
+          <h3 data-i18n="welcome.section_view">View</h3>
           <dl>
-            <dt><kbd>Ctrl</kbd>+<kbd>+</kbd></dt><dd>Zoom avant</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>-</kbd></dt><dd>Zoom arrière</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>0</kbd></dt><dd>Taille normale</dd>
-            <dt><kbd>F5</kbd> <kbd>Ctrl</kbd>+<kbd>R</kbd></dt><dd>Recharger le document</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>+</kbd></dt><dd data-i18n="shortcut.zoom_in">Zoom in</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>-</kbd></dt><dd data-i18n="shortcut.zoom_out">Zoom out</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>0</kbd></dt><dd data-i18n="shortcut.zoom_reset">Actual size</dd>
+            <dt><kbd>F5</kbd> <kbd>Ctrl</kbd>+<kbd>R</kbd></dt><dd data-i18n="shortcut.reload">Reload the document</dd>
           </dl>
         </section>
       </div>
-      <div class="empty-mouse">Souris : <kbd>Ctrl</kbd>+molette pour zoomer · clic molette sur un onglet pour le fermer · glisser un onglet hors de la barre pour le détacher</div>
+      <div class="empty-mouse" data-i18n-html="welcome.mouse">Mouse: <kbd>Ctrl</kbd>+wheel to zoom · middle-click a tab to close it · drag a tab out of the bar to detach it</div>
     </div>
     <!-- Voile de chargement (cf. js/loading.js) : posé au-delà de 180 ms de
          rendu. Le spinner s'anime en `transform`, seule propriété que le
@@ -176,110 +180,115 @@
     <div id="loading-overlay" hidden role="status" aria-live="polite">
       <div class="loading-box">
         <div class="loading-spinner" aria-hidden="true"></div>
-        <div class="loading-label">Rendu du document…</div>
+        <div class="loading-label" data-i18n="loading.rendering">Rendering document…</div>
       </div>
     </div>
   </main>
-  <div id="drop-overlay" hidden><div class="drop-label">Déposer pour ouvrir</div></div>
+  <div id="drop-overlay" hidden><div class="drop-label" data-i18n="drop.label">Drop to open</div></div>
   <div id="toast" hidden></div>
   <div id="drag-hint" hidden></div>
   <dialog id="settings-dialog">
     <form method="dialog" id="settings-form">
-      <h2>Réglages</h2>
-      <label for="theme-select">Thème</label>
+      <h2 data-i18n="settings.title">Settings</h2>
+      <label for="theme-select" data-i18n="settings.theme.label">Theme</label>
       <select id="theme-select">
-        <option value="auto">Automatique (suivre le système)</option>
-        <option value="light">Clair</option>
-        <option value="dark">Sombre</option>
+        <option value="auto" data-i18n="settings.theme.auto">Automatic (follow the system)</option>
+        <option value="light" data-i18n="settings.theme.light">Light</option>
+        <option value="dark" data-i18n="settings.theme.dark">Dark</option>
       </select>
-      <p class="settings-hint">Force le thème clair ou sombre, ou suit le réglage du système.</p>
-      <label>Icônes affichées</label>
+      <p class="settings-hint" data-i18n="settings.theme.hint">Force the light or dark theme, or follow the system setting.</p>
+      <label for="language-select" data-i18n="settings.language.label">Language</label>
+      <select id="language-select">
+        <option value="auto" data-i18n="settings.language.auto">Automatic (system language)</option>
+      </select>
+      <p class="settings-hint" data-i18n="settings.language.hint">Language of the interface. Automatic follows the language of the operating system.</p>
+      <label data-i18n="settings.icons.label">Displayed icons</label>
       <div id="icons-config"></div>
-      <p class="settings-hint">
-        Réglage commun à toutes les fenêtres. Chaque icône garde son
-        comportement par défaut tant que vous n'y touchez pas ; seuls vos choix
-        explicites sont enregistrés.
+      <p class="settings-hint" data-i18n="settings.icons.hint">
+        Setting shared by all windows. Each icon keeps its default behavior until
+        you touch it; only your explicit choices are saved.
       </p>
-      <label for="kroki-url">Serveur Kroki externe (optionnel)</label>
-      <input id="kroki-url" type="text" spellcheck="false" placeholder="Vide = rendu intégré (recommandé)" />
+      <label for="kroki-url" data-i18n="settings.server.label">External Kroki server (optional)</label>
+      <input id="kroki-url" type="text" spellcheck="false" placeholder="Empty = built-in rendering (recommended)" data-i18n-placeholder="settings.server.placeholder" />
       <p class="settings-hint" id="supported-hint"></p>
       <div class="settings-row">
-        <label class="settings-checkbox"><input type="checkbox" id="server-enabled" /> API Kroki locale</label>
-        <label for="server-port" class="settings-inline-label">port</label>
+        <label class="settings-checkbox"><input type="checkbox" id="server-enabled" /> <span data-i18n="settings.api.label">Local Kroki API</span></label>
+        <label for="server-port" class="settings-inline-label" data-i18n="settings.api.port">port</label>
         <input id="server-port" type="number" min="1024" max="65535" />
       </div>
       <p class="settings-hint" id="server-hint"></p>
-      <label>Plugins</label>
-      <button type="button" id="settings-plugins" class="secondary settings-plugins">Gérer les plugins…</button>
-      <p class="settings-hint">
-        Formats de fichiers, blocs de diagrammes et colorations supplémentaires
-        (archives <code>.kdext</code>).
+      <label data-i18n="settings.plugins.label">Plugins</label>
+      <button type="button" id="settings-plugins" class="secondary settings-plugins" data-i18n="settings.plugins.manage">Manage plugins…</button>
+      <p class="settings-hint" data-i18n-html="settings.plugins.hint">
+        Additional file formats, diagram blocks and syntax highlighting
+        (<code>.kdext</code> archives).
       </p>
       <p id="settings-error" class="settings-error" hidden></p>
       <div class="settings-actions">
-        <button type="button" id="settings-reset" class="secondary">Réinitialiser</button>
+        <button type="button" id="settings-reset" class="secondary" data-i18n="common.reset">Reset</button>
         <span class="spacer"></span>
-        <button type="button" id="settings-cancel" class="secondary">Annuler</button>
-        <button type="submit" id="settings-save" class="primary">Enregistrer</button>
+        <button type="button" id="settings-cancel" class="secondary" data-i18n="common.cancel">Cancel</button>
+        <button type="submit" id="settings-save" class="primary" data-i18n="common.save">Save</button>
       </div>
     </form>
   </dialog>
   <dialog id="changelog-dialog">
-    <h2 id="changelog-title">Nouveautés</h2>
+    <!-- Titre et indication pilotés par changelog.js (le dialog sert aussi aux plugins). -->
+    <h2 id="changelog-title">What's new</h2>
     <p class="settings-hint" id="changelog-hint">
-      Journal des modifications de Kroki Desk, de la plus récente à la plus
-      ancienne.
+      Kroki Desk changelog, from the most recent to the oldest.
     </p>
     <div id="changelog-body" class="markdown-body"></div>
     <div class="settings-actions">
       <span class="spacer"></span>
-      <button type="button" id="changelog-close" class="primary">Fermer</button>
+      <button type="button" id="changelog-close" class="primary" data-i18n="common.close">Close</button>
     </div>
   </dialog>
   <dialog id="plugins-dialog">
-    <h2>Plugins</h2>
-    <p class="settings-hint">
-      Formats de fichiers, blocs de diagrammes et colorations supplémentaires
-      (protocole v1). Un plugin s'installe en déposant son archive
-      <code>.kdext</code> sur la fenêtre, ou via le bouton ci-dessous.
+    <h2 data-i18n="plugins.title">Plugins</h2>
+    <p class="settings-hint" data-i18n-html="plugins.hint">
+      Additional file formats, diagram blocks and syntax highlighting
+      (protocol v1). A plugin is installed by dropping its
+      <code>.kdext</code> archive onto the window, or with the button below.
     </p>
     <div id="plugins-list"></div>
-    <button type="button" id="plugin-add" class="plugins-add">Ajouter un plugin…</button>
+    <button type="button" id="plugin-add" class="plugins-add" data-i18n="plugins.add">Add a plugin…</button>
     <div class="settings-actions">
-      <button type="button" id="plugins-open-dir" class="secondary" title="Ouvrir le dossier des plugins dans le gestionnaire de fichiers">Ouvrir le dossier</button>
+      <button type="button" id="plugins-open-dir" class="secondary" title="Open the plugins folder in the file manager" data-i18n="plugins.open_dir" data-i18n-title="plugins.open_dir_title">Open folder</button>
       <span class="spacer"></span>
-      <button type="button" id="plugins-close" class="secondary">Fermer</button>
+      <button type="button" id="plugins-close" class="secondary" data-i18n="common.close">Close</button>
     </div>
   </dialog>
   <dialog id="plugin-trust-dialog">
-    <h2 id="plugin-trust-title">Installer un plugin</h2>
+    <!-- Titre piloté par plugins_ui.js (installation, mise à jour ou refus). -->
+    <h2 id="plugin-trust-title">Install a plugin</h2>
     <div id="plugin-trust-body"></div>
     <p id="plugin-trust-error" class="settings-error" hidden></p>
     <div class="settings-actions">
       <span class="spacer"></span>
-      <button type="button" id="plugin-trust-cancel" class="secondary">Annuler</button>
-      <button type="button" id="plugin-trust-install" class="primary">Installer</button>
+      <button type="button" id="plugin-trust-cancel" class="secondary" data-i18n="common.cancel">Cancel</button>
+      <button type="button" id="plugin-trust-install" class="primary" data-i18n="trust.install">Install</button>
     </div>
   </dialog>
   <dialog id="info-dialog">
-    <h2>Informations</h2>
+    <h2 data-i18n="info.title">Information</h2>
     <p class="settings-hint" id="info-version"></p>
-    <h3 class="info-subtitle">Runtimes &amp; moteurs</h3>
-    <p class="settings-hint">
-      Tous les moteurs sont embarqués dans l'exécutable. Certains exigent un
-      prérequis du système (Java, distribution TeX) ou ne sont disponibles qu'avec un serveur Kroki
-      externe.
+    <h3 class="info-subtitle" data-i18n="info.engines.title">Runtimes &amp; engines</h3>
+    <p class="settings-hint" data-i18n="info.engines.hint">
+      All engines are embedded in the executable. Some require a system
+      prerequisite (Java, TeX distribution) or are only available with an external Kroki
+      server.
     </p>
     <div id="info-legend">
-      <span class="rt-legend"><span class="rt-dot ok"></span>Supporté par l'app et le système</span>
-      <span class="rt-legend"><span class="rt-dot blocked"></span>Supporté par l'app, prérequis système manquant</span>
-      <span class="rt-legend"><span class="rt-dot unsupported"></span>Non supporté par l'application</span>
+      <span class="rt-legend"><span class="rt-dot ok"></span><span data-i18n="info.legend.ok">Supported by the app and the system</span></span>
+      <span class="rt-legend"><span class="rt-dot blocked"></span><span data-i18n="info.legend.blocked">Supported by the app, system prerequisite missing</span></span>
+      <span class="rt-legend"><span class="rt-dot unsupported"></span><span data-i18n="info.legend.unsupported">Not supported by the application</span></span>
     </div>
     <div id="info-groups"></div>
     <div class="settings-actions">
-      <button type="button" id="info-changelog" class="secondary" title="Journal des modifications de l'application">Nouveautés</button>
+      <button type="button" id="info-changelog" class="secondary" title="Application changelog" data-i18n="changelog.title" data-i18n-title="info.changelog_title">What's new</button>
       <span class="spacer"></span>
-      <button type="button" id="info-close" class="primary">Fermer</button>
+      <button type="button" id="info-close" class="primary" data-i18n="common.close">Close</button>
     </div>
   </dialog>
 </body>

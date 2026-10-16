@@ -5,6 +5,19 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.25.0] — 2026-10-16
+
+### Added
+- **English and French interface.** Kroki Desk follows the language of the
+  operating system — French on a French Windows or Linux desktop, English
+  otherwise — and Settings → Language lets you pick one explicitly. The change
+  applies at once to every open window, error messages included.
+
+### Changed
+- The local Kroki API and the command-line output answer in English whatever
+  the interface language, so that the tools reading them behave the same on
+  every machine.
+
 ## [3.24.0] — 2026-10-16
 
 ### Added
@@ -858,6 +871,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
+[3.25.0]: #3250--2026-10-16
 [3.24.0]: #3240--2026-10-16
 [3.23.1]: #3231--2026-10-14
 [3.23.0]: #3230--2026-10-12

@@ -24,6 +24,8 @@
 //    `css/app.css`), sans quoi le spinner se figerait exactement quand il doit
 //    rassurer.
 
+import { t } from "./i18n.js";
+
 const DELAY_MS = 180;
 
 // Taille de markdown au-delà de laquelle un rendu **synchrone** est réputé
@@ -47,7 +49,7 @@ let depth = 0; // rendus imbriqués (renderActive appelé pendant une bascule)
  * dure plus de `DELAY_MS`. À apparier systématiquement avec `endLoading`
  * dans un `finally` : un rendu qui échoue ne doit pas laisser le voile posé.
  */
-export function beginLoading(label = "Rendu du document…") {
+export function beginLoading(label = t("loading.rendering")) {
   depth += 1;
   if (!overlay || timer !== null || !overlay.hidden) return; // déjà armé ou visible
   timer = setTimeout(() => {

@@ -1,6 +1,6 @@
 [package]
 name = "kroki_deskapp"
-version = "3.24.0"
+version = "3.25.0"
 description = "Visionneuse Markdown avec rendu de diagrammes Kroki"
 edition = "2021"
 
@@ -17,6 +17,8 @@ reqwest = "0.13.4"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 svgbob = "0.7.6"
+# Langue d'interface du système (réglage « Langue » en automatique, i18n.rs).
+sys-locale = "0.3"
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"

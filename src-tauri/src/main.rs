@@ -2,6 +2,9 @@
 // fonctionnent sans fenêtre de terminal).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+// En tête : `tr!` (macro textuelle) doit être définie avant les modules qui l'emploient.
+#[macro_use]
+mod i18n;
 mod commands;
 #[cfg(windows)]
 mod drop_target;
@@ -37,7 +40,7 @@ fn detach_if_requested() {
     let exe = match std::env::current_exe() {
         Ok(exe) => exe,
         Err(e) => {
-            eprintln!("[cli] --detach : exécutable introuvable ({e}), lancement au premier plan");
+            eprintln!("[cli] --detach: executable not found ({e}), running in the foreground");
             return;
         }
     };
@@ -77,7 +80,7 @@ fn detach_if_requested() {
     match spawned {
         Ok(_) => std::process::exit(0),
         Err(e) => {
-            eprintln!("[cli] --detach : relance impossible ({e}), lancement au premier plan")
+            eprintln!("[cli] --detach: relaunch failed ({e}), running in the foreground")
         }
     }
 }
@@ -131,6 +134,7 @@ fn main() {
             commands::get_changelog,
             commands::get_theme,
             commands::get_icons,
+            commands::get_i18n,
             commands::set_settings,
             commands::open_link,
             commands::take_pending_anchors,
@@ -154,6 +158,9 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
             commands::load_settings(&handle);
+            // Langue avant tout message : seeding, scan et fenêtres en émettent.
+            let language = handle.state::<state::SettingsState>().0.lock().unwrap().language.clone();
+            i18n::set_language(&language);
             // Plugins livrés avec l'installeur : installés/mis à jour avant le
             // scan, pour que le registre parte de l'état final. Lit
             // `removed_plugins` des réglages — donc après `load_settings`.
@@ -209,5 +216,5 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("erreur au lancement de l'application");
+        .expect("error while running the application");
 }

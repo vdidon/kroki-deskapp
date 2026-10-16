@@ -77,6 +77,9 @@ pub struct SettingsData {
     pub server_port: u16,
     /// Thème de l'interface : `"auto"` (suit le système), `"light"` ou `"dark"`.
     pub theme: String,
+    /// Langue de l'interface : `"auto"` (suit le système) ou un code livré
+    /// (`"en"`, `"fr"`), résolu par `i18n::resolve`.
+    pub language: String,
     /// Visibilité des icônes des barres d'outils, **volontairement partielle** :
     /// seules les icônes que l'utilisateur a explicitement cochées ou décochées y
     /// figurent. Une icône absente suit le défaut du registre frontend
@@ -100,6 +103,7 @@ impl Default for SettingsData {
             server_enabled: true,
             server_port: 8442,
             theme: "auto".to_string(),
+            language: "auto".to_string(),
             icons: BTreeMap::new(),
             removed_plugins: Vec::new(),
         }

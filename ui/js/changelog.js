@@ -7,6 +7,7 @@
 // même dialog, en-tête ajusté.
 
 import { invoke } from "./app.js";
+import { onLocaleChange, t } from "./i18n.js";
 
 const dialog = document.getElementById("changelog-dialog");
 const title = document.getElementById("changelog-title");
@@ -15,14 +16,26 @@ const body = document.getElementById("changelog-body");
 
 const md = window.markdownit({ linkify: true });
 
-const APP_HINT =
-  "Journal des modifications de Kroki Desk, de la plus récente à la plus ancienne.";
-
 // Clé de la source actuellement rendue dans le corps ("app" ou
 // "plugin:<id>") : le changelog de l'app est figé à la compilation, ceux des
 // plugins peuvent changer à chaque installation — on ne cache que le dernier
 // rendu, suffisant pour les réouvertures successives du même contenu.
 let shownKey = null;
+
+// Source dont l'en-tête (titre + indication) est affiché : `null` pour
+// l'application, l'entrée `list_plugins` pour un plugin. Le titre et
+// l'indication sont dans la langue courante, refaits si elle change.
+let headerPlugin = null;
+
+function setHeader() {
+  if (headerPlugin) {
+    title.textContent = t("changelog.plugin_title", { name: headerPlugin.name || headerPlugin.id });
+    hint.textContent = t("changelog.plugin_hint", { id: headerPlugin.id });
+  } else {
+    title.textContent = t("changelog.title");
+    hint.textContent = t("changelog.hint");
+  }
+}
 
 // Prépare le markdown de l'application : le titre et le préambule (déjà
 // portés par l'en-tête du dialog) sont coupés — la liste démarre à la
@@ -73,8 +86,8 @@ export async function openChangelog() {
       shownKey = null;
     }
   }
-  title.textContent = "Nouveautés";
-  hint.textContent = APP_HINT;
+  headerPlugin = null;
+  setHeader();
   show();
 }
 
@@ -90,12 +103,13 @@ export async function openPluginChangelog(p) {
       shownKey = null;
     }
   }
-  title.textContent = `Nouveautés — ${p.name || p.id}`;
-  hint.textContent = `Journal des modifications du plugin ${p.id}, fourni par son éditeur.`;
+  headerPlugin = p;
+  setHeader();
   show();
 }
 
 export function initChangelog() {
+  onLocaleChange(setHeader);
   document.getElementById("changelog-close").addEventListener("click", () => dialog.close());
   // Liens éventuels du corps (URL citées dans une entrée) : navigateur système
   // via le backend, jamais de navigation de la webview elle-même.

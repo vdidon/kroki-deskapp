@@ -22,6 +22,7 @@
 // saisissable au travers.
 
 import { state } from "./app.js";
+import { t, onLocaleChange } from "./i18n.js";
 import { collectMatchRanges } from "./textmatch.js";
 import { buildMatcher, initSearchToggles } from "./searchopts.js";
 
@@ -88,6 +89,11 @@ function paint() {
   } else {
     window.CSS.highlights.delete(CURRENT_NAME);
   }
+}
+
+// « 3/12 » : rang de l'occurrence courante sur le total.
+function counter() {
+  return t("docsearch.counter", { current: current + 1, total: matches.length });
 }
 
 function setStatus(text, error = false) {
@@ -222,7 +228,7 @@ function run({ keepIndex = false, reveal = true, anchor = null } = {}) {
   }
   if (!v) {
     clearHighlights();
-    setStatus(state.active == null ? "Aucun document" : "Indisponible dans une page HTML");
+    setStatus(state.active == null ? t("docsearch.no_document") : t("docsearch.unavailable_html"));
     updateNav();
     return;
   }
@@ -231,7 +237,7 @@ function run({ keepIndex = false, reveal = true, anchor = null } = {}) {
     re = buildMatcher(query, opts);
   } catch {
     clearHighlights();
-    setStatus("Expression régulière invalide", true);
+    setStatus(t("searchopts.invalid_regex"), true);
     updateNav();
     return;
   }
@@ -241,7 +247,7 @@ function run({ keepIndex = false, reveal = true, anchor = null } = {}) {
   remember();
   watchRuler();
   paint();
-  setStatus(matches.length ? `${current + 1}/${matches.length}` : "Aucun résultat");
+  setStatus(matches.length ? counter() : t("docsearch.no_result"));
   updateNav();
   if (reveal && matches.length) revealCurrent(v.el);
 }
@@ -261,7 +267,7 @@ function step(dir) {
   remember();
   paint();
   scheduleRuler();
-  setStatus(`${current + 1}/${matches.length}`);
+  setStatus(counter());
   const v = searchableView();
   if (v) revealCurrent(v.el);
 }
@@ -348,6 +354,9 @@ export function initDocSearch({ beforeOpen } = {}) {
   prevBtn.addEventListener("click", () => step(-1));
   nextBtn.addEventListener("click", () => step(1));
   closeBtn.addEventListener("click", closeDocSearch);
+  // Le statut affiché (« Aucun résultat »…) suit la langue : on relance la
+  // recherche sur la même occurrence plutôt que de mémoriser un message figé.
+  onLocaleChange(() => refreshDocSearch());
   // Accordéon ouvert ou fermé dans la vue : l'ensemble cherchable a changé.
   // `toggle` ne remonte pas, d'où la capture ; regroupé par frame, plusieurs
   // `<details>` pouvant basculer d'un coup.

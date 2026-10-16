@@ -10,49 +10,78 @@
 // d'actions de vue dépendent en plus du document affiché (cf.
 // `updateViewActions` dans main.js), qui interroge `iconEnabled`.
 
-const LOCKED_HINT = "Toujours visible : seul point d'accès à ces réglages";
+import { t } from "./i18n.js";
 
+// Libellés, indications et titres de groupe sont des fonctions : résolus au
+// moment d'afficher (dialog Réglages, reconstruit à chaque changement de
+// langue), jamais figés à l'import. `locked` : indication commune
+// (`icons.locked_hint`, ajoutée par settings.js).
 export const ICON_GROUPS = [
   {
-    title: "Barre de la fenêtre",
+    title: () => t("icons.group.window"),
     // Le conteneur dont les boutons sont pilotés directement par applyIcons.
     container: "tabbar-actions",
     items: [
-      { id: "btn-open", label: "Ouvrir", hint: "Ouvrir un fichier (Ctrl+O)", def: true },
+      {
+        id: "btn-open",
+        label: () => t("icons.open.label"),
+        hint: () => t("icons.open.hint"),
+        def: true,
+      },
       {
         id: "btn-save-session",
-        label: "Session",
-        hint: "Enregistrer la session (fenêtres et onglets ouverts → .kdws)",
+        label: () => t("icons.session.label"),
+        hint: () => t("icons.session.hint"),
         def: true,
       },
       {
         id: "btn-search",
-        label: "Recherche",
-        hint: "Rechercher dans les documents ouverts (Ctrl+Maj+F)",
+        label: () => t("icons.search.label"),
+        hint: () => t("icons.search.hint"),
         def: true,
       },
-      { id: "btn-refresh", label: "Rafraîchir", hint: "Rafraîchir tous les onglets", def: true },
-      { id: "btn-new-window", label: "Nouvelle fenêtre", hint: "Ctrl+Maj+N", def: true },
-      { id: "btn-info", label: "Informations", def: true },
-      { id: "btn-settings", label: "Réglages", def: true, locked: LOCKED_HINT },
+      {
+        id: "btn-refresh",
+        label: () => t("icons.refresh.label"),
+        hint: () => t("icons.refresh.hint"),
+        def: true,
+      },
+      {
+        id: "btn-new-window",
+        label: () => t("icons.new_window.label"),
+        hint: () => t("icons.new_window.hint"),
+        def: true,
+      },
+      { id: "btn-info", label: () => t("icons.info.label"), def: true },
+      { id: "btn-settings", label: () => t("icons.settings.label"), def: true, locked: true },
     ],
   },
   {
-    title: "Actions du document",
+    title: () => t("icons.group.document"),
     // Pile flottante : la visibilité finale se décide dans updateViewActions
     // (un bouton activé reste caché si le document ne s'y prête pas).
     container: null,
     items: [
-      { id: "btn-toc", label: "Sommaire", def: true },
-      { id: "btn-source-toggle", label: "Code source", hint: "Afficher le source du document", def: true },
+      { id: "btn-toc", label: () => t("icons.toc.label"), def: true },
+      {
+        id: "btn-source-toggle",
+        label: () => t("icons.source.label"),
+        hint: () => t("icons.source.hint"),
+        def: true,
+      },
       {
         id: "btn-derived",
-        label: "Markdown intermédiaire",
-        hint: "Markdown généré par un plugin de document (.tex…) — outil de mise au point, n'apparaît que sur ces documents",
+        label: () => t("icons.derived.label"),
+        hint: () => t("icons.derived.hint"),
         def: false,
       },
-      { id: "btn-fit-width", label: "Pleine largeur", def: true },
-      { id: "btn-export", label: "Export", hint: "Exporter le rendu (page HTML autonome)", def: true },
+      { id: "btn-fit-width", label: () => t("icons.fit_width.label"), def: true },
+      {
+        id: "btn-export",
+        label: () => t("icons.export.label"),
+        hint: () => t("icons.export.hint"),
+        def: true,
+      },
     ],
   },
 ];

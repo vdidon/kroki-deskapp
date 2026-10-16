@@ -2249,7 +2249,7 @@ dependencies = [
 
 [[package]]
 name = "kroki_deskapp"
-version = "3.24.0"
+version = "3.25.0"
 dependencies = [
  "base64 0.22.1",
  "dunce",
@@ -2260,6 +2260,7 @@ dependencies = [
  "serde",
  "serde_json",
  "svgbob",
+ "sys-locale",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -4337,6 +4338,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "sys-locale"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eab9a99a024a169fe8a903cf9d4a3b3601109bcc13bd9e3c6fff259138626c4"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

@@ -12,6 +12,7 @@ import { invoke, listen, escapeHtml } from "./app.js";
 import { allPlugins, pluginRuntimeState } from "./plugins.js";
 import { openPluginChangelog } from "./changelog.js";
 import { isNativeFence } from "./render.js";
+import { onLocaleChange, t } from "./i18n.js";
 
 const dialog = document.getElementById("plugins-dialog");
 const listEl = document.getElementById("plugins-list");
@@ -21,24 +22,26 @@ const trustBody = document.getElementById("plugin-trust-body");
 const trustError = document.getElementById("plugin-trust-error");
 const trustInstall = document.getElementById("plugin-trust-install");
 
-// Capacités du manifeste « en clair » pour le dialog de confiance (§9.2).
+// Capacités du manifeste « en clair » pour le dialog de confiance (§9.2) :
+// des fonctions, résolues à l'affichage dans la langue courante.
 const CAP_LABELS = {
-  "document:markdown": "transformer ses types de fichiers en markdown",
-  "document:html": "produire une mise en page HTML (réservé, non servi)",
-  "document:webview": "fournir une vue interactive (réservé, non servi)",
-  "fence:svg": "rendre des blocs de code en SVG",
-  "fence:html": "rendre des blocs de code en HTML (sanitizé)",
-  "fence:markdown": "rendre des blocs de code en markdown (pipeline complet)",
-  "fence:webview": "rendre des blocs interactifs (réservé, non servi)",
-  "highlight:code": "colorer des blocs de code",
-  "read:siblings": "lire des fichiers voisins des documents ouverts",
+  "document:markdown": () => t("trust.cap.document_markdown"),
+  "document:html": () => t("trust.cap.document_html"),
+  "document:webview": () => t("trust.cap.document_webview"),
+  "fence:svg": () => t("trust.cap.fence_svg"),
+  "fence:html": () => t("trust.cap.fence_html"),
+  "fence:markdown": () => t("trust.cap.fence_markdown"),
+  "fence:webview": () => t("trust.cap.fence_webview"),
+  "highlight:code": () => t("trust.cap.highlight_code"),
+  "read:siblings": () => t("trust.cap.read_siblings"),
 };
 
+// statut -> [classe du badge, libellé]
 const STATUS_LABELS = {
-  ok: ["ok", "Actif"],
-  inert: ["blocked", "Inerte"],
-  invalid: ["unsupported", "Invalide"],
-  broken: ["unsupported", "En panne"],
+  ok: ["ok", () => t("plugins.status.ok")],
+  inert: ["blocked", () => t("plugins.status.inert")],
+  invalid: ["unsupported", () => t("plugins.status.invalid")],
+  broken: ["unsupported", () => t("plugins.status.broken")],
 };
 
 function chip(text) {
@@ -53,11 +56,11 @@ function chip(text) {
 function nativeClaimWarnings(p) {
   const out = [];
   for (const f of p.fences || []) {
-    if (isNativeFence(f)) out.push(`la fence ${f} est gérée nativement — revendication ignorée`);
+    if (isNativeFence(f)) out.push(t("plugins.native_fence", { name: f }));
   }
   for (const h of p.highlights || []) {
     if (window.hljs.getLanguage(h)) {
-      out.push(`la coloration ${h} est gérée nativement — revendication ignorée`);
+      out.push(t("plugins.native_highlight", { name: h }));
     }
   }
   return out;
@@ -87,7 +90,7 @@ function renderCard(p) {
   titles.append(name, publisher);
   const badge = document.createElement("span");
   badge.className = `rt-badge ${badgeClass}`;
-  badge.textContent = badgeLabel;
+  badge.textContent = badgeLabel();
   head.append(titles, badge);
   card.append(head);
 
@@ -110,7 +113,7 @@ function renderCard(p) {
   claims.className = "rt-types";
   for (const e of p.extensions || []) claims.append(chip(`.${e}`));
   for (const f of p.fences || []) claims.append(chip(`\`\`\`${f}`));
-  for (const h of p.highlights || []) claims.append(chip(`coloration ${h}`));
+  for (const h of p.highlights || []) claims.append(chip(t("plugins.claim_highlight", { name: h })));
   if (claims.childElementCount) card.append(claims);
 
   for (const w of [...(p.warnings || []), ...nativeClaimWarnings(p)]) {
@@ -130,18 +133,18 @@ function renderCard(p) {
     const news = document.createElement("button");
     news.type = "button";
     news.className = "plugin-changelog";
-    news.textContent = "Nouveautés";
+    news.textContent = t("changelog.title");
     news.addEventListener("click", () => openPluginChangelog(p));
     actions.append(news);
   }
   const del = document.createElement("button");
   del.type = "button";
   del.className = "plugin-delete";
-  del.textContent = "Supprimer";
+  del.textContent = t("plugins.delete");
   del.addEventListener("click", async () => {
     if (!del.dataset.armed) {
       del.dataset.armed = "1";
-      del.textContent = "Confirmer la suppression ?";
+      del.textContent = t("plugins.delete_confirm");
       del.classList.add("armed");
       return;
     }
@@ -153,7 +156,7 @@ function renderCard(p) {
       del.disabled = false;
       delete del.dataset.armed;
       del.classList.remove("armed");
-      del.textContent = "Supprimer";
+      del.textContent = t("plugins.delete");
       alertError(card, err);
     }
   });
@@ -175,8 +178,7 @@ function renderList() {
   if (!plugins.length) {
     const empty = document.createElement("p");
     empty.className = "settings-hint plugins-empty";
-    empty.textContent =
-      "Aucun plugin installé. Déposez une archive .kdext sur la fenêtre ou utilisez le bouton ci-dessous.";
+    empty.textContent = t("plugins.empty");
     listEl.append(empty);
     return;
   }
@@ -187,6 +189,11 @@ export function openPlugins() {
   renderList();
   dialog.showModal();
 }
+
+// Cartes écrites par le JS : refaites si la langue change, dialog ouvert.
+onLocaleChange(() => {
+  if (dialog.open) renderList();
+});
 
 // --------------------------------------------------------------------------- //
 // Dialog de confiance (§9.2) — obligatoire, y compris en mise à jour
@@ -212,7 +219,7 @@ export async function requestPluginInstall(path) {
   try {
     preview = await invoke("plugin_manifest_preview", { path });
   } catch (err) {
-    trustTitle.textContent = "Archive de plugin refusée";
+    trustTitle.textContent = t("trust.title_refused");
     trustBody.innerHTML = `<p class="settings-error">${escapeHtml(String(err))}</p>`;
     trustInstall.disabled = true;
     trustDialog.showModal();
@@ -220,33 +227,31 @@ export async function requestPluginInstall(path) {
   }
 
   const update = preview.installedVersion != null;
-  trustTitle.textContent = update ? "Mettre à jour un plugin" : "Installer un plugin";
+  trustTitle.textContent = update ? t("trust.title_update") : t("trust.title_install");
   const rows = [
-    trustRow("Nom", `${preview.name} (${preview.id})`),
-    trustRow("Éditeur", preview.publisher || "(non renseigné)"),
+    trustRow(t("trust.row.name"), `${preview.name} (${preview.id})`),
+    trustRow(t("trust.row.publisher"), preview.publisher || t("trust.publisher_unset")),
     trustRow(
-      "Version",
+      t("trust.row.version"),
       update ? `${preview.installedVersion} → ${preview.version}` : preview.version,
     ),
   ];
   if (preview.downgrade) {
-    rows.push(
-      `<p class="plugin-warning">⚠ Retour à une version antérieure à celle installée.</p>`,
-    );
+    rows.push(`<p class="plugin-warning">${escapeHtml(t("trust.downgrade"))}</p>`);
   }
-  if (preview.description) rows.push(trustRow("Description", preview.description));
+  if (preview.description) rows.push(trustRow(t("trust.row.description"), preview.description));
   const claims = [
     ...(preview.extensions || []).map((e) => `.${e}`),
     ...(preview.fences || []).map((f) => `\`\`\`${f}`),
-    ...(preview.highlights || []).map((h) => `coloration ${h}`),
+    ...(preview.highlights || []).map((h) => t("plugins.claim_highlight", { name: h })),
   ];
-  if (claims.length) rows.push(trustRow("Prend en charge", claims.join(", ")));
+  if (claims.length) rows.push(trustRow(t("trust.row.supports"), claims.join(", ")));
   const caps = (preview.capabilities || []).map(
-    (c) => CAP_LABELS[c] || `capacité inconnue « ${c} » (ignorée)`,
+    (c) => (Object.hasOwn(CAP_LABELS, c) ? CAP_LABELS[c]() : t("trust.cap_unknown", { name: c })),
   );
   if (caps.length) {
     rows.push(
-      `<div class="trust-row"><span class="trust-label">Peut</span><span>${caps
+      `<div class="trust-row"><span class="trust-label">${escapeHtml(t("trust.row.can"))}</span><span>${caps
         .map(escapeHtml)
         .join("<br>")}</span></div>`,
     );
@@ -254,15 +259,15 @@ export async function requestPluginInstall(path) {
   if ((preview.siblingExtensions || []).length) {
     rows.push(
       trustRow(
-        "Fichiers lisibles",
-        preview.siblingExtensions.map((e) => `.${e}`).join(", ") +
-          " (dossier des documents ouverts uniquement)",
+        t("trust.row.readable_files"),
+        t("trust.readable_scope", {
+          list: preview.siblingExtensions.map((e) => `.${e}`).join(", "),
+        }),
       ),
     );
   }
   rows.push(
-    `<p class="settings-hint">Un plugin exécute du code (sandboxé) fourni par un tiers.` +
-      ` N'installez que des plugins dont vous connaissez la provenance.</p>`,
+    `<p class="settings-hint">${escapeHtml(t("trust.warning"))}</p>`,
   );
   trustBody.innerHTML = rows.join("");
 

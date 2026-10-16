@@ -17,6 +17,12 @@
   color-scheme: light;
 }
 
+/* Langue : fenêtre masquée jusqu'à la traduction du HTML statique (initI18n,
+   i18n.js), pour ne pas montrer le repli anglais d'index.html. */
+:root[data-i18n-pending] body {
+  visibility: hidden;
+}
+
 /* Thème : « auto » = AUCUN attribut [data-theme] → la palette sombre suit le système
    en pur CSS (premier rendu sans flash, suivi automatique des bascules système).
    Les overrides « clair »/« sombre » (Réglages → Thème) posent [data-theme] et

@@ -230,7 +230,7 @@ pub fn first_window(app: &AppHandle) -> Option<WebviewWindow> {
 /// `create_window` se charge de `show()` + `set_focus()`.
 pub fn open_new_window(app: &AppHandle) {
     if let Err(e) = create_window(app, None, None) {
-        eprintln!("[fenêtre] création impossible : {e}");
+        eprintln!("[window] cannot create window: {e}");
     }
 }
 
@@ -244,7 +244,7 @@ pub fn open_in_first_window(app: &AppHandle, args: &[FileArg]) {
                 None => return,
             },
             Err(e) => {
-                eprintln!("[fenêtre] création impossible : {e}");
+                eprintln!("[window] cannot create window: {e}");
                 return;
             }
         },
@@ -441,7 +441,7 @@ fn move_tab_to_new_window(
     let label = match create_window(app, Some(pos), size) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("[fenêtre] détachement impossible : {e}");
+            eprintln!("[window] cannot detach tab: {e}");
             return;
         }
     };
@@ -567,7 +567,7 @@ pub fn collect_file_args<I: IntoIterator<Item = String>>(args: I, cwd: &Path) ->
                 })
             };
             if arg.is_none() {
-                eprintln!("[cli] fichier introuvable, ignoré : {a}");
+                eprintln!("[cli] file not found, ignored: {a}");
             }
             arg
         })

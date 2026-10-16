@@ -261,19 +261,16 @@ fn valid_id(id: &str) -> bool {
 /// le plugin inerte, pas invalide (spec §3).
 fn validate_hard(m: &Manifest) -> Result<(), String> {
     if !valid_id(&m.id) {
-        return Err(format!("id invalide « {} » (attendu : [a-z0-9-])", m.id));
+        return Err(tr!("pluginpkg.manifest_id_invalid", id = m.id));
     }
     if m.manifest_version != 1 {
-        return Err(format!(
-            "manifestVersion {} non supporté (hôte : 1)",
-            m.manifest_version
+        return Err(tr!(
+            "pluginpkg.manifest_version",
+            version = m.manifest_version
         ));
     }
     if m.api_version != "1" && !m.api_version.starts_with("1.") {
-        return Err(format!(
-            "apiVersion « {} » non supportée (hôte : 1)",
-            m.api_version
-        ));
+        return Err(tr!("pluginpkg.api_version", version = m.api_version));
     }
     let entry = Path::new(&m.entry);
     if m.entry.is_empty()
@@ -282,7 +279,7 @@ fn validate_hard(m: &Manifest) -> Result<(), String> {
             .components()
             .any(|c| matches!(c, std::path::Component::ParentDir))
     {
-        return Err(format!("entry invalide « {} »", m.entry));
+        return Err(tr!("pluginpkg.entry_invalid", entry = m.entry));
     }
     Ok(())
 }
@@ -319,23 +316,20 @@ fn load_plugin(dir: &Path) -> PluginInfo {
     let manifest_path = dir.join("manifest.json");
     let bytes = match std::fs::read(&manifest_path) {
         Ok(b) => b,
-        Err(e) => return invalid(format!("manifest.json illisible : {e}")),
+        Err(e) => return invalid(tr!("pluginpkg.manifest_unreadable", error = e)),
     };
     let m: Manifest = match serde_json::from_slice(&bytes) {
         Ok(m) => m,
-        Err(e) => return invalid(format!("manifest.json invalide : {e}")),
+        Err(e) => return invalid(tr!("pluginpkg.manifest_invalid", error = e)),
     };
     if let Err(e) = validate_hard(&m) {
         return invalid(e);
     }
     if m.id != dirname {
-        return invalid(format!(
-            "l'id du manifeste « {} » doit correspondre au nom du dossier « {dirname} »",
-            m.id
-        ));
+        return invalid(tr!("pluginpkg.id_mismatch", id = m.id, dir = dirname));
     }
     if !dir.join(&m.entry).is_file() {
-        return invalid(format!("entry introuvable : {}", m.entry));
+        return invalid(tr!("pluginpkg.entry_not_found", entry = m.entry));
     }
 
     // Statut : inerte si le runtime est inconnu ou si aucune capacité
@@ -343,21 +337,14 @@ fn load_plugin(dir: &Path) -> PluginInfo {
     let (status, status_reason) = if m.runtime != "worker" {
         (
             "inert",
-            format!(
-                "runtime « {} » non supporté par cette version de Kroki Desk",
-                m.runtime
-            ),
+            tr!("pluginpkg.runtime_unsupported", runtime = m.runtime),
         )
     } else if !m
         .capabilities
         .iter()
         .any(|c| HOST_CAPABILITIES.contains(&c.as_str()) && c != "read:siblings")
     {
-        (
-            "inert",
-            "aucune capacité servable — ce plugin requiert une version plus récente de Kroki Desk"
-                .to_string(),
-        )
+        ("inert", tr!("pluginpkg.no_capability"))
     } else {
         ("ok", String::new())
     };
@@ -388,6 +375,46 @@ fn load_plugin(dir: &Path) -> PluginInfo {
     }
 }
 
+/// Avertissements d'un conflit de revendication, côté perdant puis côté
+/// gagnant. `kind` : 0 = extension, 1 = fence, 2 = coloration. Une clé par
+/// phrase entière : le nom du type de revendication n'est pas recollé.
+fn conflict_messages(kind: usize, name: &str, winner: &str, loser: &str) -> (String, String) {
+    match kind {
+        0 => (
+            tr!(
+                "pluginpkg.conflict.extension.lost",
+                name = name,
+                winner = winner
+            ),
+            tr!(
+                "pluginpkg.conflict.extension.won",
+                name = name,
+                loser = loser
+            ),
+        ),
+        1 => (
+            tr!(
+                "pluginpkg.conflict.fence.lost",
+                name = name,
+                winner = winner
+            ),
+            tr!("pluginpkg.conflict.fence.won", name = name, loser = loser),
+        ),
+        _ => (
+            tr!(
+                "pluginpkg.conflict.highlight.lost",
+                name = name,
+                winner = winner
+            ),
+            tr!(
+                "pluginpkg.conflict.highlight.won",
+                name = name,
+                loser = loser
+            ),
+        ),
+    }
+}
+
 /// Règles de conflit (§8) : le natif gagne toujours (extensions — les fences
 /// natives sont arbitrées côté frontend qui connaît `KROKI_TYPES`), puis entre
 /// plugins le dernier installé gagne, avec avertissement des deux côtés.
@@ -402,8 +429,7 @@ fn resolve_conflicts(list: &mut [PluginInfo]) {
             .drain(..)
             .partition(|e| manager::DOC_EXTENSIONS.contains(&e.as_str()));
         for e in native {
-            p.warnings
-                .push(format!(".{e} est géré nativement — revendication ignorée"));
+            p.warnings.push(tr!("pluginpkg.native_extension", name = e));
         }
         p.extensions = kept;
     }
@@ -417,7 +443,6 @@ fn resolve_conflicts(list: &mut [PluginInfo]) {
                 _ => p.highlights.clone(),
             }
         };
-        let label = ["l'extension .", "la fence ", "la coloration "][kind];
         for i in 0..list.len() {
             if list[i].status != "ok" {
                 continue;
@@ -428,12 +453,9 @@ fn resolve_conflicts(list: &mut [PluginInfo]) {
                 {
                     let winner = list[j].id.clone();
                     let loser = list[i].id.clone();
-                    list[i].warnings.push(format!(
-                        "{label}{c} est reprise par « {winner} » (installé plus récemment)"
-                    ));
-                    list[j]
-                        .warnings
-                        .push(format!("{label}{c} remplace celle de « {loser} »"));
+                    let (lost, won) = conflict_messages(kind, &c, &winner, &loser);
+                    list[i].warnings.push(lost);
+                    list[j].warnings.push(won);
                 }
             }
         }
@@ -498,7 +520,8 @@ pub(crate) fn percent_decode(s: &str) -> String {
 /// `http://plugin.localhost/<id>/<chemin>`). Lecture seule, confinée au dossier
 /// du plugin (canonicalisation + `starts_with`, comme `read_data_file`).
 pub fn serve(request: &tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
-    let not_found = || http_response(404, "text/plain", b"introuvable".to_vec());
+    // Réponse HTTP technique, lue par le worker (jamais affichée) : anglais fixe.
+    let not_found = || http_response(404, "text/plain", b"not found".to_vec());
     let path = percent_decode(request.uri().path());
     let mut parts = path.trim_start_matches('/').splitn(2, '/');
     let (Some(id), Some(rel)) = (parts.next(), parts.next()) else {
@@ -527,20 +550,20 @@ pub fn serve(request: &tauri::http::Request<Vec<u8>>) -> tauri::http::Response<V
 // --------------------------------------------------------------------------- //
 
 fn archive_manifest(path: &Path) -> Result<Manifest, String> {
-    let file = std::fs::File::open(path).map_err(|e| format!("archive illisible : {e}"))?;
-    let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("archive invalide : {e}"))?;
+    let file =
+        std::fs::File::open(path).map_err(|e| tr!("pluginpkg.archive_unreadable", error = e))?;
+    let mut zip =
+        zip::ZipArchive::new(file).map_err(|e| tr!("pluginpkg.archive_invalid", error = e))?;
     let mut entry = zip.by_name("manifest.json").map_err(|e| match e {
-        zip::result::ZipError::FileNotFound => {
-            "manifest.json absent à la racine de l'archive".to_string()
-        }
+        zip::result::ZipError::FileNotFound => tr!("pluginpkg.manifest_missing"),
         // Ex. méthode de compression non supportée (PPMd) : montrer la cause.
-        e => format!("manifest.json illisible : {e}"),
+        e => tr!("pluginpkg.manifest_unreadable", error = e),
     })?;
     let mut bytes = Vec::new();
     std::io::Read::read_to_end(&mut entry, &mut bytes)
-        .map_err(|e| format!("manifest.json illisible : {e}"))?;
+        .map_err(|e| tr!("pluginpkg.manifest_unreadable", error = e))?;
     let m: Manifest =
-        serde_json::from_slice(&bytes).map_err(|e| format!("manifest.json invalide : {e}"))?;
+        serde_json::from_slice(&bytes).map_err(|e| tr!("pluginpkg.manifest_invalid", error = e))?;
     validate_hard(&m)?;
     Ok(m)
 }
@@ -611,22 +634,24 @@ pub fn plugin_manifest_preview(path: String) -> Result<ManifestPreview, String> 
 fn install_archive(src: &Path) -> Result<Manifest, String> {
     let m = archive_manifest(src)?;
     let dir = plugins_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("dossier des plugins : {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| tr!("pluginpkg.dir_error", error = e))?;
 
     let tmp = dir.join(format!(".tmp-{}", m.id));
     let _ = std::fs::remove_dir_all(&tmp);
-    let file = std::fs::File::open(src).map_err(|e| format!("archive illisible : {e}"))?;
-    let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("archive invalide : {e}"))?;
+    let file =
+        std::fs::File::open(src).map_err(|e| tr!("pluginpkg.archive_unreadable", error = e))?;
+    let mut zip =
+        zip::ZipArchive::new(file).map_err(|e| tr!("pluginpkg.archive_invalid", error = e))?;
     zip.extract(&tmp).map_err(|e| {
         let _ = std::fs::remove_dir_all(&tmp);
-        format!("extraction impossible : {e}")
+        tr!("pluginpkg.extract_failed", error = e)
     })?;
 
     let dest = dir.join(&m.id);
     let bak = dir.join(format!("{}.bak", m.id));
     if dest.exists() {
         let _ = std::fs::remove_dir_all(&bak);
-        std::fs::rename(&dest, &bak).map_err(|e| format!("sauvegarde impossible : {e}"))?;
+        std::fs::rename(&dest, &bak).map_err(|e| tr!("pluginpkg.backup_failed", error = e))?;
     }
     if let Err(e) = std::fs::rename(&tmp, &dest) {
         // Restaure l'ancienne version si la bascule échoue.
@@ -634,7 +659,7 @@ fn install_archive(src: &Path) -> Result<Manifest, String> {
             let _ = std::fs::rename(&bak, &dest);
         }
         let _ = std::fs::remove_dir_all(&tmp);
-        return Err(format!("installation impossible : {e}"));
+        return Err(tr!("pluginpkg.install_failed", error = e));
     }
     Ok(m)
 }
@@ -654,12 +679,12 @@ pub fn install_plugin(app: AppHandle, path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn uninstall_plugin(app: AppHandle, id: String) -> Result<(), String> {
     if !valid_id(&id) {
-        return Err("id invalide".into());
+        return Err(tr!("pluginpkg.id_invalid"));
     }
     let dir = plugins_dir();
     let dest = dir.join(&id);
     if dest.exists() {
-        std::fs::remove_dir_all(&dest).map_err(|e| format!("suppression impossible : {e}"))?;
+        std::fs::remove_dir_all(&dest).map_err(|e| tr!("pluginpkg.remove_failed", error = e))?;
     }
     let _ = std::fs::remove_dir_all(dir.join(format!("{id}.bak")));
     // Mémorise le refus, sinon un plugin livré avec l'installeur reviendrait au
@@ -749,7 +774,7 @@ pub fn seed_bundled(app: &AppHandle) {
             Ok(m) => m,
             Err(e) => {
                 eprintln!(
-                    "[plugins] archive livrée ignorée ({}) : {e}",
+                    "[plugins] bundled archive ignored ({}): {e}",
                     path.display()
                 );
                 continue;
@@ -764,10 +789,10 @@ pub fn seed_bundled(app: &AppHandle) {
         }
         match install_archive(&path) {
             Ok(_) => eprintln!(
-                "[plugins] {} {} installé (livré avec l'app)",
+                "[plugins] {} {} installed (bundled with the app)",
                 m.id, m.version
             ),
-            Err(e) => eprintln!("[plugins] installation de {} impossible : {e}", m.id),
+            Err(e) => eprintln!("[plugins] cannot install {}: {e}", m.id),
         }
     }
 }
@@ -783,10 +808,10 @@ pub fn list_plugins() -> Vec<PluginInfo> {
 #[tauri::command]
 pub fn open_plugins_dir(app: AppHandle) -> Result<(), String> {
     let dir = plugins_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("création du dossier impossible : {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| tr!("pluginpkg.mkdir_failed", error = e))?;
     app.opener()
         .open_path(dir.to_string_lossy(), None::<String>)
-        .map_err(|e| format!("ouverture impossible : {e}"))
+        .map_err(|e| tr!("pluginpkg.open_failed", error = e))
 }
 
 /// Sélecteur natif d'archive `.kdext` (bouton « Ajouter un plugin… ») : le
@@ -797,7 +822,7 @@ pub fn pick_plugin_archive(app: AppHandle, window: WebviewWindow) {
     let label = window.label().to_string();
     app.dialog()
         .file()
-        .add_filter("Plugin Kroki Desk", &[ARCHIVE_EXT])
+        .add_filter(tr!("dialog.filter.plugin"), &[ARCHIVE_EXT])
         .pick_file(move |file| {
             let Some(file) = file else { return };
             let Ok(path) = file.into_path() else { return };
@@ -811,37 +836,57 @@ pub fn pick_plugin_archive(app: AppHandle, window: WebviewWindow) {
 #[tauri::command]
 pub fn plugin_changelog(id: String) -> Result<String, String> {
     if !valid_id(&id) {
-        return Err("id invalide".into());
+        return Err(tr!("pluginpkg.id_invalid"));
     }
     std::fs::read_to_string(plugins_dir().join(&id).join(CHANGELOG_FILE))
-        .map_err(|e| format!("changelog illisible : {e}"))
+        .map_err(|e| tr!("pluginpkg.changelog_unreadable", error = e))
 }
 
 /// Service `host/readFile` (capacité `read:siblings`, spec §6.5) : lecture
 /// confinée au dossier du document en cours, allowlist = `siblingExtensions`
 /// du manifeste. Même garde anti-traversée que `read_data_file`.
+///
+/// L'erreur porte le code du protocole (`not-found` | `denied`) à côté du
+/// message traduit : le worker ne doit pas le deviner dans un texte qui change
+/// avec la langue de l'interface.
 #[tauri::command]
 pub fn plugin_read_sibling(
     plugin_id: String,
     base_dir: String,
     rel: String,
-) -> Result<String, String> {
+) -> Result<String, SiblingError> {
+    read_sibling(&plugin_id, &base_dir, &rel).map_err(|message| {
+        let missing = std::fs::metadata(Path::new(&base_dir).join(&rel))
+            .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound);
+        SiblingError {
+            code: if missing { "not-found" } else { "denied" },
+            message,
+        }
+    })
+}
+
+/// Erreur de `plugin_read_sibling`, telle que relayée au plugin (spec §6.5).
+#[derive(Serialize)]
+pub struct SiblingError {
+    code: &'static str,
+    message: String,
+}
+
+fn read_sibling(plugin_id: &str, base_dir: &str, rel: &str) -> Result<String, String> {
     let allowed: Vec<String> = registry()
         .read()
         .unwrap()
         .iter()
         .find(|p| p.id == plugin_id && p.status == "ok")
         .map(|p| p.sibling_extensions.clone())
-        .ok_or("plugin inconnu")?;
+        .ok_or_else(|| tr!("pluginpkg.unknown_plugin"))?;
     let ext = Path::new(&rel)
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase())
         .unwrap_or_default();
     if !allowed.contains(&ext) {
-        return Err(format!(
-            "extension .{ext} non autorisée par le manifeste du plugin"
-        ));
+        return Err(tr!("pluginpkg.extension_not_allowed", ext = ext));
     }
-    crate::commands::read_confined(&base_dir, &rel)
+    crate::commands::read_confined(base_dir, rel)
 }

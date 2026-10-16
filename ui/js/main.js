@@ -19,6 +19,7 @@ import { initInfo, openInfo } from "./info.js";
 import { initChangelog } from "./changelog.js";
 import { exportActiveView } from "./export.js";
 import { applyTheme, initTheme } from "./theme.js";
+import { initI18n, loadLocale, onLocaleChange, t } from "./i18n.js";
 import { initFindWord } from "./findword.js";
 import {
   initGlobalSearch,
@@ -359,11 +360,26 @@ function updateViewActions() {
   if (!show) return;
   const isSource = v.mode === "source";
   sourceBtn.classList.toggle("active", isSource);
-  sourceBtn.title = isSource ? "Afficher le rendu (preview)" : "Afficher le code source (lecture seule)";
+  updateSourceTitle();
   sourceBtn.setAttribute("aria-pressed", String(isSource));
   const isDerived = v.mode === "derived";
   derivedBtn.classList.toggle("active", isDerived);
   derivedBtn.setAttribute("aria-pressed", String(isDerived));
+}
+
+// Titre du bouton source : suit le mode de la vue active et la langue.
+function updateSourceTitle() {
+  if (state.views.get(state.active)?.mode === "source") {
+    sourceBtn.title = t("toolbar.source_hide");
+  } else {
+    sourceBtn.title = t("toolbar.source_show");
+  }
+}
+
+// Titre du bouton pleine largeur : suit la préférence et la langue.
+function updateFitTitle() {
+  if (fitWidth) fitBtn.title = t("toolbar.fit_on");
+  else fitBtn.title = t("toolbar.fit_off");
 }
 
 // --- Sommaire (table des matières) de l'onglet actif ---
@@ -393,7 +409,7 @@ function buildToc(headings) {
   if (!headings.length) {
     const empty = document.createElement("div");
     empty.className = "toc-empty";
-    empty.textContent = "Aucun titre dans ce document";
+    empty.textContent = t("toc.empty");
     tocPanel.replaceChildren(empty);
     return;
   }
@@ -404,7 +420,7 @@ function buildToc(headings) {
     item.className = "toc-item";
     item.dataset.level = String(h.level);
     item.style.paddingLeft = `${8 + (h.level - minLevel) * 14}px`;
-    const label = h.text || "(sans titre)";
+    const label = h.text || t("toc.untitled");
     item.textContent = label;
     item.title = label;
     item.addEventListener("click", () => {
@@ -610,9 +626,7 @@ function setFitWidth(on) {
   viewsEl.classList.toggle("fit-width", fitWidth);
   fitBtn.classList.toggle("active", fitWidth);
   fitBtn.setAttribute("aria-pressed", String(fitWidth));
-  fitBtn.title = fitWidth
-    ? "Revenir à la largeur de lecture (centré)"
-    : "Étendre le contenu à toute la largeur";
+  updateFitTitle();
   if (v) {
     resizePlotlyFigures(v.el);
     scrollToLine(v.el, attr, line);
@@ -742,6 +756,11 @@ function initShortcuts() {
 }
 
 async function boot() {
+  // Langue en tout premier : le HTML statique est traduit (et la fenêtre
+  // démasquée) avant le premier paint, et les modules initialisés ensuite
+  // écrivent leurs textes directement dans la bonne langue.
+  await initI18n();
+
   // Thème d'abord : applique l'override sauvegardé avant tout rendu. En « auto » il
   // n'altère rien (le premier paint suit déjà @media en pur CSS). initTheme réaccorde
   // les figures Plotly quand le système bascule en mode auto.
@@ -767,6 +786,13 @@ async function boot() {
   // Registre des plugins avant le premier rendu : le routage des extensions
   // et des fences en dépend. Un changement (install/suppression) re-rend tout.
   await initPlugins(rerenderAll);
+  updateSourceTitle(); // titres dynamiques : pas de data-i18n-title (cf. index.html)
+  updateFitTitle();
+  onLocaleChange(() => {
+    updateSourceTitle();
+    updateFitTitle();
+    closeToc(); // son contenu (« Aucun titre… », « (sans titre) ») est dans l'ancienne langue
+  });
   initTabbar();
   initTearDrag();
   initLinks();
@@ -792,7 +818,11 @@ async function boot() {
   await initSession();
 
   document.getElementById("btn-open").addEventListener("click", () => invoke("open_file_dialog"));
-  document.getElementById("btn-open-empty").addEventListener("click", () => invoke("open_file_dialog"));
+  // Délégation : le lien est dans un texte traduit par innerHTML (`welcome.open_hint`),
+  // recréé à chaque changement de langue — un écouteur direct serait perdu.
+  emptyEl.addEventListener("click", (e) => {
+    if (e.target.closest("#btn-open-empty")) invoke("open_file_dialog");
+  });
   document.getElementById("btn-refresh").addEventListener("click", rerenderAll);
   document.getElementById("btn-new-window").addEventListener("click", () => invoke("new_window"));
   document.getElementById("btn-settings").addEventListener("click", openSettings);
@@ -843,6 +873,14 @@ async function boot() {
   await listen("theme-changed", (e) => {
     if (e.payload.from === currentLabel) return;
     applyTheme(e.payload.mode);
+    rerenderAll();
+  });
+  // Langue changée dans une AUTRE fenêtre : même protocole que le thème. Le
+  // re-rendu traduit les messages insérés dans les documents (erreurs de rendu,
+  // bannières des plugins).
+  await listen("locale-changed", async (e) => {
+    if (e.payload.from === currentLabel) return;
+    await loadLocale();
     rerenderAll();
   });
   // Icônes changées dans une AUTRE fenêtre (réglage global) : même protocole

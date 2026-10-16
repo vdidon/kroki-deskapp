@@ -6,19 +6,26 @@
 
 import { invoke } from "./app.js";
 import { openChangelog } from "./changelog.js";
+import { t } from "./i18n.js";
 
 const dialog = document.getElementById("info-dialog");
 const groupsEl = document.getElementById("info-groups");
 const versionEl = document.getElementById("info-version");
 
-const STATUS_LABELS = {
-  ok: "Disponible",
-  blocked: "Prérequis manquant",
-  unsupported: "Non embarqué",
-};
+// Libellé d'un statut, traduit à l'affichage (le dialog est rendu à chaque ouverture).
+function statusLabel(status) {
+  switch (status) {
+    case "ok":
+      return t("info.status.ok");
+    case "blocked":
+      return t("info.status.blocked");
+    default:
+      return t("info.status.unsupported");
+  }
+}
 
 function renderGroup(g) {
-  const status = STATUS_LABELS[g.status] ? g.status : "unsupported";
+  const status = ["ok", "blocked"].includes(g.status) ? g.status : "unsupported";
 
   const group = document.createElement("section");
   group.className = `rt-group ${status}`;
@@ -37,7 +44,7 @@ function renderGroup(g) {
 
   const badge = document.createElement("span");
   badge.className = `rt-badge ${status}`;
-  badge.textContent = STATUS_LABELS[status];
+  badge.textContent = statusLabel(status);
 
   head.append(titles, badge);
   group.append(head);
@@ -52,10 +59,10 @@ function renderGroup(g) {
   if (Array.isArray(g.types) && g.types.length) {
     const chips = document.createElement("div");
     chips.className = "rt-types";
-    for (const t of g.types) {
+    for (const type of g.types) {
       const chip = document.createElement("span");
       chip.className = "rt-chip";
-      chip.textContent = t;
+      chip.textContent = type;
       chips.append(chip);
     }
     group.append(chips);

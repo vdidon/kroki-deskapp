@@ -8,6 +8,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::engine;
+use crate::i18n;
 use crate::kroki::{self, KrokiState};
 use crate::manager;
 use crate::server;
@@ -32,11 +33,14 @@ pub fn get_window_state(window: WebviewWindow, state: State<AppState>) -> TabsPa
 pub fn read_document(state: State<AppState>, doc_id: u64) -> Result<DocPayload, String> {
     let (path, title) = {
         let st = state.0.lock().unwrap();
-        let doc = st.docs.get(&doc_id).ok_or("Document inconnu")?;
+        let doc = st
+            .docs
+            .get(&doc_id)
+            .ok_or_else(|| tr!("error.document.unknown"))?;
         (doc.path.clone(), doc.title.clone())
     };
-    let bytes =
-        std::fs::read(&path).map_err(|e| format!("Impossible de lire {} : {e}", path.display()))?;
+    let bytes = std::fs::read(&path)
+        .map_err(|e| tr!("error.file.read", path = path.display(), error = e))?;
     let markdown = String::from_utf8_lossy(&bytes).into_owned();
     Ok(DocPayload {
         id: doc_id,
@@ -84,7 +88,7 @@ pub async fn render_diagram(
             engine::render_local(&app2, &d, &s, &json_opts)
         })
         .await
-        .map_err(|e| format!("rendu interrompu : {e}"))??
+        .map_err(|e| tr!("engine.render_interrupted", error = e))??
     } else {
         kroki::render(&kroki, &external, &dtype, &source, opts).await?
     };
@@ -116,7 +120,8 @@ pub fn render_job_done(
     let result = match (svg, error) {
         (Some(s), _) => Ok(s),
         (None, Some(e)) => Err(e),
-        (None, None) => Err("réponse vide du moteur de rendu".into()),
+        // Erreur vide : `engine::render_js` la traduit sur le thread qui attend.
+        (None, None) => Err(String::new()),
     };
     engine::complete_job(&app, id, result);
 }
@@ -143,9 +148,9 @@ pub fn open_file_dialog(app: AppHandle, window: WebviewWindow) {
     let ext_refs: Vec<&str> = exts.iter().map(|s| s.as_str()).collect();
     app.dialog()
         .file()
-        .add_filter("Documents (Markdown + plugins)", &ext_refs)
-        .add_filter("Session Kroki Desk", &[crate::session::SESSION_EXT])
-        .add_filter("Tous les fichiers", &["*"])
+        .add_filter(tr!("dialog.filter.documents"), &ext_refs)
+        .add_filter(tr!("dialog.filter.session"), &[crate::session::SESSION_EXT])
+        .add_filter(tr!("dialog.filter.all_files"), &["*"])
         .pick_files(move |files| {
             let Some(files) = files else { return };
             let paths: Vec<PathBuf> = files
@@ -200,10 +205,10 @@ pub async fn reveal_tab_file(app: AppHandle, doc_id: u64) -> Result<(), String> 
         let st = st.0.lock().unwrap();
         st.docs.get(&doc_id).map(|d| d.path.clone())
     }
-    .ok_or("Document introuvable.")?;
+    .ok_or_else(|| tr!("error.document.not_found"))?;
     app.opener()
         .reveal_item_in_dir(&path)
-        .map_err(|e| format!("Impossible d'afficher le fichier : {e}"))
+        .map_err(|e| tr!("error.reveal_failed", error = e))
 }
 
 #[tauri::command]
@@ -313,6 +318,20 @@ pub fn get_theme(settings: State<SettingsState>) -> String {
     settings.0.lock().unwrap().theme.clone()
 }
 
+/// Langue de l'interface pour le frontend : le code résolu (`auto` → langue du
+/// système), le réglage brut, les langues livrées (`{code, name}`) et le catalogue complet de la
+/// langue courante, déjà complété par l'anglais. Lu au boot de chaque fenêtre et
+/// après un changement de réglage (cf. `ui/js/i18n.js`).
+#[tauri::command]
+pub fn get_i18n(settings: State<SettingsState>) -> serde_json::Value {
+    json!({
+        "locale": i18n::current(),
+        "setting": settings.0.lock().unwrap().language,
+        "languages": i18n::language_list(),
+        "messages": i18n::messages(),
+    })
+}
+
 /// Visibilité des icônes, seule (cf. `SettingsData::icons`) : lue au boot de
 /// chaque fenêtre pour masquer les icônes désactivées avant le premier paint —
 /// même motivation que `get_theme`, sans le coût de `get_settings`.
@@ -333,20 +352,29 @@ pub fn set_settings(
     server_enabled: bool,
     server_port: u16,
     theme: String,
+    language: String,
     icons: BTreeMap<String, bool>,
 ) -> Result<(), String> {
     let url = external_url.trim().trim_end_matches('/').to_string();
     if !url.is_empty() && !url.starts_with("http://") && !url.starts_with("https://") {
-        return Err("L'URL du serveur externe doit commencer par http:// ou https:// (ou rester vide pour le rendu intégré)".into());
+        return Err(tr!("error.settings.url_scheme"));
     }
     if server_port < 1024 {
-        return Err("Le port doit être ≥ 1024".into());
+        return Err(tr!("error.settings.port_min", min = 1024));
     }
     // Valeur inconnue → on retombe sur « auto » (tolérant plutôt qu'erreur bloquante).
     let theme = match theme.as_str() {
         "light" | "dark" => theme,
         _ => "auto".to_string(),
     };
+    // Code inconnu → « auto », même tolérance que le thème.
+    let language = if i18n::languages().contains(&language.as_str()) {
+        language
+    } else {
+        "auto".to_string()
+    };
+    let previous_locale = i18n::current();
+    let locale = i18n::set_language(&language);
     {
         let mut s = settings.0.lock().unwrap();
         // Non exposé au dialog Réglages : préservé tel quel (alimenté par
@@ -357,6 +385,7 @@ pub fn set_settings(
             server_enabled,
             server_port,
             theme: theme.clone(),
+            language,
             icons: icons.clone(),
             removed_plugins,
         };
@@ -370,6 +399,17 @@ pub fn set_settings(
         "theme-changed",
         json!({ "mode": theme, "from": window.label() }),
     );
+    // Langue : seulement si elle change effectivement (« auto » → « fr » sur un
+    // poste français ne change rien à l'affichage).
+    if locale != previous_locale {
+        // Les statuts et avertissements des plugins sont composés au scan, dans
+        // la langue d'alors : un nouveau scan les recompose (et notifie le dialog).
+        crate::plugins::rescan(&app);
+        let _ = app.emit(
+            "locale-changed",
+            json!({ "locale": locale, "from": window.label() }),
+        );
+    }
     let _ = app.emit(
         "icons-changed",
         json!({ "icons": icons, "from": window.label() }),
@@ -418,7 +458,7 @@ pub fn open_link(app: AppHandle, window: WebviewWindow, base_dir: String, href: 
 #[tauri::command]
 pub fn read_data_file(base_dir: String, rel: String) -> Result<String, String> {
     if !rel.to_ascii_lowercase().ends_with(".json") {
-        return Err("Seuls les fichiers .json sont autorisés".into());
+        return Err(tr!("error.data_file.json_only"));
     }
     read_confined(&base_dir, &rel)
 }
@@ -432,19 +472,20 @@ pub fn read_data_file(base_dir: String, rel: String) -> Result<String, String> {
 pub fn read_confined(base_dir: &str, rel: &str) -> Result<String, String> {
     let p = PathBuf::from(rel);
     if p.is_absolute() || rel.contains('\0') {
-        return Err("Chemin non autorisé".into());
+        return Err(tr!("error.path.not_allowed"));
     }
-    let base = dunce::canonicalize(base_dir).map_err(|e| format!("Dossier invalide : {e}"))?;
+    let base =
+        dunce::canonicalize(base_dir).map_err(|e| tr!("error.path.invalid_dir", error = e))?;
     let abs =
-        dunce::canonicalize(base.join(&p)).map_err(|e| format!("Chemin introuvable : {e}"))?;
+        dunce::canonicalize(base.join(&p)).map_err(|e| tr!("error.path.not_found", error = e))?;
     if !abs.starts_with(&base) {
-        return Err("Chemin hors du dossier du document".into());
+        return Err(tr!("error.path.outside_dir"));
     }
     if !abs.is_file() {
-        return Err("Le chemin ne désigne pas un fichier".into());
+        return Err(tr!("error.path.not_file"));
     }
     let bytes =
-        std::fs::read(&abs).map_err(|e| format!("Impossible de lire {} : {e}", abs.display()))?;
+        std::fs::read(&abs).map_err(|e| tr!("error.file.read", path = abs.display(), error = e))?;
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
@@ -469,7 +510,7 @@ pub async fn export_html(
         .dialog()
         .file()
         .set_file_name(&suggested_name)
-        .add_filter("Page HTML", &["html"])
+        .add_filter(tr!("dialog.filter.html_page"), &["html"])
         .blocking_save_file()
     else {
         return Ok(false);
@@ -479,7 +520,7 @@ pub async fn export_html(
         dest.set_extension("html");
     }
     std::fs::write(&dest, html.as_bytes())
-        .map_err(|e| format!("Impossible d'écrire {} : {e}", dest.display()))?;
+        .map_err(|e| tr!("error.file.write", path = dest.display(), error = e))?;
     Ok(true)
 }
 
@@ -491,13 +532,13 @@ pub async fn export_html(
 pub async fn save_session(app: AppHandle, window: WebviewWindow) -> Result<bool, String> {
     let snap = crate::session::snapshot(&app, window.label());
     if snap.is_empty() {
-        return Err("Aucun onglet ouvert : rien à enregistrer.".into());
+        return Err(tr!("error.session.nothing_to_save"));
     }
     let Some(dest) = app
         .dialog()
         .file()
         .set_file_name("session.kdws")
-        .add_filter("Session Kroki Desk", &[crate::session::SESSION_EXT])
+        .add_filter(tr!("dialog.filter.session"), &[crate::session::SESSION_EXT])
         .blocking_save_file()
     else {
         return Ok(false);

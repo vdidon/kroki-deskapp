@@ -16,6 +16,7 @@
 
 import { invoke, state, escapeHtml } from "./app.js";
 import { renderDocument } from "./render.js";
+import { t, getLocale } from "./i18n.js";
 
 // Neutralise la mise en page « application » (body flex plein cadre, vues
 // empilées en position absolue) : la page exportée défile normalement.
@@ -75,10 +76,10 @@ export async function exportActiveView() {
   if (!article) return false;
   for (const el of article.querySelectorAll(".modebar-container")) el.remove();
 
-  const title = state.tabs.find((t) => t.id === state.active)?.title || "document";
+  const title = state.tabs.find((t) => t.id === state.active)?.title || t("export.default_title");
   const theme = document.documentElement.dataset.theme;
   const html =
-    `<!doctype html>\n<html lang="fr"${theme ? ` data-theme="${escapeHtml(theme)}"` : ""}>\n` +
+    `<!doctype html>\n<html lang="${getLocale()}"${theme ? ` data-theme="${escapeHtml(theme)}"` : ""}>\n` +
     `<head>\n<meta charset="utf-8" />\n` +
     `<meta name="viewport" content="width=device-width, initial-scale=1" />\n` +
     `<title>${escapeHtml(title)}</title>\n` +

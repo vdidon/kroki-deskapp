@@ -399,7 +399,11 @@ rendering or to the source view:
 ```bash
 node tests/test_latex_plugin.mjs [file.tex …]   # latex-doc plugin + highlighting
 node tests/test_hlsplit.mjs      [file.md …]    # split of highlighted lines
+node tests/test_i18n.mjs                        # language catalogs vs. code
 ```
+
+`test_i18n.mjs` is to be run after any change to a displayed text (see
+« Interface language » below).
 
 A plugin mounted by junction from another repo carries its own
 tests there.
@@ -562,6 +566,36 @@ source, options); a re-render therefore naturally retries errors.
   `icons.js` (registry of toolbar icons, see below),
   `loading.js` (loading overlay, see below),
   `main.js`, `app.js` (helpers + `invoke` re-export).
+- **Interface language** (3.25.0): English (reference and fallback) and
+  French. **Single source** for front and back: `src-tauri/i18n/<lang>.json`,
+  flat `key → text` objects with `{param}` placeholders, a text depending on a
+  number being a CLDR plural object (`{"one": …, "other": …}`, picked by
+  `count`). The Rust side embeds them (`include_str!`, `i18n.rs`) and reads
+  them through the `tr!("key", name = value)` macro; the frontend receives the
+  current catalog, already completed with English, from `get_i18n` and reads
+  it through `t("key", params)` (`ui/js/i18n.js`). Static HTML carries
+  `data-i18n` / `data-i18n-html` / `data-i18n-title` / `-placeholder` /
+  `-aria-label`; the text left in `index.html` is only the English fallback,
+  replaced before the first paint (`data-i18n-pending` keeps the window hidden
+  until then). Setting `SettingsData::language` = `auto` (default: the OS UI
+  language via `sys-locale`, English when it is not shipped) or a code;
+  propagated by the `locale-changed` event (same `from` protocol as
+  `theme-changed`), each window reloading its catalog then re-rendering.
+  Text written by JS that stays on screen must be recomputed when displayed or
+  subscribed through `onLocaleChange`. The language is a **global** on the Rust
+  side (errors are born deep in modules without an `AppHandle`).
+  **Deliberately English whatever the setting**: the local HTTP API
+  (`server.rs` wraps rendering in `i18n::in_reference_language`, a per-thread
+  override) and the CLI/log output — technical interfaces read by tools; the
+  messages that need Java/TeX keep the phrase "external Kroki server", which
+  the shipped skill looks for. One gap: the wrapper errors written by the
+  hidden render webview (`ui/renderer/i18n.js`, its own `t()` reloaded on
+  `locale-changed`) follow the interface language even through the API — the
+  JS engines' own messages are English anyway. Keys are literals: `tests/test_i18n.mjs` collects
+  them (`t("…")`, `tr!("…")`, `data-i18n*`) and checks catalog parity,
+  parameters, unknown and dead keys — a key built at runtime is declared by an
+  `i18n-dynamic: <prefix>` comment. Adding a language = adding a catalog to
+  `CATALOGS` (`i18n.rs`) with its `language.name` endonym.
 - **Two zooms** (3.17.0): text zoom (`Ctrl+wheel`, `setZoom`) and
   page zoom (`Shift+wheel`, `setPageZoom`) compose into a **single** CSS
   `zoom` on `#views` (`applyZoom`, `main.js`). CSS `zoom` alone is only

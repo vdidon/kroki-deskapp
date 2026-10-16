@@ -36,7 +36,7 @@ pub fn init(app: &AppHandle) {
     });
     match watcher {
         Ok(w) => *app.state::<WatcherState>().watcher.lock().unwrap() = Some(w),
-        Err(e) => eprintln!("[watcher] initialisation impossible : {e}"),
+        Err(e) => eprintln!("[watcher] initialization failed: {e}"),
     }
 }
 
@@ -104,7 +104,7 @@ pub fn watch_file(app: &AppHandle, path: &Path) {
     if first_dir {
         if let Some(w) = ws.watcher.lock().unwrap().as_mut() {
             if let Err(e) = w.watch(&dir, RecursiveMode::NonRecursive) {
-                eprintln!("[watcher] watch {} impossible : {e}", dir.display());
+                eprintln!("[watcher] cannot watch {}: {e}", dir.display());
             }
         }
     }

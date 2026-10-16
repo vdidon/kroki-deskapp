@@ -13,6 +13,10 @@
 // d'attributs Graphviz arbitraires, patte d'oie (cardinalités rendues en libellé texte).
 
 (function () {
+  // `rendererT` est posé par renderer.js (module, ui/renderer/i18n.js) avant tout
+  // chargement de ce script.
+  const t = (key, params) => window.rendererT(key, params);
+
   // Cardinalité erd → libellé porté par l'arête.
   const CARD = { "?": "0,1", "1": "1", "*": "0,N", "+": "1,N" };
   const HEADER_BG = "#ececff";
@@ -138,7 +142,7 @@
       const am = /^([*+]{0,2})\s*(.+?)$/.exec(head);
       if (!am) continue;
       if (!current) {
-        throw new Error(`erd : attribut « ${head} » hors de toute entité (attendu après un [Entité])`);
+        throw new Error(t("erd.attr_outside_entity", { attr: head }));
       }
       const marks = am[1] || "";
       current.attrs.push({
@@ -149,7 +153,7 @@
     }
 
     if (!entities.length) {
-      throw new Error("erd : aucune entité trouvée (déclarez au moins une [Entité]).");
+      throw new Error(t("erd.no_entity"));
     }
     return { entities, rels, title };
   }

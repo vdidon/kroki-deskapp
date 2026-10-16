@@ -80,13 +80,12 @@ pub fn resolve_alias(dtype: &str) -> &str {
 }
 
 pub fn supported_summary() -> String {
-    format!(
-        "Types intégrés : {}, {} ; si Java est installé, {} ; si une distribution TeX \
-         (MiKTeX, TeX Live) est installée, {}.",
-        JS_TYPES.join(", "),
-        NATIVE_TYPES.join(", "),
-        JAVA_TYPES.join(", "),
-        TEX_TYPES.join(", ")
+    tr!(
+        "engine.supported_summary",
+        js = JS_TYPES.join(", "),
+        native = NATIVE_TYPES.join(", "),
+        java = JAVA_TYPES.join(", "),
+        tex = TEX_TYPES.join(", ")
     )
 }
 
@@ -113,10 +112,10 @@ pub fn supported_types() -> Vec<&'static str> {
 pub struct RuntimeGroup {
     /// Runtime sous-jacent : `native` | `webview` | `jvm` | `tex` | `external`.
     pub runtime: &'static str,
-    /// Libellé lisible du groupe.
-    pub label: &'static str,
+    /// Libellé lisible du groupe (dans la langue de l'interface).
+    pub label: String,
     /// Prérequis système (ce qu'il faut pour que le système le supporte).
-    pub requirement: &'static str,
+    pub requirement: String,
     /// `ok` (app + système) | `blocked` (app, prérequis système manquant) |
     /// `unsupported` (pas pris en charge par l'application).
     pub status: &'static str,
@@ -134,53 +133,50 @@ pub fn runtime_report(app: &AppHandle) -> Vec<RuntimeGroup> {
     vec![
         RuntimeGroup {
             runtime: "native",
-            label: "Moteurs natifs (Rust)",
-            requirement: "Compilés dans l'exécutable",
+            label: tr!("runtimes.native.label"),
+            requirement: tr!("runtimes.native.requirement"),
             status: "ok",
-            note: "Toujours disponibles, aucun prérequis.".into(),
+            note: tr!("runtimes.native.note"),
             types: NATIVE_TYPES.to_vec(),
         },
         RuntimeGroup {
             runtime: "webview",
-            label: "Moteurs JS / WASM",
-            requirement: "Webview système (WebView2)",
+            label: tr!("runtimes.webview.label"),
+            requirement: tr!("runtimes.webview.requirement"),
             status: "ok",
-            note: "Exécutés dans la webview de rendu intégrée.".into(),
+            note: tr!("runtimes.webview.note"),
             types: JS_TYPES.to_vec(),
         },
         RuntimeGroup {
             runtime: "jvm",
-            label: "Moteurs Java",
-            requirement: "JRE/JDK installé sur le poste",
+            label: tr!("runtimes.jvm.label"),
+            requirement: tr!("runtimes.jvm.requirement"),
             status: if java_ok { "ok" } else { "blocked" },
             note: if java_ok {
-                "Java détecté : rendu local actif.".into()
+                tr!("runtimes.jvm.note_ok")
             } else {
-                "Java introuvable : installez un JRE/JDK, ou configurez un serveur Kroki externe."
-                    .into()
+                tr!("runtimes.jvm.note_missing")
             },
             types: JAVA_TYPES.to_vec(),
         },
         RuntimeGroup {
             runtime: "tex",
-            label: "Moteur TeX",
-            requirement: "Distribution TeX installée sur le poste (latex et dvisvgm)",
+            label: tr!("runtimes.tex.label"),
+            requirement: tr!("runtimes.tex.requirement"),
             status: if tex.is_some() { "ok" } else { "blocked" },
             note: match &tex {
-                Some(t) if t.miktex => "MiKTeX détecté : rendu local actif.".into(),
-                Some(_) => "Distribution TeX détectée : rendu local actif.".into(),
-                None => "latex ou dvisvgm introuvable : installez MiKTeX ou TeX Live, \
-                         ou configurez un serveur Kroki externe."
-                    .into(),
+                Some(t) if t.miktex => tr!("runtimes.tex.note_miktex"),
+                Some(_) => tr!("runtimes.tex.note_other"),
+                None => tr!("runtimes.tex.note_missing"),
             },
             types: TEX_TYPES.to_vec(),
         },
         RuntimeGroup {
             runtime: "external",
-            label: "Non embarqués",
-            requirement: "Serveur Kroki externe requis",
+            label: tr!("runtimes.external.label"),
+            requirement: tr!("runtimes.external.requirement"),
             status: "unsupported",
-            note: "Types reconnus par Kroki mais non intégrés à l'application.".into(),
+            note: tr!("runtimes.external.note"),
             types: EXTERNAL_ONLY_TYPES.to_vec(),
         },
     ]
@@ -258,13 +254,14 @@ fn build_renderer(app: &AppHandle) {
         RENDERER_LABEL,
         WebviewUrl::App("renderer/renderer.html".into()),
     )
-    .title("Kroki Desk — rendu")
+    // Fenêtre cachée, jamais affichée : titre technique, non traduit.
+    .title("Kroki Desk — renderer")
     .visible(false)
     .skip_taskbar(true)
     .inner_size(1200.0, 900.0)
     .build();
     if let Err(e) = built {
-        eprintln!("[engine] création de la webview de rendu impossible : {e}");
+        eprintln!("[engine] cannot create the render webview: {e}");
         // Échec : relâcher le verrou pour autoriser une nouvelle tentative.
         app.state::<EngineState>()
             .creating
@@ -288,10 +285,10 @@ fn wait_renderer_ready(app: &AppHandle, timeout: Duration) -> Result<(), String>
     let guard = lock.lock().unwrap();
     let (guard, res) = cv
         .wait_timeout_while(guard, timeout, |ready| !*ready)
-        .map_err(|_| "état du moteur de rendu corrompu".to_string())?;
+        .map_err(|_| tr!("engine.state_corrupted"))?;
     drop(guard);
     if res.timed_out() {
-        Err("Le moteur de rendu intégré n'a pas démarré à temps".into())
+        Err(tr!("engine.renderer_timeout"))
     } else {
         Ok(())
     }
@@ -323,9 +320,7 @@ fn render_js(
             .lock()
             .unwrap()
             .remove(&id);
-        return Err(format!(
-            "communication avec le moteur de rendu impossible : {e}"
-        ));
+        return Err(tr!("engine.renderer_comm", error = e));
     }
     let res = rx.recv_timeout(Duration::from_secs(40));
     app.state::<EngineState>()
@@ -334,8 +329,12 @@ fn render_js(
         .unwrap()
         .remove(&id);
     match res {
+        // Erreur vide = réponse sans résultat (cf. `render_job_done`) : le texte
+        // est produit ici, sur le thread qui attend, pour suivre sa langue (celle
+        // de l'API HTTP locale est l'anglais, pas celle de l'interface).
+        Ok(Err(e)) if e.is_empty() => Err(tr!("engine.empty_response")),
         Ok(r) => r,
-        Err(_) => Err(format!("Délai de rendu dépassé pour « {dtype} »")),
+        Err(_) => Err(tr!("engine.render_timeout", dtype = dtype)),
     }
 }
 
@@ -385,7 +384,7 @@ fn ensure_plantuml_jar(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_local_data_dir()
-        .map_err(|e| format!("dossier de données introuvable : {e}"))?;
+        .map_err(|e| tr!("engine.data_dir_not_found", error = e))?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let jar = dir.join(format!("plantuml-mit-{PLANTUML_VERSION}.jar"));
     let needs_write = match std::fs::metadata(&jar) {
@@ -394,18 +393,14 @@ fn ensure_plantuml_jar(app: &AppHandle) -> Result<PathBuf, String> {
     };
     if needs_write {
         std::fs::write(&jar, PLANTUML_JAR)
-            .map_err(|e| format!("extraction de PlantUML impossible : {e}"))?;
+            .map_err(|e| tr!("engine.jar_extract_failed", name = "PlantUML", error = e))?;
     }
     Ok(jar)
 }
 
 fn render_plantuml(app: &AppHandle, source: &str) -> Result<String, String> {
     let Some(java) = find_java(app) else {
-        return Err(
-            "PlantUML nécessite Java, qui n'a pas été trouvé sur ce poste. \
-             Installez un JRE/JDK (ou configurez un serveur Kroki externe dans les réglages)."
-                .into(),
-        );
+        return Err(tr!("engine.java_missing", name = "PlantUML"));
     };
     let jar = ensure_plantuml_jar(app)?;
     let src = if source.contains("@start") {
@@ -430,11 +425,11 @@ fn render_plantuml(app: &AppHandle, source: &str) -> Result<String, String> {
     no_window(&mut cmd);
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("lancement de Java impossible : {e}"))?;
+        .map_err(|e| tr!("engine.spawn_failed", name = "Java", error = e))?;
     child
         .stdin
         .take()
-        .ok_or("stdin indisponible")?
+        .ok_or_else(|| tr!("engine.stdin_unavailable"))?
         .write_all(src.as_bytes())
         .map_err(|e| e.to_string())?;
 
@@ -446,8 +441,8 @@ fn render_plantuml(app: &AppHandle, source: &str) -> Result<String, String> {
     });
     let output = match rx.recv_timeout(Duration::from_secs(60)) {
         Ok(Ok(o)) => o,
-        Ok(Err(e)) => return Err(format!("erreur PlantUML : {e}")),
-        Err(_) => return Err("Délai PlantUML dépassé (60 s)".into()),
+        Ok(Err(e)) => return Err(tr!("engine.tool_error", name = "PlantUML", error = e)),
+        Err(_) => return Err(tr!("engine.tool_timeout", name = "PlantUML", seconds = 60)),
     };
     let stdout = String::from_utf8_lossy(&output.stdout);
     if stdout.contains("<svg") {
@@ -456,9 +451,10 @@ fn render_plantuml(app: &AppHandle, source: &str) -> Result<String, String> {
         Ok(stdout.into_owned())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(format!(
-            "PlantUML n'a pas produit de SVG.\n{}",
-            stderr.trim()
+        Err(tr!(
+            "engine.no_svg",
+            name = "PlantUML",
+            details = stderr.trim()
         ))
     }
 }
@@ -469,7 +465,7 @@ fn ensure_ditaa_jar(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_local_data_dir()
-        .map_err(|e| format!("dossier de données introuvable : {e}"))?;
+        .map_err(|e| tr!("engine.data_dir_not_found", error = e))?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let jar = dir.join(format!("ditaa-{DITAA_VERSION}.jar"));
     let needs_write = match std::fs::metadata(&jar) {
@@ -478,18 +474,14 @@ fn ensure_ditaa_jar(app: &AppHandle) -> Result<PathBuf, String> {
     };
     if needs_write {
         std::fs::write(&jar, DITAA_JAR)
-            .map_err(|e| format!("extraction de ditaa impossible : {e}"))?;
+            .map_err(|e| tr!("engine.jar_extract_failed", name = "ditaa", error = e))?;
     }
     Ok(jar)
 }
 
 fn render_ditaa(app: &AppHandle, source: &str) -> Result<String, String> {
     let Some(java) = find_java(app) else {
-        return Err(
-            "ditaa nécessite Java, qui n'a pas été trouvé sur ce poste. \
-             Installez un JRE/JDK (ou configurez un serveur Kroki externe dans les réglages)."
-                .into(),
-        );
+        return Err(tr!("engine.java_missing", name = "ditaa"));
     };
     let jar = ensure_ditaa_jar(app)?;
 
@@ -511,11 +503,11 @@ fn render_ditaa(app: &AppHandle, source: &str) -> Result<String, String> {
     no_window(&mut cmd);
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("lancement de Java impossible : {e}"))?;
+        .map_err(|e| tr!("engine.spawn_failed", name = "Java", error = e))?;
     child
         .stdin
         .take()
-        .ok_or("stdin indisponible")?
+        .ok_or_else(|| tr!("engine.stdin_unavailable"))?
         .write_all(source.as_bytes())
         .map_err(|e| e.to_string())?;
 
@@ -526,15 +518,19 @@ fn render_ditaa(app: &AppHandle, source: &str) -> Result<String, String> {
     });
     let output = match rx.recv_timeout(Duration::from_secs(60)) {
         Ok(Ok(o)) => o,
-        Ok(Err(e)) => return Err(format!("erreur ditaa : {e}")),
-        Err(_) => return Err("Délai ditaa dépassé (60 s)".into()),
+        Ok(Err(e)) => return Err(tr!("engine.tool_error", name = "ditaa", error = e)),
+        Err(_) => return Err(tr!("engine.tool_timeout", name = "ditaa", seconds = 60)),
     };
     let stdout = String::from_utf8_lossy(&output.stdout);
     if stdout.contains("<svg") {
         Ok(stdout.into_owned())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(format!("ditaa n'a pas produit de SVG.\n{}", stderr.trim()))
+        Err(tr!(
+            "engine.no_svg",
+            name = "ditaa",
+            details = stderr.trim()
+        ))
     }
 }
 
@@ -614,7 +610,7 @@ fn run_bounded(
     no_window(&mut cmd);
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("lancement de {what} impossible : {e}"))?;
+        .map_err(|e| tr!("engine.spawn_failed", name = what, error = e))?;
     let deadline = Instant::now() + TEX_TIMEOUT;
     loop {
         match child.try_wait() {
@@ -623,12 +619,13 @@ fn run_bounded(
             Ok(None) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(format!(
-                    "Délai {what} dépassé ({} s)",
-                    TEX_TIMEOUT.as_secs()
+                return Err(tr!(
+                    "engine.tool_timeout",
+                    name = what,
+                    seconds = TEX_TIMEOUT.as_secs()
                 ));
             }
-            Err(e) => return Err(format!("erreur {what} : {e}")),
+            Err(e) => return Err(tr!("engine.tool_error", name = what, error = e)),
         }
     }
 }
@@ -655,7 +652,7 @@ fn tikz_document(source: &str) -> String {
 fn tex_error(log: &str) -> String {
     let lines: Vec<&str> = log.lines().collect();
     let Some(start) = lines.iter().position(|l| l.starts_with('!')) else {
-        return "(aucune erreur lisible dans le journal de latex)".into();
+        return tr!("engine.tex_no_error");
     };
     let mut message = lines[start].to_string();
     if let Some(at) = lines[start..]
@@ -668,10 +665,7 @@ fn tex_error(log: &str) -> String {
         message = format!("{message}\n{} {rest}", lines[at].trim_end());
     }
     if message.contains(".sty' not found") || message.contains("Unknown option") {
-        message.push_str(
-            "\n\nPaquet absent de la distribution TeX : installez-le depuis sa console \
-             (l'installation automatique est désactivée pendant le rendu).",
-        );
+        message = format!("{message}\n\n{}", tr!("engine.tex_package_missing"));
     }
     message
 }
@@ -716,12 +710,7 @@ fn missing_glyph_fonts(log: &str) -> Vec<String> {
 /// interdit en plus la lecture de fichiers par chemin absolu.
 fn render_tikz(app: &AppHandle, source: &str) -> Result<String, String> {
     let Some(tex) = find_tex(app) else {
-        return Err(
-            "TikZ nécessite une distribution TeX (MiKTeX, TeX Live) fournissant latex et \
-             dvisvgm, introuvable sur ce poste. Installez-en une (ou configurez un serveur \
-             Kroki externe dans les réglages)."
-                .into(),
-        );
+        return Err(tr!("engine.tex_missing"));
     };
     compile_tikz(&tex, source)
 }
@@ -733,10 +722,9 @@ fn compile_tikz(tex: &TexTools, source: &str) -> Result<String, String> {
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     )));
-    std::fs::create_dir_all(&dir.0)
-        .map_err(|e| format!("dossier de compilation impossible : {e}"))?;
+    std::fs::create_dir_all(&dir.0).map_err(|e| tr!("engine.tex_dir_failed", error = e))?;
     std::fs::write(dir.0.join("figure.tex"), tikz_document(source))
-        .map_err(|e| format!("écriture du document TikZ impossible : {e}"))?;
+        .map_err(|e| tr!("engine.tex_write_failed", error = e))?;
 
     let mut latex = std::process::Command::new("latex");
     latex.current_dir(&dir.0).args([
@@ -760,10 +748,7 @@ fn compile_tikz(tex: &TexTools, source: &str) -> Result<String, String> {
         let log = std::fs::read(dir.0.join("figure.log"))
             .map(|b| String::from_utf8_lossy(&b).into_owned())
             .unwrap_or_default();
-        return Err(format!(
-            "La compilation TikZ a échoué.\n{}",
-            tex_error(&log)
-        ));
+        return Err(tr!("engine.tikz_failed", details = tex_error(&log)));
     }
 
     let mut dvisvgm = std::process::Command::new("dvisvgm");
@@ -779,18 +764,14 @@ fn compile_tikz(tex: &TexTools, source: &str) -> Result<String, String> {
     let missing = missing_glyph_fonts(&std::fs::read_to_string(&stderr).unwrap_or_default());
     if !missing.is_empty() {
         // Une figure amputée de son texte passerait pour correcte : on refuse.
-        return Err(format!(
-            "dvisvgm n'a pas pu vectoriser les polices {} : le texte manquerait à la \
-             figure. Installez le paquet lmodern (ou cm-super) dans la distribution TeX, \
-             ou choisissez une police vectorielle dans le préambule.",
-            missing.join(", ")
-        ));
+        return Err(tr!("engine.tex_fonts_missing", fonts = missing.join(", ")));
     }
     match std::fs::read_to_string(dir.0.join("figure.svg")) {
         Ok(svg) if status.success() && svg.contains("<svg") => Ok(scope_svg_ids(&svg, source)),
-        _ => Err(format!(
-            "dvisvgm n'a pas produit de SVG.\n{}",
-            std::fs::read_to_string(&stderr).unwrap_or_default().trim()
+        _ => Err(tr!(
+            "engine.no_svg",
+            name = "dvisvgm",
+            details = std::fs::read_to_string(&stderr).unwrap_or_default().trim()
         )),
     }
 }
@@ -828,10 +809,10 @@ pub fn render_local(
         t if JS_TYPES.contains(&t) => render_js(app, t, source, options),
         t if JAVA_TYPES.contains(&t) => render_plantuml(app, source),
         t if TEX_TYPES.contains(&t) => render_tikz(app, source),
-        other => Err(format!(
-            "Le type « {other} » n'est pas disponible dans le rendu intégré.\n{}\n\
-             Pour les autres types, configurez un serveur Kroki externe dans les réglages.",
-            supported_summary()
+        other => Err(tr!(
+            "engine.type_unavailable",
+            dtype = other,
+            summary = supported_summary()
         )),
     }
 }
@@ -870,8 +851,10 @@ mod tikz_tests {
             "{msg}"
         );
         assert!(!msg.contains("Type X"));
-        assert!(msg.contains("installez-le"));
-        assert!(tex_error("rien").contains("aucune erreur"));
+        // Comparés au catalogue plutôt qu'à un texte : le test ne dépend pas de la
+        // langue (les tests tournent en anglais, la référence).
+        assert!(msg.ends_with(&tr!("engine.tex_package_missing")), "{msg}");
+        assert_eq!(tex_error("rien"), tr!("engine.tex_no_error"));
     }
 
     #[test]

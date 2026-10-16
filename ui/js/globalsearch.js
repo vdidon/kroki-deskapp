@@ -10,6 +10,7 @@
 // (aucune modification du DOM, cf. findword.js) sous un nom dédié.
 
 import { invoke, state, isHtmlPath } from "./app.js";
+import { t, getLocale, onLocaleChange } from "./i18n.js";
 import { scrollToLine } from "./render.js";
 import { collectMatchRanges } from "./textmatch.js";
 import { buildMatcher, initSearchToggles, iterMatches } from "./searchopts.js";
@@ -173,7 +174,7 @@ function renderResults(results) {
       head.textContent = r.tab.title;
       const note = document.createElement("div");
       note.className = "search-note";
-      note.textContent = "Document illisible";
+      note.textContent = t("globalsearch.unreadable");
       group.append(head, note);
       frag.append(group);
       continue;
@@ -191,7 +192,7 @@ function renderResults(results) {
     head.textContent = r.tab.title;
     const count = document.createElement("span");
     count.className = "search-count";
-    count.textContent = String(r.total);
+    count.textContent = formatCount(r.total);
     head.append(count);
     group.append(head);
     for (const h of r.hits) {
@@ -208,25 +209,36 @@ function renderResults(results) {
     if (r.truncated) {
       const note = document.createElement("div");
       note.className = "search-note";
-      note.textContent = `Affichage limité aux ${MAX_LINES_PER_DOC} premières lignes`;
+      note.textContent = t("globalsearch.lines_limited", { max: MAX_LINES_PER_DOC });
       group.append(note);
     }
     frag.append(group);
   }
   resultsEl.replaceChildren(frag);
   resultsEl.scrollTop = scrollTop;
-  if (!state.tabs.length) statusEl.textContent = "Aucun document ouvert";
-  else if (total === 0) statusEl.textContent = "Aucun résultat";
-  else {
-    const occ = total > 1 ? "occurrences" : "occurrence";
-    const docs = docCount > 1 ? `${docCount} documents` : "1 document";
-    const note = anyCapped
-      ? " (comptage plafonné)"
-      : anyTruncated
-        ? " (résultats tronqués)"
-        : "";
-    statusEl.textContent = `${total} ${occ} dans ${docs}${note}`;
+  if (!state.tabs.length) statusEl.textContent = t("globalsearch.no_open_document");
+  else if (total === 0) statusEl.textContent = t("globalsearch.no_result");
+  else statusEl.textContent = summaryText(total, docCount, anyCapped ? "capped" : anyTruncated ? "truncated" : "");
+}
+
+// Nombre affiché, séparateurs de milliers de la langue courante.
+function formatCount(n) {
+  return n.toLocaleString(getLocale());
+}
+
+// Bilan « N occurrences dans M documents (note) ». Une phrase par combinaison
+// (document unique ou non × note) : le pluriel du catalogue ne porte que sur
+// `count` (les occurrences), et on ne recolle jamais de fragments traduits.
+function summaryText(total, docCount, note) {
+  const p = { count: total, total: formatCount(total), docs: formatCount(docCount) };
+  if (docCount === 1) {
+    if (note === "capped") return t("globalsearch.summary_one_doc_capped", p);
+    if (note === "truncated") return t("globalsearch.summary_one_doc_truncated", p);
+    return t("globalsearch.summary_one_doc", p);
   }
+  if (note === "capped") return t("globalsearch.summary_docs_capped", p);
+  if (note === "truncated") return t("globalsearch.summary_docs_truncated", p);
+  return t("globalsearch.summary_docs", p);
 }
 
 // Vide les résultats ; `status` non vide = message d'erreur (motif invalide).
@@ -252,7 +264,7 @@ async function runSearch() {
   try {
     re = buildMatcher(raw, opts);
   } catch {
-    clearResults("Expression régulière invalide");
+    clearResults(t("searchopts.invalid_regex"));
     return;
   }
   statusEl.classList.remove("error");
@@ -337,6 +349,11 @@ export function initGlobalSearch({ beforeOpen } = {}) {
   closeBtn = document.getElementById("search-close");
   opts = initSearchToggles(document.getElementById("search-opts"), () => scheduleSearch(0));
   searchBtn.addEventListener("click", toggleGlobalSearch);
+  // Statut, notes et bilan affichés : une nouvelle recherche les reconstruit
+  // dans la langue courante (résultats rafraîchis, position de défilement gardée).
+  onLocaleChange(() => {
+    if (isGlobalSearchOpen()) scheduleSearch(0);
+  });
   closeBtn.addEventListener("click", closeGlobalSearch);
   input.addEventListener("input", () => scheduleSearch());
   input.addEventListener("keydown", (e) => {

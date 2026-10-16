@@ -4,7 +4,7 @@
 > compiles with the machine's `latex` + `dvisvgm` (MiKTeX or TeX Live), and only if
 > both are on the PATH — otherwise via an external Kroki server, or not at all. Without
 > TeX the block shows an error whatever the syntax, and the local API answers
-> **HTTP 400**, same as a syntax error (the body mentions « serveur Kroki externe »),
+> **HTTP 400**, same as a syntax error (the body mentions "external Kroki server"),
 > so do not "fix" a source that was never going to render here. Check
 > `latex --version` / `dvisvgm --version`, or the « Informations » dialog; if TeX is
 > missing, pick an embedded engine (`d2`, `graphviz`…) and say so in one line.

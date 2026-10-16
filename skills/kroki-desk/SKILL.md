@@ -382,10 +382,11 @@ body=$(curl -s --max-time 5 -w '\n%{http_code}' \
 code=${body##*$'\n'}; msg=${body%$'\n'*}
 case "$code" in
   200) echo "OK — renders in Kroki Desk" ;;
-  # Both "engine not embedded" and "Java not found" carry « serveur Kroki externe »;
+  # Both "engine not embedded" and "Java not found" carry "external Kroki server"
+  # (« serveur Kroki externe » before 3.25.0, whose API answered in French);
   # no engine's own syntax error does. That phrase is the discriminator.
   400) case "$msg" in
-         *"serveur Kroki externe"*)
+         *"external Kroki server"*|*"serveur Kroki externe"*)
            echo "ENGINE UNAVAILABLE here — the source may well be valid; switch engine or tell the user: $msg" ;;
          *) echo "SYNTAX ERROR — fix the source and retry: $msg" ;;
        esac ;;

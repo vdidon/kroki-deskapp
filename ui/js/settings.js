@@ -1,13 +1,15 @@
-// Réglages : thème, icônes des barres d'outils, serveur externe optionnel et
+// Réglages : thème, langue, icônes des barres d'outils, serveur externe optionnel et
 // API Kroki locale, persistés côté Rust.
 
 import { invoke } from "./app.js";
 import { applyTheme } from "./theme.js";
 import { openPlugins } from "./plugins_ui.js";
 import { ICON_GROUPS, applyIcons } from "./icons.js";
+import { getLanguages, getLanguageSetting, loadLocale, onLocaleChange, t } from "./i18n.js";
 
 const dialog = document.getElementById("settings-dialog");
 const themeSelect = document.getElementById("theme-select");
+const languageSelect = document.getElementById("language-select");
 const iconsBox = document.getElementById("icons-config");
 const urlInput = document.getElementById("kroki-url");
 const serverEnabled = document.getElementById("server-enabled");
@@ -22,29 +24,63 @@ let onSaved = null;
 // suivre le défaut du registre (cf. icons.js).
 let iconWork = {};
 const iconBoxes = new Map(); // id -> <input type=checkbox>
+// Dernier état reçu de `get_settings` : sert à recalculer l'indication des types
+// pris en charge si la langue change pendant que le dialog est ouvert.
+let supportedInfo = null;
 
 function updateServerHint() {
   serverHint.textContent = serverEnabled.checked
-    ? `Rendu intégré exposé sur http://127.0.0.1:${serverPort.value || 8442} — utilisable par d'autres outils (extensions VS Code, scripts…).`
-    : "API locale désactivée.";
+    ? t("settings.api.hint_on", { port: serverPort.value || 8442 })
+    : t("settings.api.hint_off");
+}
+
+// `supported` vient du Rust (déjà dans la langue courante) ; les phrases sur
+// Java et TeX manquants sont ajoutées ici.
+function updateSupportedHint() {
+  if (!supportedInfo) return;
+  supportedHint.textContent =
+    supportedInfo.supported +
+    (supportedInfo.java_available ? "" : ` ${t("settings.supported.no_java")}`) +
+    (supportedInfo.tex_available ? "" : ` ${t("settings.supported.no_tex")}`);
+}
+
+// Langues livrées, sous leur endonyme (« Français ») : un nom de langue ne se
+// traduit pas, chacun doit pouvoir reconnaître la sienne. L'option « auto »
+// vient d'index.html (traduite par data-i18n).
+function buildLanguageUi() {
+  const current = languageSelect.value;
+  const auto = languageSelect.querySelector('option[value="auto"]');
+  const options = getLanguages().map(({ code, name }) => {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.lang = code;
+    opt.textContent = name;
+    return opt;
+  });
+  languageSelect.replaceChildren(auto, ...options);
+  languageSelect.value = current;
 }
 
 // Une case par icône, avec un aperçu cloné du bouton réel : la liste ne peut pas
 // dériver du visuel de la barre, et une icône ajoutée à index.html n'a qu'à être
-// déclarée dans le registre.
+// déclarée dans le registre. Reconstruite à chaque changement de langue (les
+// libellés du registre sont des fonctions, résolues ici).
 function buildIconsUi() {
+  iconBoxes.clear();
   const groups = ICON_GROUPS.map((group) => {
     const box = document.createElement("div");
     box.className = "icons-group";
     const title = document.createElement("div");
     title.className = "icons-group-title";
-    title.textContent = group.title;
+    title.textContent = group.title();
     const grid = document.createElement("div");
     grid.className = "icons-grid";
     for (const it of group.items) {
       const item = document.createElement("label");
       item.className = "icon-toggle";
-      item.title = [it.hint, it.locked].filter(Boolean).join(" · ") || it.label;
+      item.title =
+        [it.hint?.(), it.locked ? t("icons.locked_hint") : ""].filter(Boolean).join(" · ") ||
+        it.label();
       const input = document.createElement("input");
       input.type = "checkbox";
       input.dataset.icon = it.id;
@@ -62,7 +98,7 @@ function buildIconsUi() {
       if (svg) preview.appendChild(svg.cloneNode(true));
       const label = document.createElement("span");
       label.className = "icon-label";
-      label.textContent = it.label;
+      label.textContent = it.label();
       item.append(input, preview, label);
       if (!it.locked) iconBoxes.set(it.id, input);
       grid.appendChild(item);
@@ -87,19 +123,14 @@ function syncIconBoxes() {
 export async function openSettings() {
   const s = await invoke("get_settings");
   themeSelect.value = s.theme || "auto";
+  languageSelect.value = s.language || "auto";
   iconWork = { ...(s.icons || {}) };
   syncIconBoxes();
   urlInput.value = s.external_url;
   serverEnabled.checked = s.server_enabled;
   serverPort.value = s.server_port;
-  supportedHint.textContent =
-    s.supported +
-    (s.java_available
-      ? ""
-      : " Java est introuvable sur ce poste : plantuml/c4plantuml/ditaa nécessitent un JRE (ou un serveur externe).") +
-    (s.tex_available
-      ? ""
-      : " Aucune distribution TeX sur ce poste : tikz nécessite MiKTeX ou TeX Live (ou un serveur externe).");
+  supportedInfo = s;
+  updateSupportedHint();
   updateServerHint();
   errorEl.hidden = true;
   dialog.showModal();
@@ -108,9 +139,20 @@ export async function openSettings() {
 export function initSettings(savedCallback) {
   onSaved = savedCallback;
 
+  buildLanguageUi();
   buildIconsUi();
   serverEnabled.addEventListener("change", updateServerHint);
   serverPort.addEventListener("input", updateServerHint);
+
+  // Textes écrits par le JS (libellés des icônes, indications du serveur, noms
+  // de langues) : à refaire quand la langue change. Les choix en cours d'édition
+  // vivent dans `iconWork` et `languageSelect.value`, la reconstruction les garde.
+  onLocaleChange(() => {
+    buildLanguageUi();
+    buildIconsUi();
+    updateServerHint();
+    updateSupportedHint();
+  });
 
   // Gestion des plugins : le dialog Plugins s'empile au-dessus des Réglages
   // (modales imbriquées, native aux <dialog>).
@@ -118,6 +160,7 @@ export function initSettings(savedCallback) {
 
   document.getElementById("settings-reset").addEventListener("click", () => {
     themeSelect.value = "auto";
+    languageSelect.value = "auto";
     // Oublier les choix d'icônes : toutes repartent de leur défaut, et rien
     // n'est enregistré tant que l'utilisateur ne recoche pas quelque chose.
     iconWork = {};
@@ -138,8 +181,13 @@ export function initSettings(savedCallback) {
         serverEnabled: serverEnabled.checked,
         serverPort: Number(serverPort.value) || 8442,
         theme: themeSelect.value,
+        language: languageSelect.value,
         icons: iconWork,
       });
+      // Langue : recharger le catalogue AVANT `onSaved`, dont le re-rendu doit
+      // déjà produire les messages dans la nouvelle langue. Aussi quand la
+      // langue effective ne change pas : le réglage brut (auto ↔ code) a pu bouger.
+      if (languageSelect.value !== getLanguageSetting()) await loadLocale();
       // Feedback immédiat sur la fenêtre initiatrice ; les autres fenêtres reçoivent
       // les events `theme-changed` / `icons-changed` (cf. main.js). `onSaved`
       // re-rend avec le thème à jour et réévalue les actions de vue.

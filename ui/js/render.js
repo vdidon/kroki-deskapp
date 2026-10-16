@@ -2,6 +2,7 @@
 
 import { invoke, convertFileSrc, b64encode, b64decode, escapeHtml } from "./app.js";
 import { docIsDark } from "./theme.js";
+import { t } from "./i18n.js";
 import { remapLine } from "./anchors.js";
 import {
   fencePluginFor,
@@ -239,7 +240,7 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
       (isPluginFence ? ` data-plugin-fence="1"` : "") +
       ` data-kroki-src="${b64encode(token.content)}"` +
       ` data-kroki-opts="${b64encode(JSON.stringify(opts))}">` +
-      `<div class="kroki-loading">Rendu ${escapeHtml(type)}…</div></div>`
+      `<div class="kroki-loading">${t("render.loading", { type: escapeHtml(type) })}</div></div>`
     );
   }
   return defaultFence(tokens, idx, options, env, self);
@@ -293,7 +294,7 @@ function rewriteLocalImages(root, dir) {
 
 function diagramError(type, err) {
   return (
-    `<div class="kroki-error"><strong>Diagramme ${escapeHtml(type)} — erreur</strong>` +
+    `<div class="kroki-error"><strong>${t("render.diagram_error", { type: escapeHtml(type) })}</strong>` +
     `<pre>${escapeHtml(String(err))}</pre></div>`
   );
 }
@@ -314,7 +315,7 @@ function ensurePlotly() {
       s.onload = () => resolve(window.Plotly);
       s.onerror = () => {
         plotlyPromise = null;
-        reject(new Error("Échec du chargement de Plotly"));
+        reject(new Error(t("render.plotly_load_failed")));
       };
       document.head.appendChild(s);
     });
@@ -328,7 +329,7 @@ function ensurePlotly() {
 // explicites de la spec restent prioritaires (merge en dessous via `...existant`).
 async function renderPlotly(el, raw) {
   const fig = typeof raw === "string" ? JSON.parse(raw) : raw;
-  if (!fig || typeof fig !== "object") throw new Error("spec Plotly invalide");
+  if (!fig || typeof fig !== "object") throw new Error(t("render.plotly_invalid_spec"));
   const dark = docIsDark();
   const data = Array.isArray(fig.data) ? fig.data : [];
   const layout = { ...(fig.layout || {}) };
@@ -412,7 +413,7 @@ async function hydrateDiagrams(root, dir, depth = 0) {
           if (!raw && options.src) {
             raw = await invoke("read_data_file", { baseDir: dir || "", rel: options.src });
           }
-          if (!raw) throw new Error("spec absente (ni contenu inline ni src=)");
+          if (!raw) throw new Error(t("render.plotly_missing_spec"));
           await renderPlotly(el, raw);
           el.classList.add("ok");
           hidePairedFallbackImage(el, options.src);
@@ -432,7 +433,7 @@ async function hydrateDiagrams(root, dir, depth = 0) {
       if (el.dataset.pluginFence) {
         const plugin = fencePluginFor(type);
         try {
-          if (!plugin) throw new Error("aucun plugin installé pour ce type de bloc");
+          if (!plugin) throw new Error(t("render.no_fence_plugin"));
           const r = await pluginRenderFence(plugin, {
             lang: type,
             source,
@@ -440,7 +441,7 @@ async function hydrateDiagrams(root, dir, depth = 0) {
             dir: dir || "",
           });
           if (r.format === "markdown") {
-            if (depth >= 2) throw new Error("imbrication de fences markdown trop profonde");
+            if (depth >= 2) throw new Error(t("render.fence_nesting_too_deep"));
             el.innerHTML = sanitizeHtml(md.render(r.content));
             // Les data-source-line du markdown dérivé pointent dans le contenu
             // généré, pas dans le document ouvert : on les retire pour ne pas
@@ -516,7 +517,7 @@ export function renderHtmlDocument(view, html) {
   const iframe = document.createElement("iframe");
   iframe.className = "html-view";
   iframe.setAttribute("sandbox", "");
-  iframe.setAttribute("title", "Page HTML");
+  iframe.setAttribute("title", t("render.html_page_title"));
   iframe.srcdoc = String(html);
   view.replaceChildren(iframe);
 }
@@ -654,6 +655,6 @@ export function extractHeadings(markdown) {
 export function renderReadError(view, message) {
   view.innerHTML =
     `<article class="markdown-body"><div class="kroki-error">` +
-    `<strong>Lecture impossible</strong><pre>${escapeHtml(String(message))}</pre>` +
+    `<strong>${t("render.read_error")}</strong><pre>${escapeHtml(String(message))}</pre>` +
     `</div></article>`;
 }

@@ -4,6 +4,7 @@
 // ici on ne gère que la sauvegarde et l'affichage des rapports (toast).
 
 import { invoke, listen } from "./app.js";
+import { t } from "./i18n.js";
 
 const toastEl = document.getElementById("toast");
 let toastTimer = null;
@@ -25,7 +26,7 @@ export async function initSession() {
     btn.disabled = true;
     try {
       // `false` = dialogue annulé : pas de toast.
-      if (await invoke("save_session")) showToast("Session enregistrée.");
+      if (await invoke("save_session")) showToast(t("session.saved"));
     } catch (err) {
       showToast(String(err), true);
     } finally {
