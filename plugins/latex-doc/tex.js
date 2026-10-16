@@ -1,33 +1,34 @@
-// Rendu des documents LaTeX autonomes (.tex) — cœur de la transformation.
+// Rendering of standalone LaTeX documents (.tex) — core of the transformation.
 //
-// Un .tex passé tel quel au pipeline markdown ne donne rien : les commandes
-// restent littérales et les formules ne sont pas reconnues. On génère donc un
-// markdown dérivé, en s'appuyant sur ce que l'hôte sait déjà faire :
-//   - les maths partent en `$…$` / `$$…$$` et sont rendues par le KaTeX de
-//     l'application (markdown-it-texmath, mode `dollars`) — le plugin ne rend
-//     aucune formule lui-même, il se contente de délimiter proprement ;
-//   - les titres restent des titres markdown (`##`) pour alimenter le sommaire ;
-//   - les ancres `<div id="…">` posées avant chaque objet numéroté rendent les
-//     références croisées cliquables (initLinks, `ui/js/main.js`, résout les
-//     `href="#id"` dans la vue courante).
+// A .tex fed as-is to the markdown pipeline yields nothing: commands stay
+// literal and formulas are not recognized. We therefore generate a derived
+// markdown, relying on what the host already knows how to do:
+//   - math is emitted as `$…$` / `$$…$$` and rendered by the application's
+//     KaTeX (markdown-it-texmath, `dollars` mode) — the plugin renders no
+//     formula itself, it just delimits them cleanly;
+//   - headings stay markdown headings (`##`) to feed the outline;
+//   - the `<div id="…">` anchors placed before each numbered object make
+//     cross-references clickable (initLinks, `ui/js/main.js`, resolves the
+//     `href="#id"` in the current view).
 //
-// Trois mécanismes portent l'essentiel de la fidélité :
+// Three mechanisms carry most of the fidelity:
 //
-// 1. **Double parse.** Les signatures des macros utilisateur ne sont connues
-//    qu'après lecture du préambule ; un premier parse collecte les
-//    `\newcommand`/`\DeclareMathOperator`/`\newtheorem`, le second re-parse le
-//    document en déclarant ces signatures au parseur — sans quoi `\hyp{h:iid}`
-//    serait lu comme la macro `\hyp` suivie d'un groupe indépendant.
-// 2. **Expansion des macros utilisateur.** KaTeX ignore `\E`, `\Var`, `\SigU`…
-//    définis dans le préambule ; le plugin les expanse (corps LaTeX, paramètres
-//    `#1`…`#9` substitués) avant d'émettre la formule.
-// 3. **Placeholders de références.** La numérotation se fait en un seul
-//    parcours ; les `\ref` en avant sont donc émises comme marqueurs opaques
-//    (`\u0001`) résolus une fois tout le document numéroté.
+// 1. **Double parse.** The signatures of user macros are only known after the
+//    preamble has been read; a first parse collects the
+//    `\newcommand`/`\DeclareMathOperator`/`\newtheorem`, the second re-parses
+//    the document while declaring these signatures to the parser — otherwise
+//    `\hyp{h:iid}` would be read as the macro `\hyp` followed by an independent
+//    group.
+// 2. **User macro expansion.** KaTeX knows nothing of `\E`, `\Var`, `\SigU`…
+//    defined in the preamble; the plugin expands them (LaTeX body, parameters
+//    `#1`…`#9` substituted) before emitting the formula.
+// 3. **Reference placeholders.** Numbering is done in a single pass; forward
+//    `\ref`s are therefore emitted as opaque markers (`\u0001`) resolved once
+//    the whole document is numbered.
 //
-// Le rendu est volontairement *sémantique*, pas typographique : la mise en page
-// LaTeX (geometry, flottants, pagination, colonnes) n'a pas d'équivalent en
-// markdown et n'est pas reproduite.
+// The rendering is deliberately *semantic*, not typographic: LaTeX page layout
+// (geometry, floats, pagination, columns) has no markdown equivalent and is
+// not reproduced.
 
 import { getParser, printRaw } from "./vendor/unified-latex.esm.js";
 
@@ -35,29 +36,29 @@ import { getParser, printRaw } from "./vendor/unified-latex.esm.js";
 // Tables de correspondance
 // --------------------------------------------------------------------------- //
 
-// Environnements mathématiques : leur contenu part tel quel à KaTeX, qui
-// connaît ces environnements — on ne réécrit que les délimiteurs.
+// Math environments: their content goes to KaTeX as-is, which knows these
+// environments — only the delimiters are rewritten.
 const MATH_ENVS = new Set([
   "equation", "equation*", "align", "align*", "alignat", "alignat*",
   "gather", "gather*", "multline", "multline*", "flalign", "flalign*",
   "eqnarray", "eqnarray*", "displaymath", "math",
 ]);
 
-// Environnements dont le contenu doit être ré-encapsulé dans `\begin{…}` :
-// KaTeX les gère, mais seulement à l'intérieur d'un bloc math.
+// Environments whose content must be re-wrapped in `\begin{…}`: KaTeX handles
+// them, but only inside a math block.
 const MATH_ENVS_WRAPPED = new Set([
   "align", "align*", "alignat", "alignat*", "gather", "gather*",
   "multline", "multline*", "flalign", "flalign*", "eqnarray", "eqnarray*",
 ]);
 
-// Environnements numérotés par LaTeX (compteur `equation`) — les étoilés ne le
-// sont pas.
+// Environments numbered by LaTeX (`equation` counter) — the starred ones are
+// not.
 const NUMBERED_MATH = new Set([
   "equation", "align", "alignat", "gather", "multline", "flalign", "eqnarray",
 ]);
 
-// Macros de mise en page sans contrepartie markdown : ignorées silencieusement
-// (elles ne portent aucune information une fois la pagination abandonnée).
+// Layout macros with no markdown counterpart: silently ignored (they carry no
+// information once pagination is dropped).
 const IGNORED_MACROS = new Set([
   "maketitle", "tableofcontents", "listoffigures", "listoftables",
   "noindent", "indent", "centering", "raggedright", "raggedleft",
@@ -73,29 +74,29 @@ const IGNORED_MACROS = new Set([
   "normalfont", "selectfont", "sloppy", "fussy", "allowdisplaybreaks",
   "numberwithin", "captionsetup", "graphicspath", "author", "date", "title",
   "today", "bibliography", "nocite", "markboth", "markright",
-  // longueurs et filets : aucune information hors mise en page
+  // lengths and rules: no information outside page layout
   "rule", "textwidth", "linewidth", "columnwidth", "textheight", "paperwidth",
   "baselineskip", "parindent", "parskip", "tabcolsep", "arraystretch",
   "arraybackslash", "strut", "usetikzlibrary", "emergencystretch",
 ]);
 
-// Boîtes dont seul le **dernier** argument porte du texte (les précédents sont
-// des largeurs, positions ou couleurs — `\parbox{0.9\textwidth}{…}`).
+// Boxes where only the **last** argument carries text (the previous ones are
+// widths, positions or colors — `\parbox{0.9\textwidth}{…}`).
 const BOX_MACROS = new Set([
   "fbox", "framebox", "parbox", "makebox", "colorbox", "fcolorbox", "raisebox",
 ]);
 
-// Changements de taille qui ouvrent un sous-titre dans `\title{… \\ \large …}`.
+// Size changes that open a subtitle in `\title{… \\ \large …}`.
 const SIZE_MACROS = new Set([
   "tiny", "scriptsize", "footnotesize", "small", "normalsize", "large", "Large",
   "LARGE", "huge", "Huge",
 ]);
 
-// Séparateurs et espaces LaTeX rendus en texte.
-// `\` suivi d'une fin de ligne est une espace de contrôle, comme `\ `.
+// LaTeX separators and spaces rendered as text.
+// `\` followed by a line break is a control space, like `\ `.
 const SPACING_MACROS = new Set([",", ";", ":", "!", " ", "\n", "\t", "quad", "qquad", "thinspace", "enspace"]);
 
-// Symboles texte (hors mode math).
+// Text symbols (outside math mode).
 const TEXT_SYMBOLS = {
   euro: "€", texteuro: "€", pounds: "£", textdollar: "$", S: "§", P: "¶",
   copyright: "©", textcopyright: "©", textregistered: "®", dag: "†", ddag: "‡",
@@ -107,13 +108,13 @@ const TEXT_SYMBOLS = {
   textbullet: "•", textperiodcentered: "·", textemdash: "—", textendash: "–",
   textquotedblleft: "“", textquotedblright: "”", textquoteleft: "‘",
   textquoteright: "’", LaTeX: "LaTeX", TeX: "TeX", LaTeXe: "LaTeX2ε",
-  // caractères réservés échappés en LaTeX : rendus littéralement
+  // reserved characters escaped in LaTeX: rendered literally
   "&": "&", "%": "%", "$": "$", "#": "#", "_": "_", "{": "{", "}": "}",
 };
 
-// Accents LaTeX → diacritiques combinants (recomposés en NFC à l'émission).
-// Notés en échappements Unicode : ces caractères sont invisibles dans un
-// éditeur et se perdent au copier-coller.
+// LaTeX accents → combining diacritics (recomposed to NFC on emission).
+// Written as Unicode escapes: these characters are invisible in an editor
+// and get lost on copy-paste.
 const ACCENTS = {
   "'": "\u0301", // combining acute accent
   "`": "\u0300", // combining grave accent
@@ -133,34 +134,34 @@ const ACCENTS = {
   t: "\u0361", // combining double inverted breve
 };
 
-// Balisage inline : macro → délimiteur markdown.
+// Inline markup: macro → markdown delimiter.
 const INLINE_STYLES = {
   textbf: "**", bf: "**", strong: "**",
   emph: "*", textit: "*", it: "*", textsl: "*",
   texttt: "`", tt: "`", verb: "`",
-  underline: "**", uline: "**", // pas de souligné en markdown : gras par défaut
+  underline: "**", uline: "**", // no underline in markdown: bold by default
 };
 
-// Environnements « transparents » : aucun rendu propre, on émet leur contenu.
+// "Transparent" environments: no rendering of their own, their content is emitted.
 const TRANSPARENT_ENVS = new Set([
   "center", "flushleft", "flushright", "small", "footnotesize", "large",
   "quotation", "sloppypar", "spacing", "minipage", "samepage", "group",
 ]);
 
-// Macros qui interrompent le paragraphe courant (cf. isBlockNode).
+// Macros that interrupt the current paragraph (see isBlockNode).
 const BLOCK_MACROS = new Set([
   "part", "chapter", "section", "subsection", "subsubsection",
   "paragraph", "subparagraph", "item", "hrule", "appendix",
 ]);
 
 const MAX_EXPANSION_DEPTH = 8;
-const SEP = "\u0001"; // délimiteur des marqueurs de référence (absent d'un .tex)
+const SEP = "\u0001"; // delimiter of reference markers (absent from a .tex)
 
 // --------------------------------------------------------------------------- //
-// Utilitaires texte
+// Text utilities
 // --------------------------------------------------------------------------- //
 
-/** Ligatures typographiques LaTeX appliquées au texte hors math. */
+/** LaTeX typographic ligatures applied to text outside math. */
 function ligatures(s) {
   return s
     .replace(/---/g, "—")
@@ -173,31 +174,31 @@ function ligatures(s) {
 }
 
 /**
- * Neutralise dans du texte les caractères que markdown-it interpréterait.
- * `$` devient une entité : un `$` littéral casserait la détection des
- * délimiteurs math de texmath.
+ * Neutralizes, in text, the characters that markdown-it would interpret.
+ * `$` becomes an entity: a literal `$` would break texmath's detection of
+ * math delimiters.
  */
 function escapeMd(s) {
   return s.replace(/[\\`*_[\]<>|]/g, (c) => "\\" + c).replace(/\$/g, "&#36;");
 }
 
 /**
- * Défait `escapeMd` pour un contenu de code inline : entre backticks, markdown
- * n'interprète rien et un antislash resterait affiché (`B2B\_Market`).
+ * Undoes `escapeMd` for inline code content: between backticks, markdown
+ * interprets nothing and a backslash would remain visible (`B2B\_Market`).
  */
 function unescapeMd(s) {
   return s.replace(/\\([\\`*_[\]<>|])/g, "$1").replace(/&#36;/g, "$");
 }
 
 /**
- * Colonnes d'une spec `tabular` → alignements markdown. Lecture par jetons :
- * un filtrage par caractère lirait le `c` de `p{5cm}` comme une colonne centrée.
+ * Columns of a `tabular` spec → markdown alignments. Token-based reading:
+ * filtering by character would read the `c` of `p{5cm}` as a centered column.
  */
 function columnAligns(spec) {
   const out = [];
   let i = 0;
   const group = () => {
-    // `spec[i]` doit être `{` ; renvoie le contenu et avance après `}`.
+    // `spec[i]` must be `{`; returns the content and advances past `}`.
     if (spec[i] !== "{") return "";
     let depth = 0;
     const start = i + 1;
@@ -235,21 +236,21 @@ function columnAligns(spec) {
   return out;
 }
 
-/** Idem pour une cellule de table : les `|` doivent aussi disparaître. */
+/** Same for a table cell: `|` must disappear too. */
 function escapeCell(s) {
   return s.replace(/\|/g, "\\|");
 }
 
 /**
- * Replie sur une seule ligne : un `\\` dans un titre ou une cellule produirait
- * un saut de ligne markdown qui couperait le titre en deux ou casserait la
+ * Collapses onto a single line: a `\\` in a title or a cell would produce a
+ * markdown line break that would split the title in two or break the
  * table.
  */
 function oneLine(s) {
   return s.replace(/\s+/g, " ").trim();
 }
 
-/** Nom d'un environnement (`n.env` est une liste de nœuds). */
+/** Name of an environment (`n.env` is a list of nodes). */
 function envName(node) {
   try {
     return printRaw(node.env).trim();
@@ -258,13 +259,13 @@ function envName(node) {
   }
 }
 
-/** Ligne source 0-based d'un nœud, ou null. */
+/** 0-based source line of a node, or null. */
 function srcLine(node) {
   const l = node?.position?.start?.line;
   return typeof l === "number" ? Math.max(0, l - 1) : null;
 }
 
-/** Valeur d'attribut HTML sûre — un label LaTeX est du texte libre. */
+/** Safe HTML attribute value — a LaTeX label is free text. */
 function attrValue(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -273,7 +274,7 @@ function attrValue(s) {
     .replace(/"/g, "&quot;");
 }
 
-/** Identifiant HTML sûr, dérivé d'un numéro ou d'un titre. */
+/** Safe HTML identifier, derived from a number or a title. */
 function slug(prefix, key) {
   const body = String(key)
     .toLowerCase()
@@ -282,31 +283,31 @@ function slug(prefix, key) {
   return `${prefix}-${body || "x"}`;
 }
 
-/** Contenu d'un argument, en LaTeX brut. */
+/** Content of an argument, as raw LaTeX. */
 function argRaw(node, i) {
   const a = node.args?.[i];
   return a ? printRaw(a.content).trim() : "";
 }
 
-/** Nœuds d'un argument (liste vide si absent). */
+/** Nodes of an argument (empty list if absent). */
 function argNodes(node, i) {
   return node.args?.[i]?.content ?? [];
 }
 
-/** Vrai si l'argument existe et a été délimité (distingue `[]` absent de vide). */
+/** True if the argument exists and was delimited (tells an absent `[]` from an empty one). */
 function hasArg(node, i) {
   const a = node.args?.[i];
   return !!a && a.openMark !== "";
 }
 
 // --------------------------------------------------------------------------- //
-// Préambule : macros utilisateur et environnements de théorèmes
+// Preamble: user macros and theorem environments
 // --------------------------------------------------------------------------- //
 
 /**
- * Collecte les définitions du document. Appelée sur un premier parse « nu »
- * (signatures inconnues) : `\newcommand` & co. ont une signature intégrée au
- * parseur, elles sont donc correctement découpées même à ce stade.
+ * Collects the document's definitions. Called on a first "bare" parse
+ * (unknown signatures): `\newcommand` & co. have a signature built into the
+ * parser, so they are correctly split even at this stage.
  */
 function collectDefs(nodes, defs) {
   for (const n of nodes) {
@@ -315,14 +316,14 @@ function collectDefs(nodes, defs) {
       continue;
     }
     if (n.type === "environment") {
-      collectDefs(n.content ?? [], defs); // \newtheorem après \begin{document} : légal
+      collectDefs(n.content ?? [], defs); // \newtheorem after \begin{document}: legal
       continue;
     }
     if (n.type !== "macro") continue;
     const name = n.content;
 
     if (name === "newcommand" || name === "renewcommand" || name === "providecommand") {
-      // args : [starred, ?, {\nom}, [nargs], [défaut], {corps}]
+      // args: [starred, ?, {\name}, [nargs], [default], {body}]
       const target = argRaw(n, 2).replace(/^\\/, "");
       if (!target || !/^[A-Za-z@]+$/.test(target)) continue;
       const nargs = Number(argRaw(n, 3)) || 0;
@@ -341,7 +342,7 @@ function collectDefs(nodes, defs) {
         body: `\\operatorname${star ? "*" : ""}{${argRaw(n, 2)}}`,
       });
     } else if (name === "newtheorem") {
-      // args : [*, {env}, [compteur partagé], {libellé}, [compteur parent]]
+      // args: [*, {env}, [shared counter], {label}, [parent counter]]
       const env = argRaw(n, 1);
       if (!env) continue;
       const shared = hasArg(n, 2) ? argRaw(n, 2) : "";
@@ -353,10 +354,10 @@ function collectDefs(nodes, defs) {
         style: defs.theoremStyle,
       });
     } else if (name === "theoremstyle") {
-      // Vaut pour tous les `\newtheorem` qui suivent (amsthm).
+      // Applies to every `\newtheorem` that follows (amsthm).
       defs.theoremStyle = argRaw(n, n.args?.length ? n.args.length - 1 : 0) || "plain";
     } else if (name === "def") {
-      // `\def\x{...}` : seule la forme sans paramètres délimités est reprise.
+      // `\def\x{...}`: only the form without delimited parameters is handled.
       const raw = printRaw(n.args?.map((a) => a.content) ?? []);
       const m = /^\\([A-Za-z@]+)\{([\s\S]*)\}$/.exec(raw.trim());
       if (m) defs.macros.set(m[1], { nargs: 0, optional: null, body: m[2] });
@@ -369,12 +370,12 @@ function collectDefs(nodes, defs) {
 }
 
 /**
- * Expanseur des macros utilisateur, appliqué au LaTeX **textuel** (formules,
- * corps de macro). Opère par balayage : on lit le nom, puis autant de groupes
- * `{…}` que la définition en attend, et on substitue `#1`…`#9`.
+ * Expander for user macros, applied to **textual** LaTeX (formulas, macro
+ * bodies). Works by scanning: read the name, then as many `{…}` groups as the
+ * definition expects, and substitute `#1`…`#9`.
  */
 function makeExpander(macros) {
-  // Lit un groupe équilibré à partir de `i` (qui doit pointer sur `{`).
+  // Reads a balanced group starting at `i` (which must point at `{`).
   const readGroup = (s, i) => {
     let depth = 0;
     for (let j = i; j < s.length; j++) {
@@ -403,7 +404,7 @@ function makeExpander(macros) {
       }
       const m = /^\\([A-Za-z@]+)/.exec(text.slice(i));
       if (!m) {
-        out += text.slice(i, i + 2); // `\{`, `\\`, `\%`… : laissés intacts
+        out += text.slice(i, i + 2); // `\{`, `\\`, `\%`…: left intact
         i += 2;
         continue;
       }
@@ -414,9 +415,9 @@ function makeExpander(macros) {
         continue;
       }
       let j = i + m[0].length;
-      while (text[j] === " ") j++; // LaTeX absorbe les espaces après un nom de macro
+      while (text[j] === " ") j++; // LaTeX swallows the spaces after a macro name
       const args = [];
-      // Argument optionnel `[…]` en première position, s'il est déclaré.
+      // Optional argument `[…]` in first position, if declared.
       if (def.optional !== null && text[j] === "[") {
         const close = text.indexOf("]", j);
         if (close > 0) {
@@ -431,7 +432,7 @@ function makeExpander(macros) {
           args.push(g.body);
           j = g.next;
         } else if (j < text.length && text[j] !== "\\") {
-          args.push(text[j]); // argument d'un seul caractère, sans accolades
+          args.push(text[j]); // single-character argument, without braces
           j++;
         } else if (text[j] === "\\") {
           const mm = /^\\([A-Za-z@]+|.)/.exec(text.slice(j));
@@ -441,14 +442,14 @@ function makeExpander(macros) {
         } else break;
       }
       if (args.length < def.nargs) {
-        out += m[0]; // arguments manquants : on n'expanse pas plutôt que de casser
+        out += m[0]; // missing arguments: do not expand rather than break
         i += m[0].length;
         continue;
       }
       const body = def.body.replace(/#(\d)/g, (_, d) => args[Number(d) - 1] ?? "");
-      // Un nom de commande se termine à la première non-lettre : sans espace,
-      // `\sum\Kdiff` deviendrait `\sumK_{…}` et `\foo x` (corps `\alpha`)
-      // deviendrait `\alphax` — deux commandes inconnues.
+      // A command name ends at the first non-letter: without a space,
+      // `\sum\Kdiff` would become `\sumK_{…}` and `\foo x` (body `\alpha`)
+      // would become `\alphax` — two unknown commands.
       if (/\\[A-Za-z@]+$/.test(out) && /^[A-Za-z@]/.test(body)) out += " ";
       out += body;
       if (/\\[A-Za-z@]+$/.test(body) && /^[A-Za-z@]/.test(text[j] ?? "")) out += " ";
@@ -462,39 +463,39 @@ function makeExpander(macros) {
 }
 
 // --------------------------------------------------------------------------- //
-// Génération du markdown dérivé
+// Generation of the derived markdown
 // --------------------------------------------------------------------------- //
 
-// Déclarations que `collectDefs` sait reconnaître. Sert à décider si le corps
-// du document doit être inclus dans le parse de collecte (cf. `defsScope`) :
-// un faux positif ne coûte que le comportement d'origine, jamais la fidélité.
+// Declarations that `collectDefs` knows how to recognize. Used to decide whether
+// the document body must be included in the collection parse (see `defsScope`):
+// a false positive only costs the original behavior, never fidelity.
 const DEF_MARKERS = /\\(newcommand|renewcommand|providecommand|DeclareMathOperator|newtheorem|def|title|author|date)\b/;
 
 /**
- * Portée du **premier** parse, celui qui ne sert qu'à collecter les définitions.
- * Elles vivent presque toujours dans le préambule : parser les quelques Ko qui
- * précèdent `\begin{document}` suffit alors, au lieu du document entier — le
- * parseur PEG domine le coût du rendu et cette passe le paie deux fois.
- * Repli sur le source complet dès qu'une déclaration traîne dans le corps
- * (`\newtheorem` après `\begin{document}` est légal, cf. collectDefs).
+ * Scope of the **first** parse, the one that only serves to collect definitions.
+ * They almost always live in the preamble: parsing the few KB that precede
+ * `\begin{document}` is then enough, instead of the whole document — the PEG
+ * parser dominates the cost of rendering and this pass pays it twice.
+ * Falls back to the full source as soon as a declaration lingers in the body
+ * (`\newtheorem` after `\begin{document}` is legal, see collectDefs).
  */
 function defsScope(source) {
   const cut = source.indexOf("\\begin{document}");
-  if (cut < 0) return source; // fragment : pas de préambule délimitable
+  if (cut < 0) return source; // fragment: no delimitable preamble
   return DEF_MARKERS.test(source.slice(cut)) ? source : source.slice(0, cut);
 }
 
 // --------------------------------------------------------------------------- //
-// Figures TikZ : document autonome compilé par l'hôte
+// TikZ figures: standalone document compiled by the host
 // --------------------------------------------------------------------------- //
 
-// Paquets du préambule repris dans le document d'une figure. Liste blanche et
-// non liste noire : un paquet de mise en page (`geometry`, `hyperref`,
-// `fancyhdr`…) n'y sert à rien, et un paquet absent de la distribution du
-// poste fait échouer toute la compilation — l'hôte désactive l'installation
-// automatique de MiKTeX. `babel` est exclu pour la même raison (le français
-// est rarement installé par défaut) et parce que ses caractères actifs
-// (`;`, `:`, `!`) cassent la syntaxe TikZ.
+// Preamble packages carried over into a figure's document. A whitelist rather
+// than a blacklist: a layout package (`geometry`, `hyperref`, `fancyhdr`…) is
+// useless there, and a package missing from the workstation's distribution
+// makes the whole compilation fail — the host disables MiKTeX's automatic
+// installation. `babel` is excluded for the same reason (French is rarely
+// installed by default) and because its active characters (`;`, `:`, `!`)
+// break TikZ syntax.
 const TIKZ_PACKAGES = new Set([
   "inputenc", "fontenc", "lmodern", "amsmath", "amssymb", "amsfonts", "mathtools",
   "bm", "textcomp", "eurosym", "upgreek", "mathrsfs", "stmaryrd", "xcolor", "color",
@@ -502,12 +503,12 @@ const TIKZ_PACKAGES = new Set([
   "circuitikz",
 ]);
 
-// Déclarations du préambule utiles à une figure. Les définitions de macros
-// sont paresseuses : reprendre une `\newcommand` inutilisée ne coûte rien.
+// Preamble declarations useful to a figure. Macro definitions are lazy:
+// carrying over an unused `\newcommand` costs nothing.
 const TIKZ_DECLARATIONS =
   /\\(usepackage|RequirePackage|usetikzlibrary|usepgfplotslibrary|tikzset|pgfplotsset|tikzstyle|newcommand|renewcommand|providecommand|DeclareMathOperator|definecolor|colorlet)(?![A-Za-z@])(\*?)/g;
 
-/** Lit un groupe équilibré (`{…}` ou `[…]`) ouvert en `i` ; renvoie l'indice qui le suit. */
+/** Reads a balanced group (`{…}` or `[…]`) opened at `i`; returns the index that follows it. */
 function skipGroup(s, i) {
   const open = s[i];
   const close = open === "{" ? "}" : "]";
@@ -523,9 +524,9 @@ function skipGroup(s, i) {
 }
 
 /**
- * Lignes de préambule d'une figure TikZ autonome, tirées du préambule du
- * document : paquets de la liste blanche, bibliothèques et styles TikZ,
- * macros utilisateur et couleurs. Un fragment sans préambule n'en donne aucune.
+ * Preamble lines of a standalone TikZ figure, drawn from the document's
+ * preamble: whitelisted packages, TikZ libraries and styles, user macros and
+ * colors. A fragment without a preamble yields none.
  */
 function tikzPreamble(source) {
   const cut = source.indexOf("\\begin{document}");
@@ -549,7 +550,7 @@ function tikzPreamble(source) {
         groups.push(`{${cs[0]}}`);
         i = j + cs[0].length;
       } else if (pre[j] === "=" && name === "tikzstyle") {
-        i = j + 1; // `\tikzstyle{nom}=[…]`
+        i = j + 1; // `\tikzstyle{name}=[…]`
       } else break;
     }
     TIKZ_DECLARATIONS.lastIndex = i;
@@ -560,8 +561,8 @@ function tikzPreamble(source) {
       const kept = names.filter((p) => TIKZ_PACKAGES.has(p));
       if (kept.length) lines.push(`\\usepackage${kept.length === names.length ? opts : ""}{${kept.join(",")}}`);
     } else if (name === "renewcommand") {
-      // Une commande que la classe `standalone` ne définit pas (`\contentsname`
-      // en dépend selon la classe d'origine) ferait échouer `\renewcommand`.
+      // A command that the `standalone` class does not define (`\contentsname`
+      // depends on the original class) would make `\renewcommand` fail.
       const target = (groups.find((g) => g[0] === "{") ?? "").slice(1, -1).trim();
       if (/^\\[A-Za-z@]+$/.test(target)) lines.push(`\\providecommand{${target}}{}${declaration}`);
     } else {
@@ -571,25 +572,82 @@ function tikzPreamble(source) {
   return lines;
 }
 
+/**
+ * Labels the plugin writes into the rendering itself (LaTeX's `\proofname`,
+ * `\partname`, `\abstractname`), in the document's language — as LaTeX does.
+ */
+const LABELS = {
+  en: {
+    proof: "Proof",
+    part: "Part",
+    abstract: "Abstract",
+    untitled: "(untitled)",
+    tikzSource: "TikZ source",
+    tikzNodesAndSource: "Node text and TikZ source",
+  },
+  fr: {
+    proof: "Démonstration",
+    part: "Partie",
+    abstract: "Résumé",
+    untitled: "(sans titre)",
+    tikzSource: "Source TikZ",
+    tikzNodesAndSource: "Texte des nœuds et source TikZ",
+  },
+};
+const FRENCH = new Set(["french", "francais", "frenchb", "acadian", "canadien"]);
+// Babel language options other than French: they can only select English
+// labels, but they must be told apart from class options (`a4paper`, `11pt`).
+const OTHER_LANGUAGES = new Set([
+  "english", "american", "british", "usenglish", "ukenglish", "canadian", "australian",
+  "newzealand", "german", "ngerman", "austrian", "naustrian", "swissgerman", "spanish",
+  "catalan", "italian", "portuguese", "brazilian", "dutch", "danish", "swedish", "norsk",
+  "nynorsk", "finnish", "polish", "czech", "slovak", "russian", "ukrainian", "greek",
+  "turkish", "hungarian", "romanian", "croatian", "serbian", "slovene", "japanese",
+]);
+
+/**
+ * Main language of the document, read from the preamble: polyglossia's
+ * `\setdefaultlanguage`/`\setmainlanguage`, else babel's `main=` option, else
+ * the last language among the babel and class options (babel's own rule —
+ * class options are passed on to it). English when nothing is declared or
+ * the language is not one the plugin has labels for.
+ */
+export function docLanguage(source) {
+  const pre = String(source).split(/\\begin\s*\{document\}/)[0].replace(/(?<!\\)%.*$/gm, "");
+  const toLang = (name) => (FRENCH.has(name.trim().toLowerCase()) ? "fr" : "en");
+  const poly = /\\set(?:default|main)language\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}/.exec(pre);
+  if (poly) return toLang(poly[1]);
+  const babel = /\\usepackage\s*(?:\[([^\]]*)\])?\s*\{[^}]*\bbabel\b[^}]*\}/.exec(pre);
+  if (!babel) return "en";
+  const cls = /\\documentclass\s*(?:\[([^\]]*)\])?/.exec(pre);
+  const opts = [cls?.[1], babel[1]].filter(Boolean).join(",").split(",").map((o) => o.trim());
+  const main = opts.find((o) => o.startsWith("main="));
+  if (main) return toLang(main.slice(5));
+  const isLang = (o) => FRENCH.has(o.toLowerCase()) || OTHER_LANGUAGES.has(o.toLowerCase());
+  const langs = opts.filter(isLang);
+  return langs.length ? toLang(langs[langs.length - 1]) : "en";
+}
+
 function generate(source, { title, fragment }) {
+  const L = LABELS[docLanguage(source)];
   const defs = { macros: new Map(), theorems: new Map(), meta: {}, theoremStyle: "plain" };
   const nude = getParser().parse(defsScope(source));
   collectDefs(nude.content, defs);
 
-  // Second parse : le parseur connaît maintenant la signature des macros
-  // utilisateur, leurs arguments sont donc correctement rattachés.
+  // Second parse: the parser now knows the signature of user macros, so
+  // their arguments are correctly attached.
   const signatures = {};
   for (const [name, def] of defs.macros) {
     const sig = (def.optional !== null ? "o" : "") + "m".repeat(def.nargs - (def.optional !== null ? 1 : 0));
     signatures[name] = { signature: sig };
   }
-  // Idem pour les environnements de théorèmes : le parseur ne connaît que les
-  // noms usuels (`theorem`, `remark`…). Sans signature, le titre d'un
-  // `\begin{hypothese}[Titre]` resterait dans le corps, crochets compris.
+  // Same for theorem environments: the parser only knows the usual names
+  // (`theorem`, `remark`…). Without a signature, the title of a
+  // `\begin{hypothese}[Title]` would stay in the body, brackets included.
   const envSignatures = {};
   for (const name of defs.theorems.keys()) envSignatures[name] = { signature: "o" };
-  // `longtable` est inconnu du parseur : sans signature, sa spec de colonnes
-  // (`{p{1.7cm} …}`) resterait dans la première cellule.
+  // `longtable` is unknown to the parser: without a signature, its column spec
+  // (`{p{1.7cm} …}`) would stay in the first cell.
   envSignatures.longtable = { signature: "o m" };
   const parser = getParser({ macros: signatures, environments: envSignatures });
   const ast = parser.parse(source);
@@ -597,18 +655,18 @@ function generate(source, { title, fragment }) {
   const body = docEnv ? docEnv.content : ast.content;
 
   const expand = makeExpander(defs.macros);
-  const out = []; // une entrée = une ligne de markdown
+  const out = []; // one entry = one line of markdown
   const anchors = [[0, 0]];
   const warnings = new Set();
-  const labels = new Map(); // label LaTeX → { text, anchor }
-  const anchorLines = new Map(); // id d'ancre → index de sa ligne dans `out`
+  const labels = new Map(); // LaTeX label → { text, anchor }
+  const anchorLines = new Map(); // anchor id → index of its line in `out`
   const footnotes = [];
   const counters = new Map();
   let sectionNums = [0, 0, 0, 0];
-  let inAppendix = false; // après `\appendix` : sections lettrées (A, B.2…)
+  let inAppendix = false; // after `\appendix`: lettered sections (A, B.2…)
   let partNum = 0;
-  // `\part` s'insère au-dessus des sections : leurs titres descendent d'un
-  // niveau pour que le sommaire reflète la hiérarchie.
+  // `\part` sits above the sections: their headings go down one level so
+  // that the outline reflects the hierarchy.
   const levelShift = body.some((n) => n.type === "macro" && n.content === "part") ? 1 : 0;
   let lastAnchoredSrc = -1;
 
@@ -617,9 +675,9 @@ function generate(source, { title, fragment }) {
     if (out.length && out[out.length - 1] !== "") out.push("");
   };
   /**
-   * Retire une ligne déjà émise **en réaccordant les ancres** : celles qui la
-   * suivent pointeraient sinon une ligne trop bas (la synchro preview ↔ source
-   * dériverait dans tout ce qui suit une liste).
+   * Removes an already emitted line **while realigning the anchors**: those
+   * that follow it would otherwise point one line too low (the preview ↔ source
+   * sync would drift across everything after a list).
    */
   const removeLine = (i) => {
     if (i < 0 || i >= out.length) return;
@@ -645,12 +703,12 @@ function generate(source, { title, fragment }) {
       .map((v, k) => (k === 0 && inAppendix && v >= 1 && v <= 26 ? String.fromCharCode(64 + v) : v))
       .join(".");
 
-  // --- références ------------------------------------------------------- //
+  // --- references ------------------------------------------------------- //
   const ref = (kind, key) => `${SEP}${kind}${SEP}${key}${SEP}`;
   const defineLabel = (key, text, anchor) => {
     if (key) labels.set(key, { text, anchor });
   };
-  // Cible courante d'un `\label` : mise à jour par chaque objet numéroté.
+  // Current target of a `\label`: updated by each numbered object.
   let pendingLabel = null;
   const openLabelTarget = (text, anchor) => {
     pendingLabel = { text, anchor };
@@ -660,16 +718,16 @@ function generate(source, { title, fragment }) {
     else defineLabel(key, "", "");
   };
 
-  // Pose une ancre HTML invisible (bloc : pas de paragraphe parasite). La ligne
-  // est mémorisée pour y greffer ensuite les alias de `\label` (cf. fin de
-  // `generate`) — greffe sur la ligne existante, donc sans décaler `anchors`.
+  // Places an invisible HTML anchor (block: no stray paragraph). The line
+  // is remembered so that `\label` aliases can be grafted onto it later (see the
+  // end of `generate`) — grafting onto the existing line, hence without shifting `anchors`.
   const anchorDiv = (id) => {
     anchorLines.set(id, out.length);
     push(`<div id="${id}"></div>`);
     push("");
   };
 
-  // --- expansion des macros utilisateur dans le flux inline -------------- //
+  // --- expansion of user macros in the inline flow ----------------------- //
   const expandCache = new Map();
   const expandMacroNode = (n) => {
     const key = n.content + "\u0000" + (n.args ?? []).map((a) => a.openMark + printRaw(a.content) + a.closeMark).join("");
@@ -684,11 +742,11 @@ function generate(source, { title, fragment }) {
     return nodes;
   };
 
-  // --- maths ------------------------------------------------------------- //
+  // --- math -------------------------------------------------------------- //
   /**
-   * Prépare le contenu d'une formule pour KaTeX : extraction des `\label`
-   * (qui n'ont aucun sens pour un moteur de rendu) puis expansion des macros
-   * du préambule, que KaTeX ne connaît pas.
+   * Prepares a formula's content for KaTeX: extraction of `\label`s
+   * (meaningless to a renderer) then expansion of the preamble's macros,
+   * which KaTeX does not know.
    */
   const prepareMath = (raw) => {
     const found = [];
@@ -697,12 +755,12 @@ function generate(source, { title, fragment }) {
       return "";
     });
     s = expand(s);
-    // Ce que KaTeX ne sait pas lire, en mode math comme dans `\text{}` (liste
-    // établie en sondant le KaTeX vendoré, cf. tests/test_latex_plugin.mjs) :
-    // sans ce nettoyage la formule entière s'afficherait en rouge.
+    // What KaTeX cannot read, in math mode as well as in `\text{}` (list
+    // established by probing the vendored KaTeX, see tests/test_latex_plugin.mjs):
+    // without this cleanup the whole formula would be displayed in red.
     s = s
       .replace(/\\(?:hspace|vspace)\*?\s*\{[^{}]*\}/g, "")
-      .replace(/(?<!\\)\\([-/])/g, "") // césure et correction d'italique
+      .replace(/(?<!\\)\\([-/])/g, "") // hyphenation and italic correction
       .replace(/(?<!\\)\\\*/g, "*")
       .replace(/\\(?:euro|texteuro)(?![A-Za-z])\s*(?:\{\})?/g, "\\text{€}")
       .replace(/\\textbullet(?![A-Za-z])\s*(?:\{\})?/g, "\\text{•}")
@@ -710,9 +768,9 @@ function generate(source, { title, fragment }) {
       .replace(/\\LaTeXe(?![A-Za-z])\s*(?:\{\})?/g, "\\text{LaTeX2ε}")
       .replace(/\\l(?![A-Za-z])/g, "\\text{ł}")
       .replace(/\\L(?![A-Za-z])/g, "\\text{Ł}")
-      // Une référence dans une formule (typiquement via une macro utilisateur
-      // du genre `\hyp{…}` = `H\ref{…}`) : le numéro est inséré en texte, sans
-      // lien — un lien markdown n'a pas cours à l'intérieur d'un `$…$`.
+      // A reference inside a formula (typically via a user macro such as
+      // `\hyp{…}` = `H\ref{…}`): the number is inserted as text, without a
+      // link — a markdown link has no meaning inside a `$…$`.
       .replace(/\\(ref|eqref)\s*\{([^}]*)\}/g, (_, kind, key) =>
         `\\text{${kind === "eqref" ? "(" + ref("t", key) + ")" : ref("t", key)}}`,
       );
@@ -746,10 +804,10 @@ function generate(source, { title, fragment }) {
 
   // --- inline ------------------------------------------------------------ //
   /**
-   * Rend une liste de nœuds en texte markdown inline. Le texte brut est
-   * accumulé pour appliquer ligatures puis échappement d'un seul tenant (les
-   * ligatures traversent les frontières de nœuds : `-`, `-`, `-` sont trois
-   * nœuds `string` distincts).
+   * Renders a list of nodes as inline markdown text. Raw text is
+   * accumulated so that ligatures then escaping are applied in one go (the
+   * ligatures cross node boundaries: `-`, `-`, `-` are three distinct
+   * `string` nodes).
    */
   const emitInline = (nodes, depth = 0) => {
     let res = "";
@@ -779,15 +837,15 @@ function generate(source, { title, fragment }) {
           flush();
           const { math, labels: found } = prepareMath(printRaw(n.content));
           for (const k of found) takeLabel(k);
-          // Une fin de ligne (`\` + retour, fréquent dans une formule longue)
-          // deviendrait un saut de ligne markdown et couperait la formule.
+          // A line end (`\` + return, common in a long formula) would become
+          // a markdown line break and cut the formula.
           if (math) res += `$${math.replace(/\s*\n\s*/g, " ")}$`;
           break;
         }
         case "displaymath":
         case "mathenv": {
-          // Formule display rencontrée en contexte inline (cellule, titre…) :
-          // dégradée en inline plutôt que perdue.
+          // Display formula met in an inline context (cell, title…):
+          // degraded to inline rather than lost.
           flush();
           const { math } = prepareMath(printRaw(n.content));
           if (math) res += `$${math.replace(/\s*\n\s*/g, " ")}$`;
@@ -812,8 +870,8 @@ function generate(source, { title, fragment }) {
           res += r.text;
           if (r.next !== undefined) i = r.next;
           else if (/^[A-Za-z@]+$/.test(n.content) && !n.args?.some((a) => a.openMark || a.content?.length)) {
-            // TeX absorbe les espaces qui suivent un mot de commande sans
-            // argument : `c\oe ur` s'écrit « cœur », pas « cœ ur ».
+            // TeX swallows the spaces that follow a command word without an
+            // argument: `c\oe ur` is written "cœur", not "cœ ur".
             while (nodes[i + 1]?.type === "whitespace") i++;
           }
           break;
@@ -827,8 +885,8 @@ function generate(source, { title, fragment }) {
   };
 
   /**
-   * Rend une macro en contexte inline. Retourne le texte et, si la macro a
-   * consommé des nœuds suivants (accents `\'e`), l'index atteint.
+   * Renders a macro in an inline context. Returns the text and, if the macro
+   * consumed following nodes (accents `\'e`), the index reached.
    */
   const emitInlineMacro = (n, siblings, i, depth) => {
     const name = n.content;
@@ -843,8 +901,8 @@ function generate(source, { title, fragment }) {
       return { text: d === "`" ? "`" + unescapeMd(inner).replace(/`/g, "ʼ") + "`" : d + inner + d };
     }
     if (name === "multicolumn") {
-      // {n}{spec}{contenu} : le markdown n'a pas de fusion de cellules, seul
-      // le contenu est repris (dans la première des colonnes couvertes).
+      // {n}{spec}{content}: markdown has no cell merging, only the
+      // content is kept (in the first of the covered columns).
       return { text: emitInline(argNodes(n, 2), depth) };
     }
     if (BOX_MACROS.has(name)) {
@@ -889,7 +947,7 @@ function generate(source, { title, fragment }) {
       return { text: escapeMd(TEXT_SYMBOLS[name]) };
     }
     if (ACCENTS[name] !== undefined) {
-      // La lettre accentuée est soit un argument, soit le nœud suivant.
+      // The accented letter is either an argument or the next node.
       let letter = argRaw(n, 0);
       let next = i;
       if (!letter) {
@@ -899,8 +957,8 @@ function generate(source, { title, fragment }) {
         if (s?.type === "string" && s.content) {
           letter = s.content[0];
           if (s.content.length > 1) {
-            // On ne consomme que la première lettre : le reste du nœud est
-            // réinjecté via un nœud synthétique.
+            // Only the first letter is consumed: the rest of the node is
+            // fed back through a synthetic node.
             siblings[j] = { ...s, content: s.content.slice(1) };
             next = j - 1;
           } else next = j;
@@ -913,23 +971,23 @@ function generate(source, { title, fragment }) {
     }
     if (SPACING_MACROS.has(name)) return { text: " " };
     if (name === "\\" || name === "newline") return { text: "  \n" };
-    if (name === "-" || name === "/") return { text: "" }; // césure, correction d'italique
+    if (name === "-" || name === "/") return { text: "" }; // hyphenation, italic correction
     if (IGNORED_MACROS.has(name)) return { text: "" };
 
-    // Macro inconnue : on conserve ses arguments, seule information portée.
+    // Unknown macro: keep its arguments, the only information it carries.
     const inner = (n.args ?? []).map((a) => emitInline(a.content ?? [], depth)).join(" ").trim();
-    if (!inner) warnings.add(`commande inconnue \\${name} ignorée`);
+    if (!inner) warnings.add(`unknown command \\${name} ignored`);
     return { text: inner };
   };
 
-  // --- blocs -------------------------------------------------------------- //
+  // --- blocks ------------------------------------------------------------- //
 
-  /** Émet un paragraphe à partir de nœuds inline accumulés. */
+  /** Emits a paragraph from accumulated inline nodes. */
   const flushPara = (nodes, indent) => {
     if (!nodes.length) return;
-    // Les espaces sont normalisés, mais **pas** les retours à la ligne : les
-    // seuls présents sont les `  \n` produits par un `\\`, qui doit rester un
-    // saut de ligne markdown.
+    // Spaces are normalized, but **not** line breaks: the only ones present
+    // are the `  \n` produced by a `\\`, which must remain a markdown line
+    // break.
     const text = emitInline(nodes)
       .replace(/[^\S\n]+/g, " ")
       .replace(/ ?\n ?/g, "  \n")
@@ -937,9 +995,9 @@ function generate(source, { title, fragment }) {
     if (!text) return;
     blank();
     anchorAt(nodes[0]);
-    // Une ligne qui débute par un marqueur markdown serait mal interprétée. Un
-    // nombre n'en est un que suivi de `.`/`)` **puis d'une espace** — et c'est
-    // la ponctuation qu'on échappe : `\0.92` afficherait l'antislash.
+    // A line that starts with a markdown marker would be misinterpreted. A
+    // number only is one when followed by `.`/`)` **then a space** — and it is
+    // the punctuation that gets escaped: `\0.92` would display the backslash.
     const lines = text
       .split("\n")
       .map((l) => l.replace(/^([#>+-])/, "\\$1").replace(/^(\d+)([.)])(?=\s|$)/, "$1\\$2"));
@@ -954,7 +1012,7 @@ function generate(source, { title, fragment }) {
     n.type === "verbatim" ||
     (n.type === "macro" && BLOCK_MACROS.has(n.content));
 
-  /** Nœuds porteurs de sens (hors espaces, commentaires et mise en page pure). */
+  /** Meaningful nodes (excluding spaces, comments and pure layout). */
   const meaningful = (nodes) =>
     nodes.filter(
       (x) =>
@@ -965,9 +1023,9 @@ function generate(source, { title, fragment }) {
     );
 
   /**
-   * Texte brut d'une boîte en police machine (`\fbox{\parbox{…}{\ttfamily …}}`,
-   * idiome courant pour un exemple de JSON ou de code) : restitué en bloc de
-   * code, fins de ligne `\\` et indentation `\hspace{…em}` comprises.
+   * Raw text of a box in a monospace font (`\fbox{\parbox{…}{\ttfamily …}}`,
+   * a common idiom for a JSON or code example): rendered as a code block,
+   * `\\` line endings and `\hspace{…em}` indentation included.
    */
   const codeText = (nodes) => {
     let s = "";
@@ -1000,7 +1058,7 @@ function generate(source, { title, fragment }) {
       .replace(/^\n+|\n+$/g, "");
   };
 
-  /** Préfixe de citation sur les lignes émises depuis `start` (lignes vides comprises). */
+  /** Quote prefix on the lines emitted since `start` (blank lines included). */
   const quoteFrom = (start, indent) => {
     let end = out.length;
     while (end > start && out[end - 1] === "") end--;
@@ -1010,9 +1068,9 @@ function generate(source, { title, fragment }) {
   };
 
   /**
-   * Paragraphe réduit à un encadré (`\fbox{\parbox{…}{…}}`, souvent centré) :
-   * rendu en citation — ou en bloc de code si le contenu est en `\ttfamily`.
-   * Renvoie faux si le paragraphe n'est pas de cette forme.
+   * Paragraph reduced to a framed box (`\fbox{\parbox{…}{…}}`, often centered):
+   * rendered as a quote — or as a code block if the content is in `\ttfamily`.
+   * Returns false if the paragraph is not of this form.
    */
   const emitBoxed = (nodes, indent) => {
     const sole = meaningful(nodes);
@@ -1058,9 +1116,9 @@ function generate(source, { title, fragment }) {
         flushInline();
         emitBlockNode(n, indent);
       } else if (n.type === "group" && (n.content ?? []).some(isBlockNode)) {
-        // `{\small \begin{longtable}…}` : le groupe ne sert qu'à borner des
-        // déclarations de mise en page — inline, l'environnement serait aplati
-        // en texte (spec de colonnes et `&` compris).
+        // `{\small \begin{longtable}…}`: the group only serves to bound layout
+        // declarations — inline, the environment would be flattened into
+        // text (column spec and `&` included).
         flushInline();
         emitBlocks(n.content, indent);
       } else if (n.type === "comment") {
@@ -1085,9 +1143,9 @@ function generate(source, { title, fragment }) {
   }, "");
 
   /**
-   * `\part` : compteur romain propre (`\ref` → « II »), qui ne touche **pas**
-   * aux sections — en classe `article`, leur numérotation continue d'une partie
-   * à l'autre.
+   * `\part`: own roman counter (`\ref` → "II"), which does **not** touch
+   * the sections — in the `article` class, their numbering continues from one
+   * part to the next.
    */
   const emitPart = (n) => {
     const starred = argRaw(n, 0) === "*";
@@ -1098,7 +1156,7 @@ function generate(source, { title, fragment }) {
     const anchor = num ? slug("part", num) : slug("part", text || String(out.length));
     anchorDiv(anchor);
     openLabelTarget(num || text, anchor);
-    push("## " + (num ? `Partie ${num} — ` : "") + (text || "(sans titre)"));
+    push("## " + (num ? `${L.part} ${num} — ` : "") + (text || L.untitled));
     push("");
   };
 
@@ -1112,31 +1170,31 @@ function generate(source, { title, fragment }) {
       sectionNums[depth - 1] += 1;
       for (let k = depth; k < sectionNums.length; k++) sectionNums[k] = 0;
       num = sectionPrefix(depth);
-      // Le compteur d'équations n'est pas remis à zéro (numérotation continue,
-      // comportement par défaut de la classe `article`).
-      // Compteurs de théorèmes déclarés `[section]` : remis à zéro.
+      // The equation counter is not reset (continuous numbering,
+      // default behavior of the `article` class).
+      // Theorem counters declared `[section]`: reset to zero.
       for (const t of defs.theorems.values()) {
         if (t.parent === "section") counters.set(t.counter, 0);
       }
     }
     blank();
     anchorAt(n);
-    // Slug du numéro : `sec-2-1`, et `sec-b-1` en annexe — jamais le même
-    // identifiant qu'une section du corps.
+    // Slug of the number: `sec-2-1`, and `sec-b-1` in an appendix — never the same
+    // identifier as a body section.
     const anchor = num ? slug("sec", num) : slug("sec", text || String(out.length));
     anchorDiv(anchor);
     openLabelTarget(num || text, anchor);
-    // +1 : le niveau 1 markdown est réservé au titre du document (+1 encore
-    // sous des `\part`).
-    push("#".repeat(Math.min(6, depth + 1 + levelShift)) + " " + (num ? num + " " : "") + (text || "(sans titre)"));
+    // +1: markdown level 1 is reserved for the document title (one more
+    // under `\part`s).
+    push("#".repeat(Math.min(6, depth + 1 + levelShift)) + " " + (num ? num + " " : "") + (text || L.untitled));
     push("");
   };
 
   /**
-   * En-tête d'environnement (théorème, démonstration) fondu dans le premier
-   * paragraphe du corps, comme le compose amsthm : « **Proposition 8**
-   * (Titre). Sous H1… ». Si le corps commence par autre chose qu'un
-   * paragraphe (formule, liste, table), l'en-tête reste sur sa propre ligne.
+   * Environment header (theorem, proof) merged into the first paragraph of
+   * the body, as amsthm typesets it: "**Proposition 8** (Title). Under H1…".
+   * If the body starts with something other than a paragraph (formula, list,
+   * table), the header stays on its own line.
    */
   const runInHeader = (h) => {
     const p = h + 2;
@@ -1159,8 +1217,8 @@ function generate(source, { title, fragment }) {
     anchorAt(n);
     anchorDiv(anchor);
     openLabelTarget(num, anchor);
-    // amsthm : tête en gras (styles `plain`, `definition`) ou en italique
-    // (`remark`), note entre parenthèses en romain, point final.
+    // amsthm: bold head (`plain`, `definition` styles) or italic
+    // (`remark`), note in parentheses in roman, trailing period.
     const d = spec.style === "remark" ? "*" : "**";
     const head = `${escapeMd(spec.label)}${num ? " " + num : ""}`;
     const note = titleNodes.length ? oneLine(emitInline(titleNodes)) : "";
@@ -1174,7 +1232,7 @@ function generate(source, { title, fragment }) {
   const emitProof = (n) => {
     blank();
     anchorAt(n);
-    const title = hasArg(n, 0) ? oneLine(emitInline(argNodes(n, 0))) : "Démonstration";
+    const title = hasArg(n, 0) ? oneLine(emitInline(argNodes(n, 0))) : L.proof;
     const h = out.length;
     push(`*${title}.*`);
     push("");
@@ -1186,9 +1244,9 @@ function generate(source, { title, fragment }) {
   };
 
   /**
-   * Émet des items de liste. Un marqueur explicite (`\item[(a)]`) remplace la
-   * puce numérotée — le doublon « 1. (a) » n'existe pas en LaTeX ; il est en
-   * gras dans `description`, en romain ailleurs.
+   * Emits list items. An explicit marker (`\item[(a)]`) replaces the
+   * numbered bullet — the "1. (a)" duplicate does not exist in LaTeX; it is
+   * bold in `description`, roman elsewhere.
    */
   const emitItems = (items, ordered, indent, boldMarkers) => {
     const numbered = ordered && items.every((it) => !it.marker);
@@ -1197,7 +1255,7 @@ function generate(source, { title, fragment }) {
       const child = indent + " ".repeat(bullet.length);
       const start = out.length;
       emitBlocks(it.nodes, child);
-      // Retire les lignes vides de tête produites par `blank()` en début d'item.
+      // Removes the leading blank lines produced by `blank()` at the start of an item.
       while (out.length > start && out[start] === "") removeLine(start);
       const label = it.marker ? (boldMarkers ? `**${it.marker}** ` : `${it.marker} `) : "";
       if (out.length > start) {
@@ -1205,7 +1263,7 @@ function generate(source, { title, fragment }) {
       } else {
         out.push(indent + bullet + label);
       }
-      // Une ligne vide en fin d'item séparerait la liste en deux blocs.
+      // A blank line at the end of an item would split the list into two blocks.
       while (out.length > start && out[out.length - 1] === "") removeLine(out.length - 1);
     });
     push("");
@@ -1216,10 +1274,10 @@ function generate(source, { title, fragment }) {
     let cur = null;
     for (const c of n.content ?? []) {
       if (c.type === "macro" && c.content === "item") {
-        // Le parseur rattache le corps de l'item à `\item` : le marqueur
-        // facultatif est l'argument entre crochets, le corps le dernier
-        // argument. Les nœuds qui suivent (paragraphes séparés par une ligne
-        // vide) appartiennent au même item et sont concaténés.
+        // The parser attaches the item body to `\item`: the optional marker
+        // is the bracketed argument, the body is the last argument. The nodes
+        // that follow (paragraphs separated by a blank line) belong to the
+        // same item and are concatenated.
         const args = c.args ?? [];
         const optional = args.find((a) => a.openMark === "[");
         const bodyArg = args.filter((a) => a.openMark !== "[").pop();
@@ -1231,7 +1289,7 @@ function generate(source, { title, fragment }) {
         items.push(cur);
       } else if (cur) cur.nodes.push(c);
       else if (c.type !== "whitespace" && c.type !== "parbreak" && c.type !== "comment") {
-        // Contenu avant le premier \item : rare, mais ne doit pas disparaître.
+        // Content before the first \item: rare, but must not disappear.
         cur = { node: c, marker: "", nodes: [c] };
         items.push(cur);
       }
@@ -1242,7 +1300,7 @@ function generate(source, { title, fragment }) {
     emitItems(items, ordered, indent, boldMarkers);
   };
 
-  /** Décale les positions d'un sous-arbre re-parsé isolément (lignes du source). */
+  /** Shifts the positions of a subtree re-parsed in isolation (source lines). */
   const shiftLines = (nodes, delta) => {
     for (const x of nodes) {
       if (x.position) {
@@ -1258,16 +1316,17 @@ function generate(source, { title, fragment }) {
   };
 
   /**
-   * `tikzpicture` : le plugin ne dessine pas. Il émet une fence ```tikz
-   * contenant un **document LaTeX autonome** — la forme qu'attend Kroki —,
-   * que l'hôte compile avec la distribution TeX du poste, ou confie au serveur
-   * Kroki configuré. Le document reprend du préambule ce qu'une figure peut
-   * utiliser (cf. `tikzPreamble`) et fixe par `\newlabel` le numéro des
-   * `\ref`/`\eqref` qu'elle contient, résolus comme les autres marqueurs.
+   * `tikzpicture`: the plugin does not draw. It emits a ```tikz fence
+   * containing a **standalone LaTeX document** — the form Kroki expects —,
+   * which the host compiles with the workstation's TeX distribution, or hands
+   * over to the configured Kroki server. The document carries over from the
+   * preamble what a figure can use (see `tikzPreamble`) and fixes, through
+   * `\newlabel`, the number of the `\ref`/`\eqref` it contains, resolved like
+   * the other markers.
    *
-   * Sans moteur TeX, l'hôte affiche une erreur à la place du dessin : le texte
-   * de chaque `\node` (dans l'ordre du source) et le source TikZ restent donc
-   * disponibles, repliés sous la figure.
+   * Without a TeX engine, the host displays an error in place of the drawing:
+   * the text of each `\node` (in source order) and the TikZ source therefore
+   * remain available, folded under the figure.
    */
   let tikzLines = null;
   const emitTikz = (n, indent) => {
@@ -1291,7 +1350,7 @@ function generate(source, { title, fragment }) {
     const items = [];
     const re = /\\node(?![A-Za-z@])/g;
     for (let m; (m = re.exec(raw)); ) {
-      // Options `[…]`, nom `(…)` et position `at (…)` précèdent le texte `{…}`.
+      // Options `[…]`, name `(…)` and position `at (…)` precede the text `{…}`.
       let i = m.index + m[0].length;
       let sq = 0;
       let par = 0;
@@ -1305,7 +1364,7 @@ function generate(source, { title, fragment }) {
         else if (c === ";" && !sq && !par) break;
         else if (c === "{") {
           if (!sq && !par) break;
-          // accolades d'une valeur d'option (`font={\small}`) : sautées
+          // braces of an option value (`font={\small}`): skipped
           for (let depth = 0; i < raw.length; i++) {
             if (raw[i] === "\\") i++;
             else if (raw[i] === "{") depth++;
@@ -1334,7 +1393,7 @@ function generate(source, { title, fragment }) {
     for (const l of figure) push(indent + l);
     push(indent + figureFence);
     push("");
-    push(indent + `<details><summary>${items.length ? "Texte des nœuds et source" : "Source"} TikZ</summary>`);
+    push(indent + `<details><summary>${items.length ? L.tikzNodesAndSource : L.tikzSource}</summary>`);
     push("");
     if (items.length) emitItems(items, false, indent, false);
     const fence = fenceFor(raw);
@@ -1347,12 +1406,12 @@ function generate(source, { title, fragment }) {
   };
 
   /**
-   * `tabular` → table markdown. Attention à la dissymétrie de l'AST : le `&`
-   * **séparateur de cellule** est un nœud `string`, alors que le `\&` littéral
-   * est une macro — confondre les deux découperait les cellules au mauvais
-   * endroit. La fin de ligne `\\` est, elle, bien une macro.
-   * La première ligne devient l'en-tête : le markdown n'a pas de table sans
-   * en-tête, et une table dont la première ligne est du contenu reste lisible.
+   * `tabular` → markdown table. Mind the AST asymmetry: the **cell separator**
+   * `&` is a `string` node, whereas the literal `\&` is a macro — confusing the
+   * two would split the cells in the wrong place. The `\\` line end, on the
+   * other hand, is indeed a macro.
+   * The first row becomes the header: markdown has no header-less table, and a
+   * table whose first row is content remains readable.
    */
   const emitTabular = (n, indent) => {
     const spec = argRaw(n, n.args?.length ? n.args.length - 1 : 0);
@@ -1360,9 +1419,9 @@ function generate(source, { title, fragment }) {
     const rows = [];
     let row = [];
     let cell = [];
-    // `longtable` : les lignes qui précèdent `\endfoot`/`\endlastfoot` sont des
-    // pieds de page, et celles entre `\endfirsthead` et `\endhead` l'en-tête
-    // répété des pages suivantes — une table markdown n'a qu'un en-tête.
+    // `longtable`: the rows that precede `\endfoot`/`\endlastfoot` are page
+    // footers, and those between `\endfirsthead` and `\endhead` the repeated
+    // header of the following pages — a markdown table has only one header.
     let mark = 0;
     let firstHead = -1;
     const endCell = () => {
@@ -1376,8 +1435,8 @@ function generate(source, { title, fragment }) {
     };
     for (const c of n.content ?? []) {
       if (c.type === "string" && c.content.includes("&")) {
-        // Le parseur isole `&` dans son propre nœud, mais on découpe malgré
-        // tout : une cellule collée (`a&b`) ne doit pas être perdue.
+        // The parser isolates `&` in its own node, but we split anyway:
+        // a glued cell (`a&b`) must not be lost.
         const parts = c.content.split("&");
         parts.forEach((p, k) => {
           if (k) endCell();
@@ -1414,8 +1473,8 @@ function generate(source, { title, fragment }) {
   };
 
   const emitFloat = (n, kind) => {
-    // `table`/`figure` : le flottant lui-même n'existe pas en markdown, on rend
-    // son contenu puis sa légende, numérotée comme LaTeX le ferait.
+    // `table`/`figure`: the float itself does not exist in markdown, we render
+    // its content then its caption, numbered as LaTeX would.
     const num = bump(kind);
     const anchor = `${kind}-${num}`;
     blank();
@@ -1441,8 +1500,8 @@ function generate(source, { title, fragment }) {
   };
 
   const emitVerbatim = (n, indent, lang = "") => {
-    // La fin de ligne qui suit `\begin{verbatim}` et celle qui précède
-    // `\end{verbatim}` ne font pas partie du contenu.
+    // The line end that follows `\begin{verbatim}` and the one that precedes
+    // `\end{verbatim}` are not part of the content.
     const text = String(n.content ?? "").replace(/\r\n?/g, "\n").replace(/^\n/, "").replace(/\n$/, "");
     blank();
     anchorAt(n);
@@ -1483,7 +1542,7 @@ function generate(source, { title, fragment }) {
         case "abstract": {
           blank();
           anchorAt(n);
-          push("**Résumé**");
+          push(`**${L.abstract}**`);
           push("");
           return emitBlocks(n.content ?? [], indent);
         }
@@ -1510,7 +1569,7 @@ function generate(source, { title, fragment }) {
         case "thebibliography":
           return emitBlocks(n.content ?? [], indent);
         default:
-          if (!TRANSPARENT_ENVS.has(name)) warnings.add(`environnement « ${name} » rendu sans mise en forme`);
+          if (!TRANSPARENT_ENVS.has(name)) warnings.add(`environment "${name}" rendered without formatting`);
           return emitBlocks(n.content ?? [], indent);
       }
     }
@@ -1524,22 +1583,22 @@ function generate(source, { title, fragment }) {
         push("");
         return;
       }
-      if (name === "item") return; // `\item` hors liste : ignoré
+      if (name === "item") return; // `\item` outside a list: ignored
       if (name === "appendix") {
         sectionNums = [0, 0, 0, 0];
         inAppendix = true;
         return;
       }
-      // Macro bloc sans traitement dédié : rendue comme inline.
+      // Block macro without dedicated handling: rendered as inline.
       return flushPara([n], indent);
     }
   };
 
-  // --- titre du document -------------------------------------------------- //
+  // --- document title ----------------------------------------------------- //
   if (!fragment) {
-    // `\title{Titre \\ \large Sous-titre}` : un segment ouvert par un changement
-    // de taille est un sous-titre, rendu sous le h1 ; un `\\` nu ne fait que
-    // couper une ligne trop longue et reste replié dans le titre.
+    // `\title{Title \\ \large Subtitle}`: a segment opened by a size change
+    // is a subtitle, rendered under the h1; a bare `\\` only breaks an
+    // overly long line and stays folded into the title.
     const lines = [[]];
     for (const x of defs.meta.title ? parser.parse(defs.meta.title).content : []) {
       if (x.type === "macro" && (x.content === "\\" || x.content === "newline")) lines.push([]);
@@ -1556,7 +1615,7 @@ function generate(source, { title, fragment }) {
     push("");
     const subs = subtitles.filter(Boolean);
     if (subs.length) {
-      // une entrée de `out` = une ligne : les ancres comptent les entrées
+      // one entry of `out` = one line: the anchors count entries
       subs.forEach((s, k) => push(k < subs.length - 1 ? s + "  " : s));
       push("");
     }
@@ -1572,7 +1631,7 @@ function generate(source, { title, fragment }) {
 
   emitBlocks(body);
 
-  // --- notes de bas de page ----------------------------------------------- //
+  // --- footnotes ---------------------------------------------------------- //
   if (footnotes.length) {
     blank();
     push("---");
@@ -1585,20 +1644,20 @@ function generate(source, { title, fragment }) {
     push("");
   }
 
-  // --- alias d'ancre : le label LaTeX lui-même ----------------------------- //
-  // Les ancres posées jusqu'ici portent un **numéro** (`eq-3`, `sec-2-1`) qui
-  // bouge à la moindre insertion en amont : inutilisable comme cible stable
-  // depuis un autre document. Chaque ancre est donc doublée du ou des `\label{}`
-  // qui la visent, **verbatim** — `\label{eq:sigmaU}` ↔ `doc.tex#eq:sigmaU`,
-  // correspondance 1:1, aucune règle de transformation à retenir (un slug
-  // forcerait la casse : `sigmaU` → `sigmau`).
-  // La greffe se fait *sur* la ligne d'ancre existante : aucune ligne n'est
-  // créée, `anchors` (synchro preview ↔ source) reste exact.
-  const aliases = new Map(); // index de ligne → labels à y greffer
+  // --- anchor aliases: the LaTeX label itself ------------------------------ //
+  // The anchors placed so far carry a **number** (`eq-3`, `sec-2-1`) that
+  // moves with the slightest insertion upstream: unusable as a stable target
+  // from another document. Each anchor is therefore doubled with the `\label{}`(s)
+  // that target it, **verbatim** — `\label{eq:sigmaU}` ↔ `doc.tex#eq:sigmaU`,
+  // 1:1 correspondence, no transformation rule to remember (a slug
+  // would force the case: `sigmaU` → `sigmau`).
+  // Grafting happens *onto* the existing anchor line: no line is
+  // created, `anchors` (preview ↔ source sync) stays exact.
+  const aliases = new Map(); // line index → labels to graft onto it
   for (const [key, target] of labels) {
     const line = target.anchor ? anchorLines.get(target.anchor) : undefined;
-    // Cible sans ancre (label orphelin, équation vide) ou identifiant déjà pris
-    // par une ancre numérotée : rien à greffer, un `id` dupliqué serait pire.
+    // Target without an anchor (orphan label, empty equation) or identifier already taken
+    // by a numbered anchor: nothing to graft, a duplicated `id` would be worse.
     if (line === undefined || anchorLines.has(key)) continue;
     aliases.set(line, [...(aliases.get(line) ?? []), key]);
   }
@@ -1606,20 +1665,20 @@ function generate(source, { title, fragment }) {
     out[line] += keys.map((k) => `<div id="${attrValue(k)}"></div>`).join("");
   }
 
-  // --- lignes vides consécutives ------------------------------------------ //
-  // Fusionnées **avant** la jointure, par `removeLine` : une fusion sur le texte
-  // final décalerait toutes les ancres situées en aval. Le contenu des blocs de
-  // code (source TikZ, verbatim) est laissé intact.
+  // --- consecutive blank lines -------------------------------------------- //
+  // Merged **before** the join, through `removeLine`: a merge on the final
+  // text would shift all the anchors located downstream. The content of code
+  // blocks (TikZ source, verbatim) is left intact.
   for (let i = out.length - 1, fence = null; i > 0; i--) {
     const f = /^\s*(`{3,})/.exec(out[i]);
     if (f && (!fence || f[1].length >= fence.length)) fence = fence ? null : f[1];
     else if (!fence && out[i] === "" && out[i - 1] === "") removeLine(i);
   }
 
-  // --- résolution des références ------------------------------------------ //
+  // --- reference resolution ------------------------------------------------ //
   const unresolved = new Set();
-  // `r` = \ref, `e` = \eqref, `t` = référence apparue dans une formule (rendue
-  // en texte nu : un lien markdown ne survivrait pas à l'intérieur d'un `$…$`).
+  // `r` = \ref, `e` = \eqref, `t` = reference that appeared in a formula (rendered
+  // as bare text: a markdown link would not survive inside a `$…$`).
   const pattern = new RegExp(`${SEP}([ret])${SEP}([^${SEP}]*)${SEP}`, "g");
   const markdown = out
     .join("\n")
@@ -1637,8 +1696,8 @@ function generate(source, { title, fragment }) {
   if (unresolved.size) {
     const list = [...unresolved].slice(0, 5).join(", ");
     warnings.add(
-      `référence${unresolved.size > 1 ? "s" : ""} non résolue${unresolved.size > 1 ? "s" : ""} : ${list}` +
-        (unresolved.size > 5 ? `… (${unresolved.size} au total)` : ""),
+      `unresolved reference${unresolved.size > 1 ? "s" : ""}: ${list}` +
+        (unresolved.size > 5 ? `… (${unresolved.size} in total)` : ""),
     );
   }
 
@@ -1646,25 +1705,25 @@ function generate(source, { title, fragment }) {
 }
 
 // --------------------------------------------------------------------------- //
-// API du plugin
+// Plugin API
 // --------------------------------------------------------------------------- //
 
-/** Fence assez longue pour contenir le source sans collision de délimiteurs. */
+/** Fence long enough to contain the source without delimiter collision. */
 function fenceFor(source) {
   const longest = Math.max(2, ...[...String(source).matchAll(/`+/g)].map((m) => m[0].length));
   return "`".repeat(Math.max(3, longest + 1));
 }
 
 /**
- * Transforme un source LaTeX en document markdown prêt pour le pipeline de
- * rendu de l'hôte. Ne lève jamais : en cas d'imprévu, le source part
- * intégralement en fence sous un bandeau (retour visuel garanti pendant
- * l'édition live). La fence de repli est ```tex et non ```latex : cette
- * dernière est revendiquée par le plugin, elle serait re-rendue en boucle.
+ * Transforms a LaTeX source into a markdown document ready for the host's
+ * rendering pipeline. Never throws: in case of the unexpected, the whole
+ * source goes into a fence under a banner (guaranteed visual feedback during
+ * live editing). The fallback fence is ```tex and not ```latex: the latter
+ * is claimed by the plugin, it would be re-rendered in a loop.
  *
- * Renvoie `{ markdown, anchors, warnings }` — cf. remapLine (`ui/js/anchors.js`).
+ * Returns `{ markdown, anchors, warnings }` — see remapLine (`ui/js/anchors.js`).
  */
-export function texToMarkdown(source, { title = "Document LaTeX", fragment = false } = {}) {
+export function texToMarkdown(source, { title = "LaTeX document", fragment = false } = {}) {
   const src = String(source ?? "").replace(/\r\n?/g, "\n");
   try {
     return generate(src, { title, fragment });
@@ -1672,13 +1731,13 @@ export function texToMarkdown(source, { title = "Document LaTeX", fragment = fal
     const fence = fenceFor(src);
     const markdown = [
       ...(fragment ? [] : [`# ${title}`, ""]),
-      `> ⚠️ **Rendu LaTeX dégradé** — ${err && err.message ? err.message : String(err)}`,
+      `> ⚠️ **Degraded LaTeX rendering** — ${err && err.message ? err.message : String(err)}`,
       "",
       `${fence}tex`,
       src,
       fence,
       "",
     ].join("\n");
-    return { markdown, anchors: [[0, 0]], warnings: ["rendu dégradé : le source est affiché tel quel"] };
+    return { markdown, anchors: [[0, 0]], warnings: ["degraded rendering: the source is displayed as-is"] };
   }
 }

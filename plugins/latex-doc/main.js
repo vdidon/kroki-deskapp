@@ -1,20 +1,20 @@
-// Plugin latex-doc — entry du worker (protocole Kroki Desk v1, cf.
-// doc/plugin-protocol.md du dépôt de l'application).
+// latex-doc plugin — worker entry (Kroki Desk protocol v1, see
+// doc/plugin-protocol.md in the application repository).
 //
-// Capacités :
-// - `document:markdown` : un fichier .tex autonome devient un document markdown
-//   dérivé via texToMarkdown — les formules restent en `$…$` / `$$…$$` et sont
-//   rendues par le KaTeX de l'hôte ;
-// - `fence:markdown`    : une fence ```latex dans un .md reçoit le même rendu,
-//   sans titre de tête (le contenu est réinjecté dans le pipeline complet de
-//   l'hôte, KaTeX compris) ;
-// - `highlight:code`    : coloration du **fichier entier**, demandée par la vue
-//   « code source » de l'application. Deux noms pour la même grammaire,
-//   `tex-source` et `latex-source` : l'hôte cherche `<ext>-source`, et le
-//   plugin sert les deux extensions `.tex` et `.latex`.
+// Capabilities:
+// - `document:markdown`: a standalone .tex file becomes a derived markdown
+//   document via texToMarkdown — formulas stay as `$…$` / `$$…$$` and are
+//   rendered by the host's KaTeX;
+// - `fence:markdown`   : a ```latex fence in a .md gets the same rendering,
+//   without a heading title (the content is fed back into the host's full
+//   pipeline, KaTeX included);
+// - `highlight:code`   : highlighting of the **whole file**, requested by the
+//   application's "source code" view. Two names for the same grammar,
+//   `tex-source` and `latex-source`: the host looks for `<ext>-source`, and the
+//   plugin serves both extensions `.tex` and `.latex`.
 //
-// Le global `kd` est fourni par le runtime de l'hôte (kd_runtime.js), injecté
-// avant ce module dans le worker sandboxé.
+// The global `kd` is provided by the host runtime (kd_runtime.js), injected
+// before this module in the sandboxed worker.
 
 import { texToMarkdown } from "./tex.js";
 import { highlightLatex } from "./texhl.js";
@@ -22,11 +22,11 @@ import { highlightLatex } from "./texhl.js";
 kd.onRequest("initialize", () => ({ ok: true }));
 
 kd.onRequest("document/transform", ({ text, title }) =>
-  texToMarkdown(String(text ?? ""), { title: String(title ?? "Document LaTeX") }),
+  texToMarkdown(String(text ?? ""), { title: String(title ?? "LaTeX document") }),
 );
 
-// En fence, le source est un fragment : ni préambule ni `\begin{document}`
-// obligatoires, et pas de titre `#` (il couperait le document hôte en deux).
+// In a fence, the source is a fragment: neither preamble nor `\begin{document}`
+// required, and no `#` title (it would split the host document in two).
 kd.onRequest("fence/render", ({ source }) => {
   const { markdown } = texToMarkdown(String(source ?? ""), { fragment: true });
   return { format: "markdown", content: markdown };

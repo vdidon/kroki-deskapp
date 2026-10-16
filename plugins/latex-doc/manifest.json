@@ -1,10 +1,10 @@
 {
   "manifestVersion": 1,
   "id": "latex-doc",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "apiVersion": "1",
-  "name": "Documents LaTeX (.tex)",
-  "description": "Rendu des documents LaTeX autonomes : sections, théorèmes amsthm numérotés, équations avec \\tag, références croisées cliquables, tables, macros \\newcommand expansées, figures TikZ confiées au moteur TeX de l'hôte — les maths partent en $…$ pour le KaTeX de l'hôte ; coloration latex-source de la vue code source",
+  "name": "LaTeX documents (.tex)",
+  "description": "Rendering of standalone LaTeX documents: sections, numbered amsthm theorems, equations with \\tag, clickable cross-references, tables, expanded \\newcommand macros, TikZ figures handed to the host's TeX engine — math is passed as $…$ to the host's KaTeX; latex-source highlighting of the source code view",
   "publisher": "vdidon",
   "runtime": "worker",
   "entry": "main.js",

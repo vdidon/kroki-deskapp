@@ -1,163 +1,172 @@
-# Plugin latex-doc
+# latex-doc plugin
 
-Rendu des documents **LaTeX autonomes** (`.tex`, `.latex`) pour Kroki Desk, au
-format du protocole de plugins v1 (`doc/plugin-protocol.md` à la racine du dépôt
-de l'application). Ce dossier a vocation à devenir un dépôt autonome.
+Renders **standalone LaTeX documents** (`.tex`, `.latex`) for Kroki Desk, using
+the plugin protocol v1 format (`doc/plugin-protocol.md` at the root of the
+application repository). This folder is meant to become a standalone repository.
 
-Le plugin ne rend aucune formule lui-même : il produit un **markdown dérivé**
-dans lequel les mathématiques sont délimitées par `$…$` / `$$…$$` et confiées au
-KaTeX déjà embarqué dans l'application. Tout le reste du pipeline (sommaire,
-vue source, recherche globale, thème, export HTML) est gratuit.
+The plugin does not render any formula itself: it produces a **derived markdown**
+in which the mathematics are delimited by `$…$` / `$$…$$` and handed to the KaTeX
+already bundled with the application. The rest of the pipeline (table of
+contents, source view, global search, theme, HTML export) comes for free.
 
-## Contenu
+## Contents
 
-| Fichier | Rôle |
+| File | Role |
 | --- | --- |
-| `manifest.json` | déclaration : extensions `.tex`/`.latex`, fence ` ```latex `, capacités |
-| `main.js` | entry du worker — branche `document/transform` et `fence/render` |
-| `tex.js` | toute la transformation LaTeX → markdown |
-| `vendor/unified-latex.esm.js` | parseur LaTeX (bundle esbuild, ~245 Ko) |
-| `build_vendor.py` | régénère le vendor depuis npm |
+| `manifest.json` | declaration: `.tex`/`.latex` extensions, ` ```latex ` fence, capabilities |
+| `main.js` | worker entry — wires up `document/transform` and `fence/render` |
+| `tex.js` | the whole LaTeX → markdown transformation |
+| `vendor/unified-latex.esm.js` | LaTeX parser (esbuild bundle, ~245 KB) |
+| `build_vendor.py` | regenerates the vendor bundle from npm |
 
-## Ce qui est rendu
+## What is rendered
 
-- **Structure** : `\section`/`\subsection`/`\subsubsection` numérotées (les
-  étoilées ne le sont pas), `abstract`, `\title`/`\author`/`\date` — un segment
-  de titre ouvert par un changement de taille (`\\ \large …`) devient un
-  sous-titre. `\part` est numérotée en romain (« Partie II », que `\ref`
-  reprend) sans interrompre la numérotation des sections, qui descendent alors
-  d'un niveau dans le sommaire ; après `\appendix`, les sections sont lettrées
+- **Structure**: numbered `\section`/`\subsection`/`\subsubsection` (starred
+  ones are not numbered), `abstract`, `\title`/`\author`/`\date` — a title
+  segment opened by a size change (`\\ \large …`) becomes a subtitle. `\part`
+  is numbered in Roman numerals ("Part II", which `\ref` picks up) without
+  interrupting the section numbering, which then drops one
+  level in the table of contents; after `\appendix`, sections are lettered
   (A, B.2…).
-- **Encadrés** : un paragraphe réduit à `\fbox{\parbox{…}{…}}` devient une
-  citation, ou un bloc de code si son contenu est en `\ttfamily` (exemple de
-  JSON, pseudo-code) — sauts `\\` et indentation `\hspace{…em}` conservés.
-- **Mathématiques** : `$…$`, `\[…\]`, `equation`, `align`, `gather`, `multline`,
-  `cases`, `pmatrix`… Les environnements non étoilés sont **numérotés** et
-  reçoivent un `\tag{n}` rendu par KaTeX.
-- **Théorèmes `amsthm`** : chaque `\newtheorem` du préambule est honoré, y
-  compris le **compteur partagé** (`\newtheorem{proposition}[theorem]{…}`) et le
-  compteur parent (`[section]` → numérotation `2.1`), et le titre optionnel
-  des environnements personnalisés (`\begin{hypothese}[Titre]`). Comme chez
-  amsthm, l'en-tête ouvre le premier paragraphe — « **Proposition 8**
-  (Titre). Sous H1… » —, en gras ou en italique selon le `\theoremstyle`.
-  `proof` devient « *Démonstration.* » et se clôt par un ∎.
-- **Références croisées** : `\label`, `\ref`, `\eqref`, `\autoref`, `\pageref`
-  sont résolus en **liens cliquables** vers une ancre du document — y compris
-  les références en avant. Une référence apparaissant *dans* une formule
-  (typiquement via une macro utilisateur) est rendue en texte nu : un lien
-  markdown ne survit pas à l'intérieur d'un `$…$`.
-- **Ancres nommées** : tout objet numéroté porte son ancre numérotée (`#eq-3`,
-  `#sec-2-1`) **et** une ancre reprenant verbatim le ou les `\label{}` qui le
-  visent (`#eq:sigmaU`) — cf. « Lier un `.tex` depuis un autre document ».
-- **Macros du préambule** : `\newcommand` (avec arguments et argument optionnel)
-  et `\DeclareMathOperator` sont **expansés** avant que la formule n'atteigne
-  KaTeX, qui ne les connaît pas.
-- **Listes** (`itemize`, `enumerate`, `description`, imbriquées), **tables**
-  (`tabular`, `array`, `longtable` — alignement de la spec repris), flottants
-  `table`/`figure` avec légende numérotée, `verbatim`/`lstlisting`, `quote`.
-- **Texte** : gras/italique/monospace, accents LaTeX (`\'e` → é), ligatures
-  (`---` → —, ` `` ` → “), symboles `textcomp` (`\euro` → €), notes de bas de
-  page regroupées en fin de document, `\url`/`\href`, `\includegraphics`.
+- **Boxes**: a paragraph reduced to `\fbox{\parbox{…}{…}}` becomes a quote, or
+  a code block if its content is in `\ttfamily` (JSON example, pseudo-code) —
+  `\\` breaks and `\hspace{…em}` indentation are preserved.
+- **Mathematics**: `$…$`, `\[…\]`, `equation`, `align`, `gather`, `multline`,
+  `cases`, `pmatrix`… Non-starred environments are **numbered** and get a
+  `\tag{n}` rendered by KaTeX.
+- **`amsthm` theorems**: every `\newtheorem` in the preamble is honored,
+  including the **shared counter** (`\newtheorem{proposition}[theorem]{…}`) and
+  the parent counter (`[section]` → `2.1` numbering), as well as the optional
+  title of custom environments (`\begin{hypothese}[Title]`). As in amsthm, the
+  header opens the first paragraph — "**Proposition 8** (Title). Under H1…" —,
+  in bold or italic depending on the `\theoremstyle`. `proof` becomes
+  "*Proof.*" and ends with a ∎.
+- **Document language**: the few words the plugin writes itself — "Proof",
+  "Part", "Abstract", "(untitled)", the "TikZ source" fold — follow the
+  document's main language, as LaTeX does: French ("Démonstration", "Partie",
+  "Résumé", "(sans titre)", "Source TikZ") when
+  the preamble selects it through `babel` (`main=`, or the last language
+  option, class options included) or `polyglossia`
+  (`\setdefaultlanguage{french}`); English otherwise, including for languages
+  the plugin has no labels for. Theorem names come from your `\newtheorem`
+  declarations and are never translated.
+- **Cross-references**: `\label`, `\ref`, `\eqref`, `\autoref`, `\pageref` are
+  resolved into **clickable links** to an anchor in the document — forward
+  references included. A reference appearing *inside* a formula (typically via a
+  user macro) is rendered as plain text: a markdown link does not survive inside
+  `$…$`.
+- **Named anchors**: every numbered object carries its numbered anchor (`#eq-3`,
+  `#sec-2-1`) **and** an anchor repeating verbatim the `\label{}`(s) that point
+  to it (`#eq:sigmaU`) — see "Linking to a `.tex` from another document".
+- **Preamble macros**: `\newcommand` (with arguments and optional argument) and
+  `\DeclareMathOperator` are **expanded** before the formula reaches KaTeX, which
+  does not know them.
+- **Lists** (`itemize`, `enumerate`, `description`, nested), **tables**
+  (`tabular`, `array`, `longtable` — spec alignment preserved), `table`/`figure`
+  floats with numbered caption, `verbatim`/`lstlisting`, `quote`.
+- **Text**: bold/italic/monospace, LaTeX accents (`\'e` → é), ligatures
+  (`---` → —, ` `` ` → “), `textcomp` symbols (`\euro` → €), footnotes
+  gathered at the end of the document, `\url`/`\href`, `\includegraphics`.
 
-Une fence ` ```latex ` dans un `.md` ordinaire reçoit le **même rendu**, sans
-titre de tête (capacité `fence:markdown`). Le langage ` ```tex ` n'est
-volontairement **pas** revendiqué : il reste disponible pour afficher du code
-LaTeX coloré au lieu de le rendre.
+A ` ```latex ` fence in an ordinary `.md` gets the **same rendering**, without a
+leading title (`fence:markdown` capability). The ` ```tex ` language is
+deliberately **not** claimed: it remains available to display syntax-highlighted
+LaTeX code instead of rendering it.
 
-## Lier un `.tex` depuis un autre document
+## Linking to a `.tex` from another document
 
-N'importe quel document ouvert dans l'application (markdown natif ou produit par
-un autre plugin) peut pointer un objet précis d'un `.tex` **par son label**, en
-chemin relatif au document courant :
+Any document open in the application (native markdown or produced by another
+plugin) can point to a specific object of a `.tex` **by its label**, using a
+path relative to the current document:
 
 ```markdown
-Diffusion du niveau [σ_U](../doc/modele.tex#eq:sigmaU),
-définie en [annexe C](../doc/modele.tex#sec:annexeC).
+Diffusion of the level [σ_U](../doc/modele.tex#eq:sigmaU),
+defined in [appendix C](../doc/modele.tex#sec:annexeC).
 ```
 
-L'application ouvre le `.tex` dans un onglet, le rend, puis scrolle jusqu'à
-l'ancre. Le label est repris **verbatim** — `\label{eq:sigmaU}` donne
-`#eq:sigmaU`, casse comprise : correspondance 1:1, aucune règle de
-transformation à retenir. Dans l'autre sens, un `\href{../notes/plan.md#objectifs}{…}`
-du `.tex` ouvre pareillement le document cible.
+The application opens the `.tex` in a tab, renders it, then scrolls to the
+anchor. The label is taken **verbatim** — `\label{eq:sigmaU}` gives
+`#eq:sigmaU`, case included: 1:1 mapping, no transformation rule to remember. In
+the other direction, a `\href{../notes/plan.md#objectifs}{…}` in the `.tex`
+likewise opens the target document.
 
-Deux précautions :
+Two precautions:
 
-- **Viser un label, jamais une ancre numérotée.** `#eq-12` fonctionne mais
-  désigne « la douzième équation » : insérer une équation en amont le fait
-  pointer ailleurs, silencieusement. Même chose pour `#sec-c-5-table-de-synth-se`,
-  le slug de repli d'une section étoilée, qui suit le texte du titre.
-- **Un label sans objet numéroté n'a pas d'ancre.** Le `\label{}` doit suivre un
-  objet que le plugin numérote — équation, section (étoilée comprise), théorème,
-  flottant. Posé au fil du texte, il n'est pas ancrable : le lien ouvrira bien le
-  document mais ne scrollera pas (et un `\ref` vers lui est déjà signalé en
-  avertissement).
+- **Target a label, never a numbered anchor.** `#eq-12` works but means "the
+  twelfth equation": inserting an equation upstream silently makes it point
+  elsewhere. Same for `#sec-c-5-table-de-synth-se`, the fallback slug of a
+  starred section, which follows the title text.
+- **A label without a numbered object has no anchor.** The `\label{}` must
+  follow an object the plugin numbers — equation, section (starred included),
+  theorem, float. Placed in running text, it cannot be anchored: the link will
+  open the document but will not scroll (and a `\ref` to it is already flagged
+  with a warning).
 
-Hors de l'application, ces liens ne mènent nulle part : ni GitHub ni un
-visualiseur markdown ordinaire ne rendent un `.tex` en HTML.
+Outside the application, these links lead nowhere: neither GitHub nor an
+ordinary markdown viewer renders a `.tex` as HTML.
 
-## Limites assumées
+## Known limitations
 
-Le rendu est **sémantique**, pas typographique. Sans équivalent en markdown :
-`geometry` et toute la mise en page, la pagination, les colonnes, le placement
-des flottants, `\hspace`/`\vspace`, les styles de police fins.
+The rendering is **semantic**, not typographic. No markdown equivalent for:
+`geometry` and all page layout, pagination, columns, float placement,
+`\hspace`/`\vspace`, fine font styles.
 
-- **Fichier unique.** Les imports (`\input`, `\include`) ne sont pas suivis : le
-  plugin ne déclare pas la capacité `read:siblings`. Un document découpé en
-  plusieurs fichiers ne rendra que son fichier maître.
-- **Pas de bibliographie.** `\cite{clé}` affiche la clé entre crochets ;
-  `thebibliography` est rendu comme du texte ordinaire.
-- **TikZ dessiné par l'hôte, et seulement si le poste a une distribution TeX.**
-  Le plugin ne dessine rien : il émet une fence ` ```tikz ` contenant un
-  document autonome, que Kroki Desk ≥ 3.18.0 compile avec MiKTeX ou TeX Live
-  (`latex` et `dvisvgm` sur le PATH), ou que le serveur Kroki configuré rend.
-  Ce document ne reprend du préambule qu'une **liste blanche** de paquets
-  (mathématiques, `xcolor`, `tikz`, `pgfplots`…), plus `\usetikzlibrary`,
-  `\tikzset`, les macros et les couleurs : une figure qui dépend d'un autre
-  paquet échoue avec un message qui le nomme. `babel` en est exclu (la
-  césure y est donc anglaise). Sans TeX, l'application affiche une erreur à la
-  place du dessin ; le texte des `\node` (dans l'ordre du source) et le source
-  TikZ restent disponibles, repliés dessous. Dans une fence ` ```latex `, sans
-  préambule, seules les bibliothèques chargées par la figure elle-même sont
-  disponibles. PSTricks n'est pas pris en charge.
-- **Corps des théorèmes en romain** : le style `plain` d'amsthm compose
-  l'énoncé en italique ; le rendu ne le reproduit pas (un italique markdown ne
-  traverse ni les formules ni les paragraphes).
-- **`\euro` en mode math** compile mais KaTeX n'a pas de métrique pour « € » :
-  le glyphe est emprunté à la police du système (avertissement en console, sans
-  conséquence visible notable).
-- Les macros définies **hors préambule** ou par `\def` avec paramètres
-  délimités ne sont pas expansées.
-- Un label **sans préfixe** qui porte le nom d'une propriété du DOM
-  (`\label{title}`, `\label{location}`…) voit son ancre supprimée par le
-  sanitizer de l'application (protection anti-*DOM clobbering*). La convention
-  LaTeX usuelle — `eq:`, `sec:`, `tab:` — met à l'abri.
+- **Single file.** Imports (`\input`, `\include`) are not followed: the plugin
+  does not declare the `read:siblings` capability. A document split across
+  several files will render only its master file.
+- **No bibliography.** `\cite{key}` displays the key in brackets;
+  `thebibliography` is rendered as ordinary text.
+- **TikZ drawn by the host, and only if the machine has a TeX distribution.**
+  The plugin draws nothing: it emits a ` ```tikz ` fence containing a standalone
+  document, which Kroki Desk ≥ 3.18.0 compiles with MiKTeX or TeX Live (`latex`
+  and `dvisvgm` on the PATH), or which the configured Kroki server renders.
+  From the preamble, this document keeps only a **whitelist** of packages
+  (mathematics, `xcolor`, `tikz`, `pgfplots`…), plus `\usetikzlibrary`,
+  `\tikzset`, macros and colors: a figure that depends on another package fails
+  with a message naming it. `babel` is excluded (hyphenation is therefore
+  English). Without TeX, the application displays an error in place of the
+  drawing; the text of the `\node`s (in source order) and the TikZ source remain
+  available, folded below. In a ` ```latex ` fence, with no preamble, only the
+  libraries loaded by the figure itself are available. PSTricks is not
+  supported.
+- **Theorem bodies in roman**: amsthm's `plain` style sets the statement in
+  italic; the rendering does not reproduce this (a markdown italic survives
+  neither formulas nor paragraphs).
+- **`\euro` in math mode** compiles but KaTeX has no metrics for "€": the glyph
+  is borrowed from the system font (console warning, no notable visible
+  consequence).
+- Macros defined **outside the preamble** or by `\def` with delimited
+  parameters are not expanded.
+- A label **without a prefix** that bears the name of a DOM property
+  (`\label{title}`, `\label{location}`…) has its anchor removed by the
+  application's sanitizer (anti-*DOM clobbering* protection). The usual LaTeX
+  convention — `eq:`, `sec:`, `tab:` — protects against it.
 
-Un contenu que le plugin ne sait pas traiter ne fait jamais échouer le rendu :
-la commande inconnue est remplacée par ses arguments et signalée en bandeau
-d'avertissement ; une erreur interne affiche le source complet en fence.
+Content the plugin cannot handle never makes the rendering fail: the unknown
+command is replaced by its arguments and reported in a warning banner; an
+internal error displays the full source in a fence.
 
-## Développement
+## Development
 
 ```bash
-# 1. tests (autonomes : ni npm, ni application lancée)
-node tests/test_latex_plugin.mjs                    # suite de non-régression
-node tests/test_latex_plugin.mjs mon_doc.tex …      # + vrais documents
+# 1. tests (standalone: no npm, no running application)
+node tests/test_latex_plugin.mjs                    # regression suite
+node tests/test_latex_plugin.mjs mon_doc.tex …      # + real documents
 
-# 2. essai dans l'application : copier le dossier puis relancer l'app
-#    (aucun rebuild nécessaire — le plugin n'est pas embarqué dans le binaire)
+# 2. try it in the application: copy the folder then restart the app
+#    (no rebuild needed — the plugin is not embedded in the binary)
 cp -r plugins/latex-doc "$APPDATA/kroki-deskapp/plugins/"
 
 # 3. distribution
 python pack_plugin.py plugins/latex-doc             # → dist/latex-doc-<version>.kdext
 ```
 
-Le test compile **toutes** les formules produites avec le KaTeX vendoré du
-dépôt : c'est la vérification qui compte, une formule refusée s'afficherant en
-rouge dans l'application.
+The test compiles **all** the formulas produced with the repository's vendored
+KaTeX: that is the check that matters, since a rejected formula is displayed in
+red in the application.
 
-Pour régénérer le parseur vendoré (mise à jour d'`unified-latex`) :
+To regenerate the vendored parser (updating `unified-latex`):
 
 ```bash
-python plugins/latex-doc/build_vendor.py            # npm + esbuild, dans un dossier temporaire
+python plugins/latex-doc/build_vendor.py            # npm + esbuild, in a temporary folder
 ```

@@ -21,7 +21,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "..");
 const require = createRequire(import.meta.url);
 const katex = require(path.join(repo, "ui/vendor/katex/katex.min.js"));
-const { texToMarkdown } = await import(
+const { texToMarkdown, docLanguage } = await import(
   "file:///" + path.join(repo, "plugins/latex-doc/tex.js").replace(/\\/g, "/")
 );
 const { highlightLatex } = await import(
@@ -168,7 +168,7 @@ group("Références croisées", () => {
   check("aucun avertissement", warnings.length === 0, warnings.join(" | "));
 
   const broken = texToMarkdown(doc("Voir \\ref{inconnu}."));
-  check("référence inconnue signalée", broken.warnings.some((w) => w.includes("inconnu")), broken.warnings.join(" | "));
+  check("référence inconnue signalée", broken.warnings.some((w) => w.includes("unresolved")), broken.warnings.join(" | "));
   check("référence inconnue rendue visiblement", broken.markdown.includes("**?**"), broken.markdown);
 });
 
@@ -245,7 +245,7 @@ group("Théorèmes (amsthm)", () => {
   check("compteur partagé [theorem] respecté", markdown.includes("**Proposition 2.** Autre."), markdown);
   check("compteur indépendant pour hypothese", markdown.includes("**Hypothèse 1.**"), markdown);
   check("environnement étoilé non numéroté", /\*\*Remarque\.\*\*/.test(markdown), markdown);
-  check("démonstration rendue", markdown.includes("*Démonstration.* La preuve."), markdown);
+  check("démonstration rendue (libellé anglais sans babel)", markdown.includes("*Proof.* La preuve."), markdown);
   check("fin de preuve marquée", markdown.includes("∎"), markdown);
   check("références aux théorèmes résolues", /\[1\]\(#theorem-1\)/.test(markdown), markdown);
   check("référence à la proposition résolue", /\[2\]\(#proposition-2\)/.test(markdown), markdown);
@@ -393,6 +393,45 @@ group("Robustesse", () => {
   }
 });
 
+group("Langue du document (libellés insérés par le plugin)", () => {
+  check("sans babel : anglais", docLanguage(doc("x")) === "en");
+  const lang = (preamble) => docLanguage(doc("x", preamble));
+  check("babel french", lang(String.raw`\usepackage[french]{babel}`) === "fr");
+  check("babel : dernière langue = principale", lang(String.raw`\usepackage[french,english]{babel}`) === "en");
+  check("babel : option de classe ignorée", lang(String.raw`\usepackage[french,a4paper]{babel}`) === "fr");
+  check("babel main=", lang(String.raw`\usepackage[main=french,english]{babel}`) === "fr");
+  check(
+    "langue passée en option de classe",
+    docLanguage(String.raw`\documentclass[11pt,francais]{article} \usepackage{babel} \begin{document}x\end{document}`) === "fr",
+  );
+  check("polyglossia", lang(String.raw`\usepackage{polyglossia} \setdefaultlanguage{french}`) === "fr");
+  check("babel commenté ignoré", lang(String.raw`% \usepackage[french]{babel}`) === "en");
+  check("langue sans libellés : anglais", lang(String.raw`\usepackage[ngerman]{babel}`) === "en");
+  const body = [
+    String.raw`\begin{abstract}Court.\end{abstract}`,
+    String.raw`\part{Cadrage}`,
+    String.raw`\section{}`,
+    String.raw`\begin{proof}Ok.\end{proof}`,
+  ].join("\n");
+  const fr = texToMarkdown(doc(body, String.raw`\usepackage{amsthm} \usepackage[french]{babel}`)).markdown;
+  check(
+    "fr : Résumé, Partie, Démonstration, sans titre",
+    fr.includes("**Résumé**") && /^## Partie I — Cadrage$/m.test(fr) && fr.includes("*Démonstration.* Ok.") && fr.includes("(sans titre)"),
+    fr,
+  );
+  const tikz = (nodes) =>
+    [String.raw`\begin{tikzpicture}`, nodes ? String.raw`\node (a) at (0,0) {Étape};` : String.raw`\draw (0,0) -- (1,1);`, String.raw`\end{tikzpicture}`].join("\n");
+  const frTikz = (nodes) => texToMarkdown(doc(tikz(nodes), String.raw`\usepackage{tikz} \usepackage[french]{babel}`)).markdown;
+  check("fr : TikZ avec nœuds", frTikz(true).includes("<details><summary>Texte des nœuds et source TikZ</summary>"), frTikz(true));
+  check("fr : TikZ sans nœud", frTikz(false).includes("<details><summary>Source TikZ</summary>"), frTikz(false));
+  const en = texToMarkdown(doc(body, String.raw`\usepackage{amsthm}`)).markdown;
+  check(
+    "en : Abstract, Part, Proof, untitled",
+    en.includes("**Abstract**") && /^## Part I — Cadrage$/m.test(en) && en.includes("*Proof.* Ok.") && en.includes("(untitled)"),
+    en,
+  );
+});
+
 // Écarts relevés en confrontant un document réel (~40 pages) à son PDF.
 group("Fidélité au PDF : structure", () => {
   const { markdown, anchors } = texToMarkdown(
@@ -403,7 +442,7 @@ group("Fidélité au PDF : structure", () => {
         "\\appendix\n\\section{Annexe}\\label{app:x}\n\\subsection{Sous-annexe}\nFin.",
     ),
   );
-  check("partie en h2 numérotée en romain", /^## Partie I — Cadrage$/m.test(markdown), markdown);
+  check("partie en h2 numérotée en romain", /^## Part I — Cadrage$/m.test(markdown), markdown);
   check("sections sous une partie descendent d'un niveau", /^### 1 Objet$/m.test(markdown), markdown);
   check("numérotation des sections continue d'une partie à l'autre", /^### 2 Suite$/m.test(markdown), markdown);
   check("sous-section sous une partie", /^#### 2\.1 Détail$/m.test(markdown), markdown);
@@ -497,7 +536,7 @@ group("Fidélité au PDF : tables, encadrés, TikZ", () => {
   check("encadré \\ttfamily rendu en bloc de code", markdown.includes('```\n{\n  "geo_zone": "FR",\n}\n```'), markdown);
   check("\\rule sans résidu de dimensions", !markdown.includes("0.4pt") && /^\*Pied\.\*$/m.test(markdown), markdown);
   check("TikZ : fence tikz émise", /^```tikz$/m.test(markdown), markdown);
-  check("TikZ : texte des nœuds replié", markdown.includes("<details><summary>Texte des nœuds et source TikZ</summary>"), markdown);
+  check("TikZ : texte des nœuds replié", markdown.includes("<details><summary>Node text and TikZ source</summary>"), markdown);
   check("TikZ : texte des nœuds restitué", markdown.includes("- **Étape** $x_{1}$") || markdown.includes("- **Étape** $x_1$"), markdown);
   check("TikZ : nœud multi-lignes", /^- Suite {2}\n {2}\*fin\*$/m.test(markdown), markdown);
   const prose = markdown.replace(/^(`{3,})[a-z]*\n[\s\S]*?\n\1$/gm, "");
@@ -540,7 +579,7 @@ group("TikZ : document autonome compilable", () => {
 
   const frag = texToMarkdown("\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}", { fragment: true }).markdown;
   check("fragment : classe standalone sans préambule", frag.includes("```tikz\n\\documentclass[tikz,border=4pt]{standalone}\n\\begin{document}\n"), frag);
-  check("fragment sans nœud : seul le source est replié", frag.includes("<details><summary>Source TikZ</summary>"), frag);
+  check("fragment sans nœud : seul le source est replié", frag.includes("<details><summary>TikZ source</summary>"), frag);
 });
 
 group("Formules émises : compilation KaTeX", () => {

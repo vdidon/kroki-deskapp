@@ -1,140 +1,156 @@
 # Changelog
 
-Toutes les modifications notables de ce plugin sont documentées ici.
-Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le
-versionnage [semver](https://semver.org/lang/fr/).
+All notable changes to this plugin are documented here.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+versioning follows [semver](https://semver.org/spec/v2.0.0.html).
+
+## [1.5.0] - 2026-10-16
+
+### Added
+
+- **Labels in the document's language.** The words the plugin writes itself
+  — "Proof", "Part", "Abstract", "(untitled)", and the "TikZ source" /
+  "Node text and TikZ source" folds under a figure — follow the main language
+  selected by `babel` or `polyglossia`, as LaTeX does: French
+  ("Démonstration", "Partie", "Résumé", "(sans titre)") for a French document,
+  English otherwise. They used to be French for every document.
+
+### Changed
+
+- Warnings, the degraded-rendering banner, the default title and the plugin's
+  name and description are now in English.
 
 ## [1.4.1] - 2026-10-09
 
-### Corrigé
+### Fixed
 
-- **Table enveloppée dans un groupe.** Un environnement placé dans un groupe
-  de mise en page (`{\small \begin{longtable}…}`) était aplati en texte : spec
-  de colonnes et `&` s'affichaient tels quels. Le groupe est désormais déroulé.
-- **`longtable`.** Sa spec de colonnes (et son option `[c]`) ne fuit plus dans
-  la première cellule ; `\endhead`/`\endfirsthead` ne produisent plus
-  d'avertissement, l'en-tête répété des pages suivantes et les pieds de page
-  (`\endfoot`, `\endlastfoot`) sont retirés.
+- **Table wrapped in a group.** An environment placed inside a layout group
+  (`{\small \begin{longtable}…}`) was flattened into text: the column spec
+  and `&` were displayed as-is. The group is now unrolled.
+- **`longtable`.** Its column spec (and its `[c]` option) no longer leaks into
+  the first cell; `\endhead`/`\endfirsthead` no longer produce a warning, the
+  repeated header of the following pages and the page footers
+  (`\endfoot`, `\endlastfoot`) are removed.
 
 ## [1.4.0] - 2026-09-16
 
-### Ajouté
+### Added
 
-- **Figures TikZ dessinées.** Une `tikzpicture` devient une fence ` ```tikz `
-  contenant un document LaTeX autonome, que Kroki Desk ≥ 3.18.0 compile avec
-  la distribution TeX du poste (ou que le serveur Kroki configuré rend). Le
-  document reprend du préambule ce qu'une figure peut utiliser — paquets
-  mathématiques et graphiques, `\usetikzlibrary`, `\tikzset`, macros
-  `\newcommand`, couleurs, taille de police de la classe — et fixe le numéro
-  des `\ref`/`\eqref` qu'elle contient (y compris à travers une macro comme
-  `\hyp{…}`). `babel` et les paquets de mise en page sont écartés : ils ne
-  servent pas à la figure et peuvent manquer à la distribution du poste.
-- Le texte des nœuds et le source TikZ restent disponibles, repliés sous la
-  figure : ils prennent le relais sur un poste sans distribution TeX, où
-  l'application affiche une erreur à la place du dessin. L'avertissement
-  « figure TikZ non dessinée » disparaît, le plugin ne sachant pas si l'hôte
-  dessinera.
+- **Drawn TikZ figures.** A `tikzpicture` becomes a ` ```tikz ` fence
+  containing a standalone LaTeX document, which Kroki Desk ≥ 3.18.0 compiles
+  with the workstation's TeX distribution (or which the configured Kroki
+  server renders). The document carries over from the preamble what a figure
+  can use — math and graphics packages, `\usetikzlibrary`, `\tikzset`,
+  `\newcommand` macros, colors, the class font size — and fixes the number of
+  the `\ref`/`\eqref` it contains (including through a macro such as
+  `\hyp{…}`). `babel` and layout packages are dropped: they are of no use to
+  the figure and may be missing from the workstation's distribution.
+- The text of the nodes and the TikZ source remain available, folded under the
+  figure: they take over on a workstation without a TeX distribution, where
+  the application displays an error in place of the drawing. The
+  "TikZ figure not drawn" warning disappears, since the plugin cannot know
+  whether the host will draw it.
 
 ## [1.3.0] - 2026-09-16
 
-Écarts relevés en confrontant le rendu d'un document de 40 pages à son PDF.
+Discrepancies found by comparing the rendering of a 40-page document with its PDF.
 
-### Ajouté
+### Added
 
-- **`\part`** : numérotation romaine (« Partie II », reprise par `\ref`), sans
-  remettre à zéro les sections ; celles-ci descendent d'un niveau de titre.
-- **Encadrés** `\fbox{\parbox{…}{…}}` rendus en citation, ou en bloc de code
-  si le contenu est en `\ttfamily`.
-- **`tikzpicture`** : avertissement visible, texte des `\node` restitué et
-  source TikZ replié, au lieu des commandes de tracé déversées en texte.
-- **Sous-titres** : `\title{Titre \\ \large Sous-titre}` rend le sous-titre
-  sous le h1 au lieu de tout replier dans le titre.
+- **`\part`**: roman numbering ("Part II", picked up by `\ref`), without
+  resetting the sections; these go down one heading level.
+- **Framed boxes** `\fbox{\parbox{…}{…}}` rendered as a quote, or as a code
+  block if the content is in `\ttfamily`.
+- **`tikzpicture`**: visible warning, text of the `\node`s restored and TikZ
+  source folded, instead of the drawing commands dumped as text.
+- **Subtitles**: `\title{Title \\ \large Subtitle}` renders the subtitle
+  under the h1 instead of folding everything into the title.
 
-### Corrigé
+### Fixed
 
-- **Numérotation des sections cassée par `\part`** : chaque partie consommait
-  un numéro de section (« 5 Le modèle » au lieu de « Partie II »), décalant
-  toutes les sections et références qui suivaient.
-- **Annexes numérotées 1, 2… au lieu de A, B…** — et leurs ancres `sec-1`
-  écrasaient celles des sections du corps : un lien vers « §3 » ouvrait
-  l'annexe C.
-- **Titre des environnements de théorèmes personnalisés** (`\begin{hypothese}[…]`)
-  affiché entre crochets dans le corps.
-- **En-têtes de théorèmes** : format amsthm « **Proposition 8** (Titre). »
-  fondu dans le premier paragraphe, tête en italique pour `\theoremstyle{remark}`.
-- **Expansion des macros** : `\sum\Kdiff` produisait `\sumK_{…}` (commande
-  inconnue, formule en rouge) ; `\foo x` de corps `\alpha` produisait `\alphax`.
-- **Espace après un mot de commande** non absorbée : `c\oe ur` s'affichait
-  « cœ ur ».
-- **Paragraphe débutant par un nombre** (`0.92 …`) préfixé d'un antislash
-  visible.
-- **Antislashs visibles dans le code inline** : `\texttt{B2B\_Market}`.
-- **Spécification de colonnes** lue caractère par caractère : le `c` de
-  `p{5cm}` passait pour une colonne centrée.
-- **`\multicolumn{3}{l}{…}`** rendu « 3 l … » ; **`\rule{…}{…}`** rendu en
+- **Section numbering broken by `\part`**: each part consumed a section number
+  ("5 The model" instead of "Part II"), shifting all the sections and
+  references that followed.
+- **Appendices numbered 1, 2… instead of A, B…** — and their `sec-1` anchors
+  overwrote those of the body sections: a link to "§3" opened appendix C.
+- **Title of custom theorem environments** (`\begin{hypothese}[…]`)
+  displayed in brackets in the body.
+- **Theorem headers**: amsthm format "**Proposition 8** (Title)."
+  merged into the first paragraph, italic head for `\theoremstyle{remark}`.
+- **Macro expansion**: `\sum\Kdiff` produced `\sumK_{…}` (unknown command,
+  formula in red); `\foo x` with body `\alpha` produced `\alphax`.
+- **Space after a command word** not swallowed: `c\oe ur` was displayed
+  "cœ ur".
+- **Paragraph starting with a number** (`0.92 …`) prefixed with a visible
+  backslash.
+- **Visible backslashes in inline code**: `\texttt{B2B\_Market}`.
+- **Column specification** read character by character: the `c` of
+  `p{5cm}` was taken for a centered column.
+- **`\multicolumn{3}{l}{…}`** rendered "3 l …"; **`\rule{…}{…}`** rendered as
   dimensions.
-- **Double marqueur** « 1. (a) » sur les `\item[(a)]` d'une `enumerate`.
-- **Formule inline coupée** quand elle contient `\` + fin de ligne.
-- **Ancres décalées** : la fusion finale des lignes vides décalait la
-  synchronisation aperçu ↔ source de tout ce qui suivait (et vidait les lignes
-  blanches des blocs `verbatim`).
+- **Double marker** "1. (a)" on the `\item[(a)]`s of an `enumerate`.
+- **Inline formula cut** when it contains `\` + line end.
+- **Shifted anchors**: the final merge of blank lines shifted the
+  preview ↔ source synchronization of everything that followed (and emptied the
+  blank lines of `verbatim` blocks).
 
 ## [1.2.1] - 2026-08-21
 
-### Modifié
+### Changed
 
-- **Transformation deux fois plus rapide sur les gros documents.** Le premier
-  des deux parses ne sert qu'à collecter les définitions du préambule
-  (`\newcommand`, `\newtheorem`, `\DeclareMathOperator`, `\title`…) : il ne
-  porte plus que sur les quelques kilo-octets qui précèdent `\begin{document}`
-  au lieu du document entier. Le parseur LaTeX domine le coût du rendu, et
-  cette passe le payait deux fois. Repli automatique sur le source complet dès
-  qu'une déclaration apparaît dans le corps (`\newtheorem` après
-  `\begin{document}` est légal) : le markdown produit est inchangé, à l'octet
-  près. Mesuré sur un document de 100 Ko (2 340 lignes, 933 formules) :
-  `document/transform` passe de ~770 ms à ~390 ms, et le rendu complet dans
-  l'application de ~1 870 ms à ~1 400 ms.
+- **Twice as fast transformation on large documents.** The first of the two
+  parses only serves to collect the preamble definitions
+  (`\newcommand`, `\newtheorem`, `\DeclareMathOperator`, `\title`…): it now
+  covers only the few kilobytes that precede `\begin{document}`
+  instead of the whole document. The LaTeX parser dominates the cost of
+  rendering, and this pass paid it twice. Automatic fallback to the full
+  source as soon as a declaration appears in the body (`\newtheorem` after
+  `\begin{document}` is legal): the markdown produced is unchanged, byte for
+  byte. Measured on a 100 KB document (2,340 lines, 933 formulas):
+  `document/transform` goes from ~770 ms to ~390 ms, and the full rendering in
+  the application from ~1,870 ms to ~1,400 ms.
 
 ## [1.2.0] - 2026-08-04
 
-### Ajouté
+### Added
 
-- **Ancres nommées d'après les `\label{}`** : chaque objet numéroté (équation,
-  section, théorème, flottant) porte désormais, en plus de son ancre numérotée
-  (`#eq-3`), une ancre reprenant **verbatim** le ou les labels qui le visent
-  (`#eq:sigmaU`). Un autre document peut donc pointer une cible **stable** d'un
-  `.tex` — `[σ_U](../doc/modele.tex#eq:sigmaU)` — là où l'ancre numérotée se
-  décalait à la moindre insertion en amont. L'ancre est greffée sur la ligne
-  existante : la synchronisation aperçu ↔ source est inchangée.
+- **Anchors named after the `\label{}`s**: each numbered object (equation,
+  section, theorem, float) now carries, in addition to its numbered anchor
+  (`#eq-3`), an anchor reproducing **verbatim** the label(s) that target it
+  (`#eq:sigmaU`). Another document can therefore point to a **stable** target
+  of a `.tex` — `[σ_U](../doc/modele.tex#eq:sigmaU)` — where the numbered
+  anchor used to shift with the slightest insertion upstream. The anchor is
+  grafted onto the existing line: the preview ↔ source synchronization is
+  unchanged.
 
 ## [1.1.0] - 2026-07-31
 
-### Ajouté
+### Added
 
-- Coloration `tex-source` / `latex-source` (capacité `highlight:code`) : la vue « code source »
-  de l'application colore désormais les `.tex` — commentaires, formules
-  (`$…$`, `$$…$$`, `\[…\]`), commandes de structure, noms d'environnement,
-  commandes ordinaires, séparateurs de tableau. Coloriseur maison en une passe
-  (`texhl.js`), sans highlight.js embarqué.
+- `tex-source` / `latex-source` highlighting (`highlight:code` capability): the
+  application's "source code" view now colors `.tex` files — comments, formulas
+  (`$…$`, `$$…$$`, `\[…\]`), structure commands, environment names,
+  ordinary commands, table separators. Home-made single-pass highlighter
+  (`texhl.js`), without bundled highlight.js.
 
 ## [1.0.0] - 2026-07-22
 
-### Ajouté
+### Added
 
-- Rendu des documents `.tex` / `.latex` autonomes (capacité `document:markdown`)
-  et des fences ` ```latex ` (capacité `fence:markdown`).
-- Structure : sections numérotées, `abstract`, `\title`/`\author`/`\date`.
-- Mathématiques déléguées au KaTeX de l'application ; environnements non
-  étoilés numérotés avec `\tag{n}`.
-- Théorèmes `amsthm` : compteurs partagés (`[theorem]`) et parents
-  (`[section]`), environnements étoilés non numérotés, `proof` avec ∎.
-- Références croisées `\label`/`\ref`/`\eqref` résolues en liens d'ancre, y
-  compris en avant ; référence à l'intérieur d'une formule rendue en texte nu.
-- Expansion des macros du préambule : `\newcommand` (arguments et argument
-  optionnel) et `\DeclareMathOperator`.
-- Listes, tables (`tabular`, `array`, `longtable`), flottants avec légende
-  numérotée, `verbatim`, `quote`, notes de bas de page.
-- Texte : accents LaTeX, ligatures typographiques, symboles `textcomp`, liens,
+- Rendering of standalone `.tex` / `.latex` documents (`document:markdown`
+  capability) and of ` ```latex ` fences (`fence:markdown` capability).
+- Structure: numbered sections, `abstract`, `\title`/`\author`/`\date`.
+- Math delegated to the application's KaTeX; non-starred environments numbered
+  with `\tag{n}`.
+- `amsthm` theorems: shared counters (`[theorem]`) and parents
+  (`[section]`), unnumbered starred environments, `proof` with ∎.
+- `\label`/`\ref`/`\eqref` cross-references resolved into anchor links,
+  including forward ones; reference inside a formula rendered as bare text.
+- Expansion of preamble macros: `\newcommand` (arguments and optional
+  argument) and `\DeclareMathOperator`.
+- Lists, tables (`tabular`, `array`, `longtable`), floats with a numbered
+  caption, `verbatim`, `quote`, footnotes.
+- Text: LaTeX accents, typographic ligatures, `textcomp` symbols, links,
   images.
 
 [1.0.0]: https://github.com/vdidon/kroki-deskapp/releases/tag/latex-doc-1.0.0

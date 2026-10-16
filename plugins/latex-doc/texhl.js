@@ -1,21 +1,21 @@
-// Coloration du source LaTeX (`latex-source`), pour la vue « code source » de
-// l'application.
+// Syntax highlighting of LaTeX source (`latex-source`), for the application's
+// "source code" view.
 //
-// Pas de highlight.js embarqué ici : LaTeX se scanne en une passe, et un
-// coloriseur maison évite 125 Ko de vendor pour cinq concepts. Le contrat de
-// l'hôte est de toute façon du HTML `<span class="hljs-…">` (§6.4), re-sanitizé
-// à l'arrivée — les classes suffisent, la mécanique hljs n'est pas requise.
+// No highlight.js bundled here: LaTeX can be scanned in a single pass, and a
+// home-made highlighter avoids 125 KB of vendor code for five concepts. The
+// host's contract is plain HTML `<span class="hljs-…">` anyway (§6.4), re-sanitized
+// on arrival — the classes are enough, the hljs machinery is not required.
 //
-// Une couleur par **concept LaTeX**, pas par famille technique :
-//   commentaire · maths · structure (\section, \begin…) · nom d'environnement ·
-//   autre commande · séparateur de tableau.
+// One color per **LaTeX concept**, not per technical family:
+//   comment · math · structure (\section, \begin…) · environment name ·
+//   other command · table separator.
 //
-// Passe **unique** : une seule regex alternée décide quel concept l'emporte à
-// chaque position, ce qui rend les chevauchements impossibles (un `$` dans un
-// commentaire n'ouvre pas de formule, un `%` dans une formule ne la coupe pas).
+// **Single** pass: one alternation regex decides which concept wins at each
+// position, which makes overlaps impossible (a `$` in a comment does not open
+// a formula, a `%` in a formula does not cut it short).
 
-// Commandes qui structurent le document — le reste des `\foo` est une commande
-// ordinaire (mise en forme, macro utilisateur…).
+// Commands that structure the document — any other `\foo` is an ordinary
+// command (formatting, user macro…).
 const STRUCTURE = new Set([
   "documentclass", "usepackage", "begin", "end",
   "part", "chapter", "section", "subsection", "subsubsection", "paragraph",
@@ -28,11 +28,11 @@ const STRUCTURE = new Set([
 
 const TOKEN = new RegExp(
   [
-    // Display d'abord : `\[` serait sinon lu comme une simple séquence échappée.
+    // Display first: `\[` would otherwise be read as a plain escape sequence.
     "(?<dmath>\\$\\$[\\s\\S]*?\\$\\$|\\\\\\[[\\s\\S]*?\\\\\\]|\\\\\\([\\s\\S]*?\\\\\\))",
-    "(?<esc>\\\\[^A-Za-z@])", // \% \& \\ … : avant le reste (désamorce % et $)
+    "(?<esc>\\\\[^A-Za-z@])", // \% \& \\ … : before the rest (defuses % and $)
     "(?<comment>%[^\\n]*)",
-    "(?<imath>\\$(?:\\\\.|[^$\\\\\\n])*\\$)", // inline : borné à la ligne, un `$` seul ne contamine rien
+    "(?<imath>\\$(?:\\\\.|[^$\\\\\\n])*\\$)", // inline: bounded to the line, a lone `$` contaminates nothing
     "(?<env>\\\\(?:begin|end)\\s*\\{[^}\\n]*\\})",
     "(?<cmd>\\\\[A-Za-z@]+\\*?)",
     "(?<amp>&)",
@@ -52,7 +52,7 @@ function span(cls, text) {
   return `<span class="${classes}">${esc(text)}</span>`;
 }
 
-/** Source LaTeX → HTML coloré (spans `hljs-*`, texte échappé). */
+/** LaTeX source → colored HTML (`hljs-*` spans, escaped text). */
 export function highlightLatex(code) {
   const src = String(code ?? "");
   let out = "";
@@ -65,15 +65,15 @@ export function highlightLatex(code) {
     const g = m.groups;
     if (g.esc || g.amp) out += span("operator", m[0]);
     else if (g.comment) out += span("comment", m[0]);
-    // `hljs-formula` serait le nom juste, mais les thèmes GitHub de l'hôte lui
-    // donnent le gris **des commentaires** : maths et commentaires deviendraient
-    // indistinguables. `hljs-string` porte la seule autre couleur libre — un bleu
-    // marine proche du noir, d'où l'italique de `hljs-emphasis` par-dessus : les
-    // maths se reconnaissent alors à la forme, comme en typographie mathématique.
+    // `hljs-formula` would be the right name, but the host's GitHub themes give
+    // it the **comment** grey: math and comments would become indistinguishable.
+    // `hljs-string` carries the only other free color — a navy blue close to
+    // black, hence the italics of `hljs-emphasis` on top: math is then
+    // recognized by its shape, as in mathematical typesetting.
     else if (g.dmath || g.imath) out += span("string emphasis", m[0]);
     else if (g.env) {
-      // `\begin{align}` : le mot-clé et le nom de l'environnement sont deux
-      // concepts distincts — on ne colore pas les accolades.
+      // `\begin{align}`: the keyword and the environment name are two distinct
+      // concepts — the braces are not colored.
       const cut = m[0].indexOf("{");
       out += span("keyword", m[0].slice(0, cut));
       out += `{${span("title", m[0].slice(cut + 1, -1))}}`;

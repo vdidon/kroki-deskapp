@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Régénère `vendor/unified-latex.esm.js` — le parseur LaTeX du plugin.
+"""Regenerates `vendor/unified-latex.esm.js` — the plugin's LaTeX parser.
 
     python plugins/latex-doc/build_vendor.py [--keep]
 
-Installe `@unified-latex/*` puis bundle `getParser` + `printRaw` en un module
-ESM autonome, dans un dossier temporaire (rien n'est écrit dans le dépôt hors
-le vendor lui-même). Requiert `node` et `npm` dans le PATH ; `esbuild` est
-récupéré à la volée par `npx`.
+Installs `@unified-latex/*` then bundles `getParser` + `printRaw` into a
+standalone ESM module, in a temporary folder (nothing is written to the
+repository apart from the vendor file itself). Requires `node` and `npm` on the
+PATH; `esbuild` is fetched on the fly by `npx`.
 
-Le vendor est **committé** : ce script ne sert qu'aux montées de version
-d'unified-latex. Après régénération, relancer la suite de tests :
+The vendor file is **committed**: this script is only needed when upgrading
+unified-latex. After regenerating, rerun the test suite:
 
     node tests/test_latex_plugin.mjs
 """
@@ -38,19 +38,19 @@ def run(cmd: list[str], cwd: Path) -> None:
     print("  $", " ".join(cmd))
     proc = subprocess.run(cmd, cwd=cwd, shell=sys.platform == "win32")
     if proc.returncode:
-        sys.exit(f"échec : {' '.join(cmd)} (code {proc.returncode})")
+        sys.exit(f"failed: {' '.join(cmd)} (code {proc.returncode})")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--keep", action="store_true", help="conserver le dossier de build")
+    parser.add_argument("--keep", action="store_true", help="keep the build folder")
     args = parser.parse_args()
 
     if not shutil.which("npm"):
-        sys.exit("npm introuvable dans le PATH")
+        sys.exit("npm not found on the PATH")
 
     work = Path(tempfile.mkdtemp(prefix="latex-doc-vendor-"))
-    print(f"build dans {work}")
+    print(f"building in {work}")
     try:
         (work / "package.json").write_text('{"type":"module","private":true}\n', encoding="utf-8")
         (work / "entry.mjs").write_text(ENTRY, encoding="utf-8")
@@ -66,11 +66,11 @@ def main() -> None:
             work,
         )
         size = OUT.stat().st_size
-        print(f"→ {OUT} ({size / 1024:.0f} Ko)")
-        print("Relancer maintenant : node tests/test_latex_plugin.mjs")
+        print(f"→ {OUT} ({size / 1024:.0f} KB)")
+        print("Now rerun: node tests/test_latex_plugin.mjs")
     finally:
         if args.keep:
-            print(f"dossier de build conservé : {work}")
+            print(f"build folder kept: {work}")
         else:
             shutil.rmtree(work, ignore_errors=True)
 
