@@ -15,10 +15,14 @@ versioning follows [semver](https://semver.org/spec/v2.0.0.html).
   ("Démonstration", "Partie", "Résumé", "(sans titre)") for a French document,
   English otherwise. They used to be French for every document.
 
+- **Messages in the interface language.** Warnings, the degraded-rendering
+  banner and the default title follow the language of the Kroki Desk
+  interface (`locale`, sent since Kroki Desk 3.25.0): French or English. With
+  an older Kroki Desk they are in English.
+
 ### Changed
 
-- Warnings, the degraded-rendering banner, the default title and the plugin's
-  name and description are now in English.
+- The plugin's name and description are now in English.
 
 ## [1.4.1] - 2026-10-09
 

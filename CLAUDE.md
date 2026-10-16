@@ -594,7 +594,11 @@ source, options); a re-render therefore naturally retries errors.
   JS engines' own messages are English anyway. Keys are literals: `tests/test_i18n.mjs` collects
   them (`t("…")`, `tr!("…")`, `data-i18n*`) and checks catalog parity,
   parameters, unknown and dead keys — a key built at runtime is declared by an
-  `i18n-dynamic: <prefix>` comment. Adding a language = adding a catalog to
+  `i18n-dynamic: <prefix>` comment. Plugins receive the interface language as
+  `locale` (protocol §6.1: `initialize`, `document/transform`, `fence/render`,
+  plus the `locale/changed` notification, sent from `onLocaleChange` in
+  `plugins.js`) — for their *messages*; labels written into a rendering
+  follow the document (latex-doc: babel/polyglossia). Adding a language = adding a catalog to
   `CATALOGS` (`i18n.rs`) with its `language.name` endonym.
 - **Two zooms** (3.17.0): text zoom (`Ctrl+wheel`, `setZoom`) and
   page zoom (`Shift+wheel`, `setPageZoom`) compose into a **single** CSS

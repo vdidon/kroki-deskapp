@@ -49,7 +49,10 @@ contents, source view, global search, theme, HTML export) comes for free.
   option, class options included) or `polyglossia`
   (`\setdefaultlanguage{french}`); English otherwise, including for languages
   the plugin has no labels for. Theorem names come from your `\newtheorem`
-  declarations and are never translated.
+  declarations and are never translated. The warnings and the
+  degraded-rendering banner, which talk about the rendering rather than the
+  text, follow the **interface** language of Kroki Desk instead (≥ 3.25.0;
+  English with older versions).
 - **Cross-references**: `\label`, `\ref`, `\eqref`, `\autoref`, `\pageref` are
   resolved into **clickable links** to an anchor in the document — forward
   references included. A reference appearing *inside* a formula (typically via a

@@ -21,14 +21,17 @@ import { highlightLatex } from "./texhl.js";
 
 kd.onRequest("initialize", () => ({ ok: true }));
 
-kd.onRequest("document/transform", ({ text, title }) =>
-  texToMarkdown(String(text ?? ""), { title: String(title ?? "LaTeX document") }),
+// `locale` (interface language, protocol §6.1) only picks the language of the
+// warnings and banners; the labels written into the rendering follow the
+// document's own language (babel/polyglossia).
+kd.onRequest("document/transform", ({ text, title, locale }) =>
+  texToMarkdown(String(text ?? ""), { title: title == null ? undefined : String(title), locale }),
 );
 
 // In a fence, the source is a fragment: neither preamble nor `\begin{document}`
 // required, and no `#` title (it would split the host document in two).
-kd.onRequest("fence/render", ({ source }) => {
-  const { markdown } = texToMarkdown(String(source ?? ""), { fragment: true });
+kd.onRequest("fence/render", ({ source, locale }) => {
+  const { markdown } = texToMarkdown(String(source ?? ""), { fragment: true, locale });
   return { format: "markdown", content: markdown };
 });
 

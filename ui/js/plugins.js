@@ -13,7 +13,7 @@
 import { invoke, listen, convertFileSrc } from "./app.js";
 import { docIsDark } from "./theme.js";
 import { sanitizeAnchors } from "./anchors.js";
-import { t } from "./i18n.js";
+import { t, getLocale, onLocaleChange } from "./i18n.js";
 
 /// Capacités servables par cet hôte (négociation `initialize`, §6.1). Doit
 /// rester en phase avec `HOST_CAPABILITIES` (src-tauri/src/plugins.rs).
@@ -130,6 +130,7 @@ class PluginHost {
       hostVersion,
       capabilities: HOST_CAPABILITIES,
       theme: effectiveTheme(),
+      locale: getLocale(),
     });
   }
 
@@ -415,6 +416,13 @@ export function notifyThemeChanged() {
   for (const h of hosts.values()) h.notify("theme/changed", { theme });
 }
 
+// Langue de l'interface changée (cette fenêtre ou une autre) : `locale/changed`
+// (§6.6) aux workers vivants. Le re-rendu qui suit renvoie de toute façon
+// `locale` dans chaque requête ; la notification sert aux caches du plugin.
+onLocaleChange((locale) => {
+  for (const h of hosts.values()) h.notify("locale/changed", { locale });
+});
+
 // --------------------------------------------------------------------------- //
 // Méthodes du protocole (typées côté hôte, données plugin = non fiables)
 // --------------------------------------------------------------------------- //
@@ -424,7 +432,7 @@ export async function pluginTransformDocument(info, { text, path, dir, title }) 
   const r = await call(
     info,
     "document/transform",
-    { text, path, dir, title, theme: effectiveTheme() },
+    { text, path, dir, title, theme: effectiveTheme(), locale: getLocale() },
     dir,
   );
   return {
@@ -439,7 +447,7 @@ export async function pluginRenderFence(info, { lang, source, options, dir }) {
   const r = await call(
     info,
     "fence/render",
-    { lang, source, options, dir, theme: effectiveTheme() },
+    { lang, source, options, dir, theme: effectiveTheme(), locale: getLocale() },
     dir,
   );
   const format = r?.format;

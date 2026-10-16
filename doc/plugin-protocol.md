@@ -185,11 +185,22 @@ webview, but inverted: you only pay if you use it).
     "hostVersion": "2.9.1",              // CARGO_PKG_VERSION
     "capabilities": ["document:markdown", "fence:svg", "fence:html",
                       "fence:markdown", "highlight:code", "read:siblings"],   // what THIS host can serve
-    "theme": "dark"                       // current effective theme: "light" | "dark"
+    "theme": "dark",                      // current effective theme: "light" | "dark"
+    "locale": "fr"                        // interface language (since 3.25.0): "en" | "fr" | …
 } }
 // plugin → host
 { "result": { "ok": true } }
 ```
+
+`locale` is the language of the application's **interface** — a short code
+(`"en"`, `"fr"`), the host choosing among the languages it ships. A plugin
+MAY use it for the texts it addresses to the user: `warnings`, degraded-mode
+banner, error messages. It is not the language of the document being
+rendered: words written into the rendering itself (a "Proof" label, a table
+caption) should follow the document when it declares one. Hosts older than
+3.25.0 do not send it — treat its absence as English. The same field travels
+with every `document/transform` and `fence/render` (§ 6.2, § 6.3), so a
+plugin that has no cache can ignore `locale/changed` (§ 6.6).
 
 The intersection `manifest.capabilities ∩ params.capabilities` defines what is
 active. A plugin none of whose capabilities can be served is marked "inert"
@@ -211,7 +222,8 @@ Transforms a whole document into markdown, then rendered by the host like a
     "path": "D:\\docs\\pricing.spec",  // absolute path (cross-file deep links)
     "dir":  "D:\\docs",                // folder (base for host/readFile)
     "title": "pricing",                // file name without extension
-    "theme": "dark"
+    "theme": "dark",
+    "locale": "en"                     // interface language (§ 6.1)
 } }
 // plugin → host
 { "result": {
@@ -245,7 +257,8 @@ renders.
     "options": { "src": "partition.xml" },  // key=value pairs of the info string,
                                              // syntax of parseDiagramOptions (render.js)
     "dir": "D:\\docs",
-    "theme": "dark"
+    "theme": "dark",
+    "locale": "en"
 } }
 // plugin → host
 { "result": { "format": "svg", "content": "<svg …>…</svg>" } }
@@ -315,7 +328,8 @@ nothing special to do for multi-line constructs.
 
 | Method | Contract |
 | --- | --- |
-| `theme/changed` | `{ theme: "light" | "dark" }` — effective theme after a switch (`theme.js`). Documents/fences already rendered are re-rendered by the host anyway; this notification is for the plugin's internal caches. |
+| `theme/changed` | `{ theme: "light" \| "dark" }` — effective theme after a switch (`theme.js`). Documents/fences already rendered are re-rendered by the host anyway; this notification is for the plugin's internal caches. |
+| `locale/changed` | `{ locale: "en" \| "fr" \| … }` — interface language after a switch in the settings (since 3.25.0). Same contract as `theme/changed`: everything is re-rendered by the host, with the new `locale` in each request. |
 
 ### 6.7 Style classes provided by the host
 

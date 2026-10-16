@@ -594,6 +594,39 @@ const LABELS = {
     tikzNodesAndSource: "Texte des nœuds et source TikZ",
   },
 };
+/**
+ * Messages addressed to the user — warnings shown in the host's banner and the
+ * degraded-rendering banner — in the language of the **interface** (`locale`
+ * given by the host, protocol §6.1), not of the document: they talk about the
+ * rendering, not about the text.
+ */
+const MESSAGES = {
+  en: {
+    unknownCommand: (name) => `unknown command \\${name} ignored`,
+    unformattedEnv: (name) => `environment "${name}" rendered without formatting`,
+    unresolved: (n, list) =>
+      `unresolved reference${n > 1 ? "s" : ""}: ${list}` + (n > 5 ? `… (${n} in total)` : ""),
+    degraded: "degraded rendering: the source is displayed as-is",
+    degradedBanner: "Degraded LaTeX rendering",
+    defaultTitle: "LaTeX document",
+  },
+  fr: {
+    unknownCommand: (name) => `commande inconnue \\${name} ignorée`,
+    unformattedEnv: (name) => `environnement « ${name} » rendu sans mise en forme`,
+    unresolved: (n, list) =>
+      `référence${n > 1 ? "s" : ""} non résolue${n > 1 ? "s" : ""} : ${list}` +
+      (n > 5 ? `… (${n} au total)` : ""),
+    degraded: "rendu dégradé : le source est affiché tel quel",
+    degradedBanner: "Rendu LaTeX dégradé",
+    defaultTitle: "Document LaTeX",
+  },
+};
+
+/** Interface language given by the host (`"fr"`, `"en"`…) → message set. */
+export function uiMessages(locale) {
+  return String(locale ?? "").toLowerCase().startsWith("fr") ? MESSAGES.fr : MESSAGES.en;
+}
+
 const FRENCH = new Set(["french", "francais", "frenchb", "acadian", "canadien"]);
 // Babel language options other than French: they can only select English
 // labels, but they must be told apart from class options (`a4paper`, `11pt`).
@@ -628,7 +661,7 @@ export function docLanguage(source) {
   return langs.length ? toLang(langs[langs.length - 1]) : "en";
 }
 
-function generate(source, { title, fragment }) {
+function generate(source, { title, fragment, M }) {
   const L = LABELS[docLanguage(source)];
   const defs = { macros: new Map(), theorems: new Map(), meta: {}, theoremStyle: "plain" };
   const nude = getParser().parse(defsScope(source));
@@ -976,7 +1009,7 @@ function generate(source, { title, fragment }) {
 
     // Unknown macro: keep its arguments, the only information it carries.
     const inner = (n.args ?? []).map((a) => emitInline(a.content ?? [], depth)).join(" ").trim();
-    if (!inner) warnings.add(`unknown command \\${name} ignored`);
+    if (!inner) warnings.add(M.unknownCommand(name));
     return { text: inner };
   };
 
@@ -1569,7 +1602,7 @@ function generate(source, { title, fragment }) {
         case "thebibliography":
           return emitBlocks(n.content ?? [], indent);
         default:
-          if (!TRANSPARENT_ENVS.has(name)) warnings.add(`environment "${name}" rendered without formatting`);
+          if (!TRANSPARENT_ENVS.has(name)) warnings.add(M.unformattedEnv(name));
           return emitBlocks(n.content ?? [], indent);
       }
     }
@@ -1695,10 +1728,7 @@ function generate(source, { title, fragment }) {
 
   if (unresolved.size) {
     const list = [...unresolved].slice(0, 5).join(", ");
-    warnings.add(
-      `unresolved reference${unresolved.size > 1 ? "s" : ""}: ${list}` +
-        (unresolved.size > 5 ? `… (${unresolved.size} in total)` : ""),
-    );
+    warnings.add(M.unresolved(unresolved.size, list));
   }
 
   return { markdown, anchors, warnings: [...warnings] };
@@ -1721,23 +1751,29 @@ function fenceFor(source) {
  * live editing). The fallback fence is ```tex and not ```latex: the latter
  * is claimed by the plugin, it would be re-rendered in a loop.
  *
+ * `locale` is the interface language given by the host: it selects the
+ * language of the warnings, the degraded banner and the default title — the
+ * labels written into the rendering follow the document's language instead.
+ *
  * Returns `{ markdown, anchors, warnings }` — see remapLine (`ui/js/anchors.js`).
  */
-export function texToMarkdown(source, { title = "LaTeX document", fragment = false } = {}) {
+export function texToMarkdown(source, { title, fragment = false, locale } = {}) {
+  const M = uiMessages(locale);
+  title ??= M.defaultTitle;
   const src = String(source ?? "").replace(/\r\n?/g, "\n");
   try {
-    return generate(src, { title, fragment });
+    return generate(src, { title, fragment, M });
   } catch (err) {
     const fence = fenceFor(src);
     const markdown = [
       ...(fragment ? [] : [`# ${title}`, ""]),
-      `> ⚠️ **Degraded LaTeX rendering** — ${err && err.message ? err.message : String(err)}`,
+      `> ⚠️ **${M.degradedBanner}** — ${err && err.message ? err.message : String(err)}`,
       "",
       `${fence}tex`,
       src,
       fence,
       "",
     ].join("\n");
-    return { markdown, anchors: [[0, 0]], warnings: ["degraded rendering: the source is displayed as-is"] };
+    return { markdown, anchors: [[0, 0]], warnings: [M.degraded] };
   }
 }

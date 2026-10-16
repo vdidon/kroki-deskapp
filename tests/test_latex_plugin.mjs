@@ -432,6 +432,28 @@ group("Langue du document (libellés insérés par le plugin)", () => {
   );
 });
 
+group("Langue de l'interface (avertissements, bannière, titre par défaut)", () => {
+  const src = doc(String.raw`\foo \ref{nulle} \begin{inconnu}x\end{inconnu}`);
+  const en = texToMarkdown(src).warnings;
+  check(
+    "sans locale : anglais",
+    en.includes(String.raw`unknown command \foo ignored`) && en.includes("unresolved reference: nulle") &&
+      en.includes(`environment "inconnu" rendered without formatting`),
+    en,
+  );
+  const fr = texToMarkdown(src, { locale: "fr" }).warnings;
+  check(
+    "locale fr : français",
+    fr.includes(String.raw`commande inconnue \foo ignorée`) && fr.includes("référence non résolue : nulle") &&
+      fr.includes("environnement « inconnu » rendu sans mise en forme"),
+    fr,
+  );
+  // La langue de l'interface ne touche pas aux libellés du rendu, qui suivent le document.
+  const proof = texToMarkdown(doc(String.raw`\begin{proof}Ok.\end{proof}`, String.raw`\usepackage{amsthm}`), { locale: "fr" });
+  check("locale fr, document anglais : Proof", proof.markdown.includes("*Proof.* Ok."), proof.markdown);
+  check("titre par défaut localisé", texToMarkdown("x", { locale: "fr" }).markdown.startsWith("# Document LaTeX"), texToMarkdown("x", { locale: "fr" }).markdown);
+});
+
 // Écarts relevés en confrontant un document réel (~40 pages) à son PDF.
 group("Fidélité au PDF : structure", () => {
   const { markdown, anchors } = texToMarkdown(
