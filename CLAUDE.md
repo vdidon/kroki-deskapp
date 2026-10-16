@@ -2,850 +2,851 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Vue d'ensemble
+## Overview
 
-Kroki Desk est une visionneuse Markdown native Windows (Tauri 2 / Rust backend +
-frontend statique) qui rend les blocs de diagrammes Kroki (`mermaid`, `plantuml`,
-`graphviz`, `d2`, `bpmn`, `svgbob`…) en SVG **sans serveur, sans Docker, sans
-réseau** : tous les moteurs sont embarqués dans l'exécutable. Le binaire final est
-un fichier unique autonome.
+Kroki Desk is a native Windows Markdown viewer (Tauri 2 / Rust backend +
+static frontend) that renders Kroki diagram blocks (`mermaid`, `plantuml`,
+`graphviz`, `d2`, `bpmn`, `svgbob`…) to SVG **with no server, no Docker, no
+network**: all engines are embedded in the executable. The final binary is
+a single standalone file.
 
-Le `README.md` documente en détail les fonctionnalités utilisateur, la liste des
-moteurs et les notes de sécurité — le lire avant de toucher au rendu ou à la CSP.
+The `README.md` documents the user-facing features, the list of engines and
+the security notes in detail — read it before touching rendering or the CSP.
 
-## Commandes
+## Commands
 
-Des alias Cargo (`.cargo/config.toml`) pilotent le crate `src-tauri/` **depuis la
-racine du dépôt**, sans `cd src-tauri` :
+Cargo aliases (`.cargo/config.toml`) drive the `src-tauri/` crate **from the
+repo root**, without `cd src-tauri`:
 
 ```bash
-# Build release (binaire autonome → dist/kroki_deskapp-<version>.exe
-#                 + twin non versionné dist/kroki_deskapp.exe)
+# Release build (standalone binary → dist/kroki_deskapp-<version>.exe
+#                 + unversioned twin dist/kroki_deskapp.exe)
 cargo build-app
 
-# Build/run debug (lance l'app)
+# Debug build/run (launches the app)
 cargo run-app
 
-# Lint / format Rust
+# Rust lint / format
 cargo lint-app && cargo fmt-app
 
-# AppImage Linux (sur machine/conteneur Linux uniquement ; requiert tauri-cli)
+# Linux AppImage (Linux machine/container only; requires tauri-cli)
 cargo build-appimage
 
-# Installeur MSI Windows (Windows uniquement ; requiert les .kdext dans dist/)
+# Windows MSI installer (Windows only; requires the .kdext files in dist/)
 cargo build-msi
 
-# Paquet Debian/Ubuntu (Linux uniquement ; requiert les .kdext dans dist/)
+# Debian/Ubuntu package (Linux only; requires the .kdext files in dist/)
 cargo build-deb
 ```
 
-Les alias transmettent les arguments (`cargo run-app -- --flag`) et ciblent le crate
-via `--manifest-path` : `src-tauri` reste un package standalone (profils release et
-dossier `target/` inchangés). Équivalent brut si besoin : ajouter `--manifest-path
-src-tauri/Cargo.toml` à la commande cargo, ou l'ancienne forme `cd src-tauri && cargo …`.
+The aliases forward arguments (`cargo run-app -- --flag`) and target the crate
+via `--manifest-path`: `src-tauri` remains a standalone package (release profiles and
+`target/` folder unchanged). Raw equivalent if needed: add `--manifest-path
+src-tauri/Cargo.toml` to the cargo command, or use the old form `cd src-tauri && cargo …`.
 
-`build-app`, `build-appimage`, `build-msi` et `build-deb` passent par le crate
-`xtask/` qui,
-après le build, **publie l'artefact dans `dist/`** (gitignoré) : nom postfixé de la
-version (`kroki_deskapp-<version>.exe`, `kroki_deskapp-<version>.msi`,
+`build-app`, `build-appimage`, `build-msi` and `build-deb` go through the `xtask/`
+crate which,
+after the build, **publishes the artifact into `dist/`** (gitignored): name suffixed
+with the version (`kroki_deskapp-<version>.exe`, `kroki_deskapp-<version>.msi`,
 `kroki_deskapp-<version>-linux-<arch>-<distro>`,
 `…-linux-<arch>-<distro>.AppImage`, `…-linux-<arch>-<distro>.deb`
-— `<distro>` = tag de la distro qui compile,
-lu dans `/etc/os-release` : `debian12` pour le conteneur, `ubuntu24.04`… ; un
-build natif et un build Docker ne s'écrasent donc jamais dans `dist/`) doublé
-d'un fichier non versionné pointant sur le
-même contenu — hardlink de préférence (fonctionne sans droit administrateur,
-NTFS comme ext4 ; un symlink Windows exigerait admin/mode développeur), copie
-en repli (FS sans hardlink, ex. montages Docker Desktop). Cf. `publish_dist`
-dans `xtask/src/main.rs`. Le brut `cargo build --release --manifest-path
-src-tauri/Cargo.toml` reste possible mais ne publie rien dans `dist/`.
+— `<distro>` = tag of the building distro,
+read from `/etc/os-release`: `debian12` for the container, `ubuntu24.04`… ; a
+native build and a Docker build therefore never overwrite each other in `dist/`) paired
+with an unversioned file pointing at the
+same content — hardlink preferred (works without admin rights,
+NTFS as well as ext4; a Windows symlink would require admin/developer mode), copy
+as a fallback (FS without hardlinks, e.g. Docker Desktop mounts). See `publish_dist`
+in `xtask/src/main.rs`. The raw `cargo build --release --manifest-path
+src-tauri/Cargo.toml` remains possible but publishes nothing into `dist/`.
 
-Il n'y a **pas de bundler frontend** : `tauri.conf.json` pointe `frontendDist` sur
-`../ui` (HTML/JS/CSS statiques, `withGlobalTauri: true`, vendors pré-buildés dans
-`ui/vendor/` et `ui/renderer/vendor/`). Aucune étape `npm install`/`npm build`.
-`bundle.active: false` → `cargo build` produit l'`.exe` nu ; les installeurs
-passent tous par un overlay de config et `tauri build` (cf. ci-dessous).
+There is **no frontend bundler**: `tauri.conf.json` points `frontendDist` at
+`../ui` (static HTML/JS/CSS, `withGlobalTauri: true`, pre-built vendors in
+`ui/vendor/` and `ui/renderer/vendor/`). No `npm install`/`npm build` step.
+`bundle.active: false` → `cargo build` produces the bare `.exe`; the installers
+all go through a config overlay and `tauri build` (see below).
 
-### Installeur Windows (MSI)
+### Windows installer (MSI)
 
-`cargo build-msi` (Windows uniquement — WiX v3 n'y tourne que là) produit
-`dist/kroki_deskapp-<version>.msi` + twin. Même patron que l'AppImage : le
-xtask bootstrappe `tauri-cli` si besoin puis délègue à `tauri build --config
-src-tauri/tauri.msi.conf.json` — c'est **l'overlay** qui active le bundling,
-`tauri.conf.json` garde `bundle.active: false`. Le binaire portable reste le
-livrable principal ; le MSI s'y ajoute, il ne le remplace pas.
+`cargo build-msi` (Windows only — WiX v3 only runs there) produces
+`dist/kroki_deskapp-<version>.msi` + twin. Same pattern as the AppImage: the
+xtask bootstraps `tauri-cli` if needed then delegates to `tauri build --config
+src-tauri/tauri.msi.conf.json` — it is **the overlay** that enables bundling,
+`tauri.conf.json` keeps `bundle.active: false`. The portable binary remains the
+main deliverable; the MSI comes in addition, it does not replace it.
 
-Ce que l'overlay porte, et pourquoi :
+What the overlay carries, and why:
 
-- **La page de sélection des plugins et les associations de fichiers**, dans
-  deux fragments : `src-tauri/wix/installer.wxs` (suivi : formats natifs, App
-  Paths) et `src-tauri/wix/plugins.generated.wxs` (gitignoré, **généré à chaque
-  build** par `xtask/src/bundled.rs` depuis la stratégie d'embarquement, cf.
-  ci-dessous : propriétés `PLUGIN_*`, composants des archives et de leurs
-  associations, page `PluginDlg`). Branchés par `wix.fragmentPaths` +
-  `wix.componentGroupRefs` ; **les trois** ComponentGroup doivent être
-  référencés, sinon les composants de l'un ne sont rattachés à aucune feature.
-  Ni `bundle.fileAssociations` ni `bundle.resources` ne sont utilisés, pour la
-  même raison : le bundler place ce qu'ils déclarent dans des composants
-  **qu'il génère lui-même** — celui de l'exécutable pour les associations, un
-  par fichier avec un Id aléatoire à chaque build pour les ressources — et WiX
-  interdit d'ajouter une condition à un composant déclaré ailleurs. Or les
-  archives doivent suivre les cases, et les associations d'un format servi par
-  un plugin doivent suivre **le plugin**, pas l'application. Quatre choses à
-  savoir avant d'y toucher :
-  - **Les `.kdext` sont déclarés en `<File>`** (fragment généré), un composant conditionné par
-    plugin sous `INSTALLDIR\bundled-plugins`. Les archives sont **toutes** dans
-    le cab du MSI ; seules les cochées sont écrites sur disque. Le chemin source
-    passe par `$(sys.SOURCEFILEDIR)` (dossier du .wxs) et non par un relatif au
-    cwd, que Tauri n'expose pas. Côté Rust, **rien à faire** :
-    `plugins::seed_bundled` installe ce qu'il trouve dans
-    `resource_dir()/bundled-plugins/`. Corollaire : décocher un plugin
-    **déjà installé** ne le désinstalle pas — le seeding ajoute et met à jour,
-    il ne retire jamais.
-  - **Les associations n'ont pas de page** : toutes sont posées, seul le
-    *niveau* varie — et il est choisi pour ce qu'il fait, pas par prudence
-    affichée. `Software\Classes\<.ext>\(Default)` ne mord que sur une extension
-    **vierge** : dès qu'un `UserChoice` existe (HKCU, hash protégé depuis
-    Windows 8), il est ignoré et l'application n'apparaît qu'en suggestion —
-    vérifié sur `.md`, pourtant sans autre programme déclaré. Il n'apporte donc
-    rien sur un format partagé, alors qu'il y coûte : il écrase le `(Default)`
-    en place (`htmlfile`, `txtfilelegacy`) et MSI ne le restaure pas à la
-    désinstallation. D'où `(Default)` + `OpenWithProgids` pour `.kdws .kdext`
-    **et toutes les extensions des plugins** (c'est ce qui fait marcher le
-    double-clic, la raison d'être de l'installeur ; installer un plugin est un
-    choix explicite, partagé ou non — `.tex`, `.csv` compris — et un
-    `UserChoice` existant l'emporte de toute façon), et `OpenWithProgids`
-    **seul** pour les formats natifs partagés (`.md`, `.txt`, `.html`…).
-  - **La sélection des plugins conditionne leurs associations.** Une extension
-    n'a de sens que si le plugin qui la lit est là : chaque composant
-    `Assoc<Plugin>` (ProgID `KrokiDesk.<Plugin>` + extensions lues dans le
-    manifeste) porte la condition `PLUGIN_<ID> = "1"`, les composants des
-    formats natifs sont inconditionnels. Leur GUID est dérivé de l'id du
-    plugin (`stable_guid`) : pas d'auto-GUID sous HKMU. Une seule famille de propriétés à connaître, `PLUGIN_*`,
-    toutes `Secure="yes"` — sans ça, l'UI tournant sous le compte utilisateur ne
-    les transmettrait pas au serveur d'exécution élevé et tout serait installé
-    quoi qu'on décoche. Étant publiques, elles pilotent aussi l'installation
-    silencieuse (`msiexec /i … /qn PLUGIN_CSV_TABLES=1`).
-  - **Le dialogue s'insère par surcharge.** Tauri impose `WixUI_InstallDir`,
-    qui n'a pas de page de personnalisation ; `PluginDlg` se glisse entre
-    `InstallDirDlg` et `VerifyReadyDlg` via des `Publish` `NewDialog` d'`Order`
-    supérieur (5 — WixUI_InstallDir monte à
-    4), en reprenant sa condition de validation du chemin. Même tour que le
-    template Tauri, qui saute la licence en `Order="2"`. La page a une taille
-    fixe : 6 plugins au plus, le xtask échoue au-delà.
+- **The plugin selection page and the file associations**, in
+  two fragments: `src-tauri/wix/installer.wxs` (tracked: native formats, App
+  Paths) and `src-tauri/wix/plugins.generated.wxs` (gitignored, **generated on every
+  build** by `xtask/src/bundled.rs` from the bundling strategy, see
+  below: `PLUGIN_*` properties, components of the archives and of their
+  associations, `PluginDlg` page). Wired in by `wix.fragmentPaths` +
+  `wix.componentGroupRefs`; **all three** ComponentGroups must be
+  referenced, otherwise the components of one are attached to no feature.
+  Neither `bundle.fileAssociations` nor `bundle.resources` are used, for the
+  same reason: the bundler puts what they declare into components
+  **that it generates itself** — the executable's component for the associations, one
+  per file with a random Id on every build for the resources — and WiX
+  forbids adding a condition to a component declared elsewhere. Yet the
+  archives must follow the checkboxes, and the associations of a format served by
+  a plugin must follow **the plugin**, not the application. Four things to
+  know before touching it:
+  - **The `.kdext` files are declared as `<File>`** (generated fragment), one component conditioned by
+    plugin under `INSTALLDIR\bundled-plugins`. The archives are **all** in
+    the MSI's cab; only the checked ones are written to disk. The source path
+    goes through `$(sys.SOURCEFILEDIR)` (the .wxs's folder) and not through a path relative to the
+    cwd, which Tauri does not expose. On the Rust side, **nothing to do**:
+    `plugins::seed_bundled` installs what it finds in
+    `resource_dir()/bundled-plugins/`. Corollary: unchecking a plugin
+    **already installed** does not uninstall it — seeding adds and updates,
+    it never removes.
+  - **The associations have no page**: all are laid down, only the
+    *level* varies — and it is chosen for what it does, not out of
+    displayed caution. `Software\Classes\<.ext>\(Default)` only takes hold on a
+    **virgin** extension: as soon as a `UserChoice` exists (HKCU, hash-protected since
+    Windows 8), it is ignored and the application only appears as a suggestion —
+    verified on `.md`, even though no other program is declared. It therefore brings
+    nothing on a shared format, while costing something there: it overwrites the
+    `(Default)` in place (`htmlfile`, `txtfilelegacy`) and MSI does not restore it on
+    uninstall. Hence `(Default)` + `OpenWithProgids` for `.kdws .kdext`
+    **and all the plugins' extensions** (this is what makes the
+    double-click work, the installer's whole purpose; installing a plugin is an
+    explicit choice, shared or not — `.tex`, `.csv` included — and an existing
+    `UserChoice` wins anyway), and `OpenWithProgids`
+    **alone** for the shared native formats (`.md`, `.txt`, `.html`…).
+  - **The plugin selection conditions their associations.** An extension
+    only makes sense if the plugin that reads it is there: each `Assoc<Plugin>`
+    component (ProgID `KrokiDesk.<Plugin>` + extensions read from the
+    manifest) carries the condition `PLUGIN_<ID> = "1"`, the components of the
+    native formats are unconditional. Their GUID is derived from the plugin's
+    id (`stable_guid`): no auto-GUID under HKMU. A single family of properties to know, `PLUGIN_*`,
+    all `Secure="yes"` — without that, the UI running under the user account would not
+    pass them to the elevated execution server and everything would be installed
+    whatever is unchecked. Being public, they also drive the silent
+    installation (`msiexec /i … /qn PLUGIN_CSV_TABLES=1`).
+  - **The dialog is inserted by override.** Tauri imposes `WixUI_InstallDir`,
+    which has no customization page; `PluginDlg` slips in between
+    `InstallDirDlg` and `VerifyReadyDlg` via `Publish` `NewDialog` entries with a higher
+    `Order` (5 — WixUI_InstallDir goes up to
+    4), reusing its path validation condition. Same trick as the Tauri
+    template, which skips the license at `Order="2"`. The page has a fixed size:
+    6 plugins at most, the xtask fails beyond that.
 
-  L'exe y est désigné par `[INSTALLDIR]kroki_deskapp.exe` et **non** par la
-  référence de fichier `[#Path]`, pourtant plus robuste au renommage : Tauri
-  injecte les `componentGroupRefs` dans sa feature `External` alors que l'exe
-  appartient à `MainProgram`, et MSI refuse qu'une valeur de registre référence
-  un fichier d'une autre feature — **ICE69, erreur de link**, pas un
-  avertissement. Renommer le binaire impose donc d'éditer le fragment.
-- **Clé *App Paths*** (composant `AppPath` du même fragment,
-  inconditionnel) : rend l'exe lançable par son nom via ShellExecute
-  (`start kroki_deskapp "doc.tex#eq:x"`, `Start-Process`, Win+R) sans toucher
-  au PATH — c'est la voie documentée pour un agent qui ouvre un document à une
-  référence. Bash et CreateProcess ne la lisent pas.
-- **`wix.template` remplacé** (`src-tauri/wix/main.wxs`) : copie du template
-  de tauri-bundler (tauri-cli 2.11.4) avec **un seul** écart, signalé en
-  commentaire — le raccourci du menu Démarrer n'a plus
-  `Icon="ProductIcon"`. Cet attribut fait pointer le `.lnk` sur
-  `%WINDIR%\Installer\{ProductCode}\ProductIcon`, dossier supprimé à chaque
-  mise à jour majeure (ProductCode neuf à chaque build) ; l'épingle de la barre
-  des tâches, **copie figée** du `.lnk` que MSI ne réécrit jamais, perdait son
-  icône. Sans attribut, l'icône est lue dans l'exe (chemin stable) — comme le
-  raccourci Bureau du template, qui n'a jamais eu le défaut. Prix : le template
-  ne suit plus tauri-cli (`TAURI_CLI_VERSION = "^2"`, non figé) — à
-  re-synchroniser (diff contre l'upstream de la version installée) lors d'une
-  montée qui touche `main.wxs`.
-- **`wix.upgradeCode` figé** (`03A2A6F1-…`) : c'est exactement la valeur que
-  Tauri dérive aujourd'hui (UUID v5 de `"Kroki Desk.exe.app.x64"`), recopiée
-  pour qu'un futur changement de `productName` ne casse pas la chaîne de mise à
-  jour — sans ce GUID, chaque version s'installerait *à côté* de la précédente.
-  Ne jamais le modifier.
-- **`bannerPath` / `dialogImagePath`** : `src-tauri/wix/banner.bmp` (493×58,
-  bandeau des pages intérieures) et `dialog.bmp` (493×312, accueil/fin)
-  remplacent le logo WixUI par défaut (CD rouge). Tailles imposées par WixUI ;
-  générés depuis `icons/icon.png` par `uv run scripts/wix_images.py`, à
-  relancer si l'icône change.
-- **`webviewInstallMode: skip`** : WebView2 est préinstallé depuis Windows 10
-  2004. Les autres modes téléchargent à l'installation (réseau filtré) ou
-  ajoutent 127 à 180 Mo.
-- **Stratégie d'embarquement des plugins** (`xtask/src/bundled.rs`) : un
-  fichier texte à la racine, une ligne `<id> [on]` par plugin (`on` = coché
-  dans le MSI / installé au premier lancement du `.deb`), dans l'ordre de la
-  page. `bundled-plugins.txt` (gitignoré — la sélection du poste) fait foi
-  s'il existe, sinon `bundled-plugins.default.txt` (suivi — le comportement
-  par défaut). **Seule source de la liste** : le nom affiché et les
-  extensions viennent du `manifest.json` lu **dans `dist/<id>.kdext`** — pas
-  dans `plugins/<id>/`, qui peut être une jonction irrésoluble dans le
-  conteneur du `.deb`. `bundled::stage` recopie les archives retenues vers
-  `src-tauri/bundled-plugins/` (gitignoré, **vidé à chaque build**) — c'est de
-  là que les `<File>` du fragment les lisent — et échoue avec un renvoi vers
-  `python build_dist.py --plugins-only` si l'une manque ; `build_dist.py` (qui
-  empaquette et bundle par défaut, cf. § « Builds Linux ») enchaîne les deux
-  étapes seul. Le sous-dossier `bundled-plugins/` n'est pas cosmétique :
-  `resource_dir()` étant le dossier de l'exe, un binaire portable lancé depuis
-  `dist/` installerait sinon tous les `.kdext` voisins. Le `.deb` passe par la
-  **même** stratégie (cf. § suivant). Pour relire ce qui sera généré sans
-  bundler : `cargo run --manifest-path xtask/Cargo.toml -- bundled`.
-  **Canaux de distribution** : `KROKI_BUNDLED_PLUGINS` (chemin relatif au
-  dépôt) impose la stratégie et court-circuite le choix ci-dessus — un
-  fichier imposé absent est une erreur, jamais un repli. `build_dist.py
-  --channel public|local|all` la pose (`public` = `bundled-plugins.default.txt`
-  même si `bundled-plugins.txt` existe ; `local`, défaut = choix ci-dessus ;
-  `all` = public puis local en une passe — binaires une fois, MSI et `.deb`
-  deux fois, `dist/` finit sur les installeurs locaux),
-  la transmet au conteneur du `.deb` (`-e`), en `public` seulement recopie
-  chaque artefact produit dans `dist/public/<version>/` (les `.kdext` : ceux
-  de la stratégie seulement ; pas de dossier pour `local`) et compare après le MSI et le `.deb` le contenu de
-  `src-tauri/bundled-plugins/` à la stratégie — écart = arrêt. Seuls MSI et
-  `.deb` diffèrent d'un canal à l'autre ; `dist/` à la racine reste écrasé
-  par le dernier build, quel que soit son canal.
+  The exe is designated there by `[INSTALLDIR]kroki_deskapp.exe` and **not** by the
+  file reference `[#Path]`, although the latter is more robust to renaming: Tauri
+  injects the `componentGroupRefs` into its `External` feature while the exe
+  belongs to `MainProgram`, and MSI refuses that a registry value reference
+  a file of another feature — **ICE69, a link error**, not a
+  warning. Renaming the binary therefore requires editing the fragment.
+- ***App Paths* key** (`AppPath` component of the same fragment,
+  unconditional): makes the exe launchable by name via ShellExecute
+  (`start kroki_deskapp "doc.tex#eq:x"`, `Start-Process`, Win+R) without touching
+  the PATH — it is the documented way for an agent to open a document at a
+  reference. Bash and CreateProcess do not read it.
+- **`wix.template` replaced** (`src-tauri/wix/main.wxs`): copy of the tauri-bundler
+  template (tauri-cli 2.11.4) with **a single** deviation, flagged in a
+  comment — the Start menu shortcut no longer has
+  `Icon="ProductIcon"`. That attribute makes the `.lnk` point to
+  `%WINDIR%\Installer\{ProductCode}\ProductIcon`, a folder deleted on every major
+  update (new ProductCode on every build); the taskbar pin, a **frozen copy**
+  of the `.lnk` that MSI never rewrites, lost its icon. Without the attribute, the icon is
+  read from the exe (stable path) — like the template's Desktop shortcut, which never
+  had the defect. Price: the template no longer follows tauri-cli
+  (`TAURI_CLI_VERSION = "^2"`, not pinned) — to be
+  re-synchronized (diff against the upstream of the installed version) on an
+  upgrade that touches `main.wxs`.
+- **`wix.upgradeCode` pinned** (`03A2A6F1-…`): this is exactly the value that
+  Tauri derives today (UUID v5 of `"Kroki Desk.exe.app.x64"`), copied
+  so that a future change of `productName` does not break the update
+  chain — without this GUID, each version would install *next to* the previous one.
+  Never modify it.
+- **`bannerPath` / `dialogImagePath`**: `src-tauri/wix/banner.bmp` (493×58,
+  banner of the inner pages) and `dialog.bmp` (493×312, welcome/finish)
+  replace the default WixUI logo (red CD). Sizes imposed by WixUI;
+  generated from `icons/icon.png` by `uv run scripts/wix_images.py`, to be
+  re-run if the icon changes.
+- **`webviewInstallMode: skip`**: WebView2 is preinstalled since Windows 10
+  2004. The other modes download at install time (filtered network) or
+  add 127 to 180 MB.
+- **Plugin bundling strategy** (`xtask/src/bundled.rs`): a
+  text file at the root, one `<id> [on]` line per plugin (`on` = checked
+  in the MSI / installed at first launch of the `.deb`), in the page's
+  order. `bundled-plugins.txt` (gitignored — the workstation's selection) takes precedence
+  if it exists, otherwise `bundled-plugins.default.txt` (tracked — the default
+  behavior). **Sole source of the list**: the displayed name and the
+  extensions come from the `manifest.json` read **inside `dist/<id>.kdext`** — not
+  in `plugins/<id>/`, which may be an unresolvable junction in the
+  `.deb` container. `bundled::stage` copies the retained archives to
+  `src-tauri/bundled-plugins/` (gitignored, **emptied on every build**) — this is
+  where the fragment's `<File>` entries read them — and fails with a pointer to
+  `python build_dist.py --plugins-only` if one is missing; `build_dist.py` (which
+  packs and bundles by default, see § « Linux builds ») chains the two
+  steps by itself. The `bundled-plugins/` subfolder is not cosmetic:
+  since `resource_dir()` is the exe's folder, a portable binary launched from
+  `dist/` would otherwise install all the neighboring `.kdext`. The `.deb` goes through the
+  **same** strategy (see next §). To re-read what will be generated without
+  bundling: `cargo run --manifest-path xtask/Cargo.toml -- bundled`.
+  **Distribution channels**: `KROKI_BUNDLED_PLUGINS` (path relative to the
+  repo) imposes the strategy and bypasses the choice above — an imposed
+  file that is absent is an error, never a fallback. `build_dist.py
+  --channel public|local|all` sets it (`public` = `bundled-plugins.default.txt`
+  even if `bundled-plugins.txt` exists; `local`, default = choice above;
+  `all` = public then local in one pass — binaries once, MSI and `.deb`
+  twice, `dist/` ends up on the local installers),
+  passes it to the `.deb` container (`-e`), in `public` only copies
+  each produced artifact into `dist/public/<version>/` (the `.kdext`: those
+  of the strategy only; no folder for `local`) and after the MSI and the `.deb` compares the content of
+  `src-tauri/bundled-plugins/` against the strategy — mismatch = stop. Only MSI and
+  `.deb` differ from one channel to the other; `dist/` at the root remains overwritten
+  by the last build, whatever its channel.
 
-Le MSI est **per-machine** (`Program Files`, UAC à l'installation) : Tauri ne
-propose pas de MSI per-user sans remplacer entièrement `wix.template`.
+The MSI is **per-machine** (`Program Files`, UAC at install time): Tauri does not
+offer a per-user MSI without entirely replacing `wix.template`.
 
-Le premier build télécharge WiX 3 dans `%LOCALAPPDATA%\tauri`.
+The first build downloads WiX 3 into `%LOCALAPPDATA%\tauri`.
 
-### Paquet Debian/Ubuntu (.deb)
+### Debian/Ubuntu package (.deb)
 
-`cargo build-deb` (Linux uniquement — le bundler y pose les permissions Unix et
-assemble l'archive `ar`) produit `dist/kroki_deskapp-<version>-linux-<arch>-<distro>.deb`
-+ twin. Même patron que l'AppImage et le MSI : le xtask bootstrappe `tauri-cli`
-si besoin, recopie les `.kdext` par `bundled::stage`, génère
-`src-tauri/tauri.deb.generated.json` (le suivi `tauri.deb.conf.json` complété
-des plugins : la fusion des configs Tauri **remplace** les tableaux, un overlay
-partiel effacerait les `fileAssociations` natives) puis délègue à
-`tauri build --config` sur ce fichier. Le distribuable est celui
-construit dans le conteneur (`bash /app/scripts/linux_deb_build.sh`, aucun outil
-téléchargé donc aucun volume de cache) : c'est le tag distro du nom qui le dit.
+`cargo build-deb` (Linux only — the bundler sets Unix permissions there and
+assembles the `ar` archive) produces `dist/kroki_deskapp-<version>-linux-<arch>-<distro>.deb`
++ twin. Same pattern as the AppImage and the MSI: the xtask bootstraps `tauri-cli`
+if needed, copies the `.kdext` via `bundled::stage`, generates
+`src-tauri/tauri.deb.generated.json` (the tracked `tauri.deb.conf.json` completed
+with the plugins: merging Tauri configs **replaces** arrays, a partial overlay
+would erase the native `fileAssociations`) then delegates to
+`tauri build --config` on that file. The distributable is the one
+built in the container (`bash /app/scripts/linux_deb_build.sh`, no tool
+downloaded hence no cache volume): the distro tag in the name says so.
 
-C'est le pendant Linux du MSI, mais **les deux mécanismes n'ont presque rien en
-commun** — l'essentiel de ce qui suit explique en quoi.
+It is the Linux counterpart of the MSI, but **the two mechanisms have almost nothing in
+common** — most of what follows explains how.
 
-- **Pas de page de sélection des plugins, et il ne peut pas y en avoir.** Un
-  `.deb` n'a pas d'interface : `debconf` ne s'affiche qu'en ligne de commande et
-  est court-circuité par les installateurs graphiques. Le choix est donc rendu
-  par la **destination** : le `bundle.resources` généré place les plugins
-  `on` dans `bundled-plugins/` — que `plugins::seed_bundled` installe au premier
-  lancement, exactement comme sous Windows — et les autres dans
-  `example-plugins/`, **que rien ne lit**. Tout est donc embarqué comme dans le
-  cab du MSI, les mêmes sont installés par défaut, et les autres
-  s'installent depuis le dialog Plugins (« Ajouter un plugin… », pointer
-  `/usr/lib/Kroki Desk/example-plugins/`). Aucun code Rust n'a bougé :
-  `resource_dir()` vaut `/usr/lib/<productName>` sur Linux, et c'est
-  précisément là que le bundler dépose les ressources.
-- **Les associations tiennent en deux fichiers, pas un.** `MimeType=` dans le
-  `.desktop` ne fait que déclarer les types que l'application sait ouvrir ; il
-  ne dit **nulle part** qu'un `.kdws` est de ce type. D'où
-  `src-tauri/linux/kroki-desk.xml`, paquet *shared-mime-info* posé dans
-  `/usr/share/mime/packages/` (`deb.files`), qui définit
-  `application/x-kroki-desk-{session,plugin}` avec leurs `<glob>`. Le xtask en
-  dérive `kroki-desk.generated.xml` (gitignoré, c'est lui qui est installé) en
-  y ajoutant un type `text/x-kroki-desk-<ext>` (`<sub-class-of>` `text/plain`)
-  pour chaque extension d'un plugin installé **sans type standard** ; celles
-  qui en ont un (`STANDARD_MIME` : `.tex` → `text/x-tex`, `.csv` →
-  `text/csv`…) gardent le leur — une extension standard oubliée de la table
-  recevrait un type propre qui supplanterait le sien. Chacun est `<sub-class-of>` de sa forme réelle (zip, json,
-  texte) : c'est ce qui garde les gestionnaires génériques disponibles, et
-  surtout ce qui fait **gagner le glob contre la détection par contenu** — un
-  `.kdext` est un zip, sans cette filiation le sniffing le classerait en
+- **No plugin selection page, and there cannot be one.** A
+  `.deb` has no interface: `debconf` only displays on the command line and
+  is bypassed by graphical installers. The choice is therefore expressed by the
+  **destination**: the generated `bundle.resources` places the `on` plugins
+  in `bundled-plugins/` — which `plugins::seed_bundled` installs at first
+  launch, exactly as under Windows — and the others in
+  `example-plugins/`, **which nothing reads**. Everything is thus embedded as in the
+  MSI's cab, the same ones are installed by default, and the others
+  are installed from the Plugins dialog (« Ajouter un plugin… » — "Add a plugin…" — pointing at
+  `/usr/lib/Kroki Desk/example-plugins/`). No Rust code changed:
+  `resource_dir()` is `/usr/lib/<productName>` on Linux, and that is
+  precisely where the bundler drops the resources.
+- **The associations take two files, not one.** `MimeType=` in the
+  `.desktop` merely declares the types the application can open; it
+  says **nowhere** that a `.kdws` is of that type. Hence
+  `src-tauri/linux/kroki-desk.xml`, a *shared-mime-info* package placed in
+  `/usr/share/mime/packages/` (`deb.files`), which defines
+  `application/x-kroki-desk-{session,plugin}` with their `<glob>`s. The xtask derives from it
+  `kroki-desk.generated.xml` (gitignored, it is the one that gets installed) by
+  adding a `text/x-kroki-desk-<ext>` type (`<sub-class-of>` `text/plain`)
+  for each extension of an installed plugin **without a standard type**; those
+  that have one (`STANDARD_MIME`: `.tex` → `text/x-tex`, `.csv` →
+  `text/csv`…) keep theirs — a standard extension forgotten in the table
+  would receive a type of its own that would supplant the standard one. Each is `<sub-class-of>` its real form (zip, json,
+  text): this is what keeps generic handlers available, and
+  above all what makes the **glob win against content detection** — a
+  `.kdext` is a zip, without this lineage sniffing would classify it as
   `application/zip`.
-- **Rien n'est imposé comme application par défaut, et il n'y a rien à
-  imposer.** Là où Windows distinguait `(Default)` et `OpenWithProgids`, Linux
-  n'a que `MimeType=` (= « sait ouvrir ») ; le défaut se joue dans le
-  `mimeapps.list` de l'utilisateur, qu'un paquet n'a pas à écrire. Comme les
-  types propres à l'application et à ses plugins n'ont **qu'un seul** gestionnaire
-  déclaré, l'environnement de bureau les lui attribue de lui-même : le
-  double-clic marche sans rien réclamer. Même résultat que le MSI, sans le
-  compromis.
-- **Un modèle `.desktop` est obligatoire, pour un seul caractère.** Celui du
-  bundler écrit `Exec={{exec}}` **sans indicateur d'argument** : le lanceur n'a
-  aucun endroit où passer le fichier, et un double-clic ouvrirait l'application
-  vide. `src-tauri/linux/kroki-desk.desktop` reprend le modèle upstream et
-  ajoute `%F`. C'est ça qui rend toutes les associations opérantes.
-- **`text/plain` est volontairement absent** de `fileAssociations` — donc
-  `.txt` n'est pas associé, seul écart au MSI. Linux n'a pas de granularité par
-  extension : `.txt` *est* `text/plain`, et le déclarer ferait apparaître Kroki
-  Desk dans le « Ouvrir avec » de tout fichier texte par héritage (`.py`,
-  `.conf`, `.log`…) — que `expand_dropped_docs` **ignore silencieusement**, donc
-  un clic sans effet. `text/x-tex` a le même défaut en plus petit (il couvre
-  aussi `.sty`, `.cls`, `.ltx`) : accepté, parce que `.tex` est une
-  fonctionnalité de tête.
-- **Les scripts `postinst`/`postrm`** rafraîchissent la base MIME, l'index des
-  applications et le cache d'icônes. Redondants avec les déclencheurs dpkg de
-  `shared-mime-info` et `desktop-file-utils` — mais ces paquets ne sont que
-  *recommandés*, d'où les gardes `command -v` et les `|| true` : un cache non
-  régénéré ne doit pas laisser le paquet à demi configuré. Ils sont **exécutés
-  par dpkg en root** : leurs fins de ligne doivent rester LF, ce que force
-  `.gitattributes` (un `#!/bin/sh\r` fait échouer la configuration sans dire
-  pourquoi).
-- **`depends: ["libc6 (>= 2.36)"]`** est ajouté à la main. Tauri pousse déjà
-  `libwebkit2gtk-4.1-0` et `libgtk-3-0` sans qu'on le demande (les deux
-  s'installent sur Debian 12 et Ubuntu 24.04, où `libgtk-3-0t64` *provides*
-  l'ancien nom), mais il n'appelle **pas** `dpkg-shlibdeps` : sans plancher
-  glibc déclaré, le paquet s'installerait sur Ubuntu 22.04 pour y planter au
-  lancement. `2.36` est la glibc de bookworm, donc du conteneur — un build
-  natif sur une distro plus récente produit un paquet qui **sous-déclare** son
-  plancher : c'est une raison de plus de ne distribuer que le `-debian12`.
+- **Nothing is imposed as the default application, and there is nothing to
+  impose.** Where Windows distinguished `(Default)` and `OpenWithProgids`, Linux
+  only has `MimeType=` (= "can open"); the default is decided in the
+  user's `mimeapps.list`, which a package must not write. Since the
+  types specific to the application and its plugins have **only one** declared
+  handler, the desktop environment assigns them to it by itself: the
+  double-click works without claiming anything. Same result as the MSI, without the
+  compromise.
+- **A `.desktop` template is mandatory, for a single character.** The bundler's
+  one writes `Exec={{exec}}` **without an argument flag**: the launcher has
+  nowhere to pass the file, and a double-click would open the empty application.
+  `src-tauri/linux/kroki-desk.desktop` takes the upstream template and
+  adds `%F`. That is what makes all the associations operative.
+- **`text/plain` is deliberately absent** from `fileAssociations` — hence
+  `.txt` is not associated, the only deviation from the MSI. Linux has no per-extension
+  granularity: `.txt` *is* `text/plain`, and declaring it would make Kroki
+  Desk appear in the "Open with" of every text file by inheritance (`.py`,
+  `.conf`, `.log`…) — which `expand_dropped_docs` **silently ignores**, hence
+  a click with no effect. `text/x-tex` has the same defect on a smaller scale (it also covers
+  `.sty`, `.cls`, `.ltx`): accepted, because `.tex` is a
+  headline feature.
+- **The `postinst`/`postrm` scripts** refresh the MIME database, the application
+  index and the icon cache. Redundant with the dpkg triggers of
+  `shared-mime-info` and `desktop-file-utils` — but those packages are only
+  *recommended*, hence the `command -v` guards and the `|| true`: a cache not
+  regenerated must not leave the package half-configured. They are **run
+  by dpkg as root**: their line endings must stay LF, which
+  `.gitattributes` enforces (a `#!/bin/sh\r` makes configuration fail without saying
+  why).
+- **`depends: ["libc6 (>= 2.36)"]`** is added by hand. Tauri already pushes
+  `libwebkit2gtk-4.1-0` and `libgtk-3-0` without being asked (both
+  install on Debian 12 and Ubuntu 24.04, where `libgtk-3-0t64` *provides* the
+  old name), but it does **not** call `dpkg-shlibdeps`: without a declared
+  glibc floor, the package would install on Ubuntu 22.04 only to crash at
+  launch. `2.36` is bookworm's glibc, hence the container's — a native
+  build on a more recent distro produces a package that **under-declares** its
+  floor: one more reason to distribute only the `-debian12`.
 
-Le paquet est **per-machine** (`/usr/bin`, `/usr/lib`) ; plugins, réglages et
-sessions restent dans `~/.config/kroki-deskapp` et survivent à la
-désinstallation — c'est aussi pourquoi le seeding des plugins a lieu au premier
-lancement de chaque utilisateur, et pas à l'installation.
+The package is **per-machine** (`/usr/bin`, `/usr/lib`); plugins, settings and
+sessions stay in `~/.config/kroki-deskapp` and survive
+uninstallation — this is also why plugin seeding happens at the first
+launch of each user, and not at install time.
 
-### Builds Linux
+### Linux builds
 
-L'outillage Linux (Dockerfile, scripts de build et de test) vit dans
-`scripts/`. `python build_dist.py` (racine du dépôt, cross-plateforme Windows/
-Linux) génère **l'intégralité des artefacts de la version** en une commande
-(daemon Docker démarré requis pour les étapes Linux). **Tout est produit par
-défaut**, dans l'ordre du coût croissant — rien de lent ne doit pouvoir
-retarder un artefact bon marché : les `.kdext` de tous les plugins de
-`plugins/` (via `pack_plugin.py` — un dossier = un plugin dès qu'il porte un
-`manifest.json`, jonctions vers d'autres dépôts comprises), le binaire natif de l'hôte
-(`cargo build-app` — exe sur Windows, binaire Linux sur Linux), l'**installeur
-MSI**, puis les étapes Docker : build de l'image `kroki-linux-build`, AppImage,
-binaire Linux nu et **paquet `.deb`** → `dist/`, chacun versionné + twin non
-versionné.
+The Linux tooling (Dockerfile, build and test scripts) lives in
+`scripts/`. `python build_dist.py` (repo root, cross-platform Windows/
+Linux) generates **all of the version's artifacts** in one command
+(Docker daemon started required for the Linux steps). **Everything is produced by
+default**, in order of increasing cost — nothing slow must be able to
+delay a cheap artifact: the `.kdext` of all the plugins in
+`plugins/` (via `pack_plugin.py` — a folder = a plugin as soon as it carries a
+`manifest.json`, junctions to other repos included), the host's native binary
+(`cargo build-app` — exe on Windows, Linux binary on Linux), the **MSI
+installer**, then the Docker steps: build of the `kroki-linux-build` image, AppImage,
+bare Linux binary and **`.deb` package** → `dist/`, each versioned + unversioned
+twin.
 
-Chaque étape se retire par son `--skip-…` (`--skip-plugins`, `--skip-native`,
-`--skip-msi`, `--skip-appimage`, `--skip-binary`, `--skip-deb`) ou s'isole par
-son `--…-only` (`--native-only`, `--plugins-only`, `--msi-only`, `--deb-only`,
-mutuellement exclusifs) ; s'y ajoutent `--skip-image-build`, `--compile-only`
-(cargo build Linux de vérification seul, aucun artefact) et `--test` (test
-runtime headless Xvfb via `scripts/linux_runtime_run.sh`, incompatible avec les
-`--…-only`). Deux dépendances entre étapes : le MSI est **sauté d'office hors
-Windows** (WiX v3 n'y tourne pas — erreur seulement si `--msi-only` l'exige),
-et MSI comme `.deb` embarquent les `.kdext`, donc `--skip-plugins` les fait
-réutiliser ceux déjà dans `dist/` (utile pour relancer un installeur sans
-ré-empaqueter) au lieu de les retirer du bundle. Le `.deb` passe par Docker
-même sur hôte Linux : le distribuable est celui de bookworm. Les
-artefacts Linux étant suffixés du tag distro de build (cf. § « Commandes »),
-natif et Docker coexistent dans `dist/` sur un hôte Linux ; le distribuable
-est le `-debian12`. Le build Windows n'est possible que depuis Windows (pas
-de cross-compilation ni de Docker Windows).
+Each step is removed by its `--skip-…` (`--skip-plugins`, `--skip-native`,
+`--skip-msi`, `--skip-appimage`, `--skip-binary`, `--skip-deb`) or isolated by
+its `--…-only` (`--native-only`, `--plugins-only`, `--msi-only`, `--deb-only`,
+mutually exclusive); added to these are `--skip-image-build`, `--compile-only`
+(Linux cargo build for verification only, no artifact) and `--test` (headless
+Xvfb runtime test via `scripts/linux_runtime_run.sh`, incompatible with the
+`--…-only`). Two dependencies between steps: the MSI is **skipped outright outside
+Windows** (WiX v3 does not run there — error only if `--msi-only` requires it),
+and MSI as well as `.deb` embed the `.kdext`, so `--skip-plugins` makes them
+reuse those already in `dist/` (useful to re-run an installer without
+re-packing) instead of removing them from the bundle. The `.deb` goes through Docker
+even on a Linux host: the distributable is the bookworm one. Since the
+Linux artifacts are suffixed with the build distro tag (see § « Commands »),
+native and Docker coexist in `dist/` on a Linux host; the distributable
+is the `-debian12`. The Windows build is only possible from Windows (no
+cross-compilation nor Windows Docker).
 
-Trois formats livrables, sur machine Linux native ou via l'image Docker
-`kroki-linux-build` (commandes `docker run` en en-tête de
-`scripts/Dockerfile.linux`) :
+Three deliverable formats, on a native Linux machine or via the `kroki-linux-build`
+Docker image (`docker run` commands in the header of
+`scripts/Dockerfile.linux`):
 
-- **Binaire semi-dynamique** — `cargo build --release` (ou `cargo build-app`).
-  Crates liés statiquement (rustls, pas d'openssl), mais WebKitGTK/GTK3/glibc
-  dynamiques : la machine cible doit avoir `libwebkit2gtk-4.1` installé.
-- **AppImage autonome** — `cargo build-appimage` depuis la racine (un seul
-  fichier portable, GTK/WebKitGTK embarqués → `target/release/bundle/appimage/`).
-  L'alias lance le crate `xtask/`, qui utilise `tauri-cli` depuis le PATH s'il
-  y est, sinon l'installe en one-shot dans `xtask/target/tools/` (local au
-  dépôt, gitignoré) — seul cargo est requis — puis délègue à `tauri build
-  --config src-tauri/tauri.appimage.conf.json` : c'est cet overlay qui active
-  le bundling — `bundle.active` reste `false` dans `tauri.conf.json`, les
-  builds Windows ne produisent donc toujours que l'`.exe`. Il faut par contre
-  les paquets système du Dockerfile (dont `xdg-utils`), et le premier build
-  télécharge linuxdeploy/appimagetool depuis GitHub. Après le bundling, le
-  xtask publie l'AppImage dans `dist/` (versionnée + twin non versionné, cf.
-  § « Commandes »). En Docker : `bash /app/scripts/linux_appimage_build.sh`
-  enrobe l'alias (volume `/target`). Le xtask exporte aussi `NO_STRIP=1` (le strip
-  embarqué dans linuxdeploy ne lit pas les sections RELR des distros récentes ;
-  no-op de toute façon, libs déjà strippées) et **adoucit le hook GTK** du
-  plugin en cache `~/.cache/tauri` : upstream force `GDK_BACKEND=x11`
-  (tauri#8541), patché en « x11 seulement si `DISPLAY` existe » pour que
-  l'AppImage se lance aussi en Wayland pur sans XWayland. L'AppImage
-  **distribuable** se construit dans le conteneur (glibc bookworm =
-  compatibilité large) : buildée sur une machine récente, elle embarque sa
-  glibc/ses libs et ne tournera pas sur plus ancien.
-- **Paquet `.deb`** — `cargo build-deb`, cf. § « Paquet Debian/Ubuntu (.deb) ».
-  Même binaire semi-dynamique que le premier mode, mais installé
-  (`/usr/bin` + `/usr/lib`), avec les associations de fichiers, les plugins
-  livrés et une désinstallation propre. `sudo apt install ./<paquet>.deb` —
-  **pas** `dpkg -i`, qui ne résout aucune dépendance.
+- **Semi-dynamic binary** — `cargo build --release` (or `cargo build-app`).
+  Crates statically linked (rustls, no openssl), but WebKitGTK/GTK3/glibc
+  dynamic: the target machine must have `libwebkit2gtk-4.1` installed.
+- **Standalone AppImage** — `cargo build-appimage` from the root (a single
+  portable file, GTK/WebKitGTK embedded → `target/release/bundle/appimage/`).
+  The alias launches the `xtask/` crate, which uses `tauri-cli` from the PATH if it is
+  there, otherwise installs it one-shot in `xtask/target/tools/` (local to the
+  repo, gitignored) — only cargo is required — then delegates to `tauri build
+  --config src-tauri/tauri.appimage.conf.json`: it is this overlay that enables
+  bundling — `bundle.active` stays `false` in `tauri.conf.json`, so Windows
+  builds still only produce the `.exe`. On the other hand the Dockerfile's system packages
+  are needed (including `xdg-utils`), and the first build
+  downloads linuxdeploy/appimagetool from GitHub. After bundling, the
+  xtask publishes the AppImage into `dist/` (versioned + unversioned twin, see
+  § « Commands »). In Docker: `bash /app/scripts/linux_appimage_build.sh`
+  wraps the alias (`/target` volume). The xtask also exports `NO_STRIP=1` (the strip
+  embedded in linuxdeploy does not read the RELR sections of recent distros;
+  no-op anyway, libs already stripped) and **softens the GTK hook** of the
+  plugin cached in `~/.cache/tauri`: upstream forces `GDK_BACKEND=x11`
+  (tauri#8541), patched to "x11 only if `DISPLAY` exists" so that
+  the AppImage also launches under pure Wayland without XWayland. The
+  **distributable** AppImage is built in the container (bookworm glibc =
+  broad compatibility): built on a recent machine, it embeds its own
+  glibc/libs and will not run on older systems.
+- **`.deb` package** — `cargo build-deb`, see § « Debian/Ubuntu package (.deb) ».
+  Same semi-dynamic binary as the first mode, but installed
+  (`/usr/bin` + `/usr/lib`), with the file associations, the shipped
+  plugins and a clean uninstall. `sudo apt install ./<package>.deb` —
+  **not** `dpkg -i`, which resolves no dependencies.
 
-### Tests (pilotage des webviews, nécessite l'app lancée)
+### Tests (webview driving, requires the running app)
 
-Les tests sont des scripts Node ESM qui pilotent l'application **en cours
-d'exécution** — il n'y a pas de `cargo test` couvrant l'UI.
+The tests are Node ESM scripts that drive the **running**
+application — there is no `cargo test` covering the UI.
 
 ```bash
-# 1. Lancer l'app avec le port de debug CDP activé (PowerShell) :
+# 1. Launch the app with the CDP debug port enabled (PowerShell):
 $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9222"
 cd src-tauri ; cargo run
 
-# 2a. Harnais CDP (drag d'onglets, détachement, screenshots) :
-node tests/cdp.mjs <port> <action> [filtre-titre-page]
-#   actions : report | where | focus | reorder | tear-cancel | invoke-detach-at x y | shot
+# 2a. CDP harness (tab drag, detaching, screenshots):
+node tests/cdp.mjs <port> <action> [page-title-filter]
+#   actions: report | where | focus | reorder | tear-cancel | invoke-detach-at x y | shot
 
-# 2b. Test des moteurs via l'API Kroki locale (POST sur 127.0.0.1:8442) :
-node tests/test_nouveaux_moteurs.mjs
-#   KROKI_URL=http://127.0.0.1:<port> pour cibler un autre port
+# 2b. Engine test via the local Kroki API (POST to 127.0.0.1:8442):
+node tests/test_new_engines.mjs
+#   KROKI_URL=http://127.0.0.1:<port> to target another port
 
-# 2c. Test de la recherche multi-documents (autonome : crée/ouvre/referme
-#     ses propres fixtures via les commandes Tauri) :
-node tests/test_recherche_globale.mjs <port>
+# 2c. Multi-document search test (standalone: creates/opens/closes
+#     its own fixtures via the Tauri commands):
+node tests/test_global_search.mjs <port>
 
-# 2d. Test de la recherche dans le document (Ctrl+F) et des options
-#     Aa / ab / .* des deux recherches — même principe, autonome :
-node tests/test_recherche_document.mjs <port>
+# 2d. In-document search test (Ctrl+F) and of the Aa / ab / .* options
+#     of both searches — same principle, standalone:
+node tests/test_document_search.mjs <port>
 
-# 2e. Test du voile de chargement (autonome) : présence sur un rendu lourd,
-#     absence sur un rendu rapide, et animation qui survit au blocage du
-#     thread principal (échantillonnage par screencast CDP) :
+# 2e. Loading overlay test (standalone): presence on a heavy render,
+#     absence on a fast render, and animation that survives main-thread
+#     blocking (sampling by CDP screencast):
 node tests/test_loading.mjs <port>
 ```
 
-Deux suites tournent en revanche **sans application ni npm** (modules purs
-confrontés aux vendors du dépôt) — les lancer après tout changement du rendu
-LaTeX ou de la vue source :
+Two suites, by contrast, run **without the application or npm** (pure modules
+run against the repo's vendors) — run them after any change to LaTeX
+rendering or to the source view:
 
 ```bash
-node tests/test_latex_plugin.mjs [fichier.tex …]   # plugin latex-doc + coloration
-node tests/test_hlsplit.mjs      [fichier.md …]    # découpe des lignes colorées
+node tests/test_latex_plugin.mjs [file.tex …]   # latex-doc plugin + highlighting
+node tests/test_hlsplit.mjs      [file.md …]    # split of highlighted lines
 ```
 
-Un plugin monté par jonction depuis un autre dépôt y porte ses propres
-tests.
+A plugin mounted by junction from another repo carries its own
+tests there.
 
-## Versionnage (à gérer proactivement)
+## Versioning (to be handled proactively)
 
-Schéma **`x.y.z`**, source de vérité **unique** : le champ `version` de
-`src-tauri/Cargo.toml`. Tout le reste en dérive via `env!("CARGO_PKG_VERSION")`
-(titre de fenêtre, user-agent `kroki.rs`, `/v1/health` `server.rs`) et
-`tauri.conf.json` n'a plus de champ `version` — **ne jamais** écrire le numéro
-ailleurs qu'au seul endroit de `Cargo.toml`.
+Scheme **`x.y.z`**, **single** source of truth: the `version` field of
+`src-tauri/Cargo.toml`. Everything else derives from it via `env!("CARGO_PKG_VERSION")`
+(window title, `kroki.rs` user-agent, `/v1/health` `server.rs`) and
+`tauri.conf.json` no longer has a `version` field — **never** write the number
+anywhere other than the single place in `Cargo.toml`.
 
-| Composante | À incrémenter quand le changement est… |
+| Component | Increment when the change is… |
 | --- | --- |
-| **`z`** | une **correction de bug** |
-| **`y`** | un **ajout de fonctionnalité** |
-| **`x`** | une **refonte complète** du programme |
+| **`z`** | a **bug fix** |
+| **`y`** | a **feature addition** |
+| **`x`** | a **complete overhaul** of the program |
 
-Incrémenter une composante remet à **zéro** celles de droite (`1.4.1` → `1.5.0`
-pour une fonctionnalité ; → `2.0.0` pour une refonte).
+Incrementing a component resets those to its right to **zero** (`1.4.1` → `1.5.0`
+for a feature; → `2.0.0` for an overhaul).
 
-**Procédure attendue de l'agent** — dès qu'une modification destinée à être
-buildée change le comportement visible par l'utilisateur, il prend l'initiative,
-dans le **même commit** que le changement :
+**Expected agent procedure** — as soon as a change meant to be
+built alters the user-visible behavior, the agent takes the initiative,
+in the **same commit** as the change:
 
-1. déterminer la composante d'après la nature du changement (bug → `z`,
-   fonctionnalité → `y`, refonte → `x`) ;
-2. mettre à jour `version` dans `src-tauri/Cargo.toml` ;
-3. ajouter une entrée datée du jour en tête de `CHANGELOG.md` (sections
-   *Keep a Changelog* : « Corrigé », « Ajouté »… + la ligne de lien en bas) —
-   ce fichier est **embarqué dans le binaire** via `include_str!` (commande
-   `get_changelog`, dialog « Nouveautés », accessible depuis le dialog
-   « Informations ») : il est donc toujours
-   en phase avec la version buildée, sans effet avant rebuild ;
-4. marquer le commit du correctif/feature avec l'emoji 🔖 (cf. historique
+1. determine the component from the nature of the change (bug → `z`,
+   feature → `y`, overhaul → `x`);
+2. update `version` in `src-tauri/Cargo.toml`;
+3. add an entry dated today at the top of `CHANGELOG.md` (*Keep a Changelog*
+   sections: "Fixed", "Added"… + the link line at the bottom; entries are
+   written in English) —
+   this file is **embedded in the binary** via `include_str!` (command
+   `get_changelog`, the What's new dialog « Nouveautés », reachable from the
+   Info dialog « Informations »): it is therefore always
+   in sync with the built version, with no effect before a rebuild;
+4. mark the fix/feature commit with the 🔖 emoji (see history
    `🐛🔖 fix… → 1.4.1`, `✨🔖 feat… → 1.4.0`).
 
-Proposer le numéro retenu et **demander confirmation** si la catégorie est
-ambiguë (p. ex. correctif vs. petite fonctionnalité) ; sinon procéder. **Pas de
-bump** pour un travail sans effet sur le binaire livré : refactor interne,
-documentation, ré-organisation, `chore` de build.
+Propose the chosen number and **ask for confirmation** if the category is
+ambiguous (e.g. fix vs. small feature); otherwise proceed. **No
+bump** for work with no effect on the shipped binary: internal refactor,
+documentation, reorganization, build `chore`.
 
-## Architecture du rendu (le point clé)
+## Rendering architecture (the key point)
 
-Le rendu d'un diagramme traverse **4 environnements d'exécution** selon le type.
-Tout passe par la commande Tauri `render_diagram` (`commands.rs`), qui appelle
-`engine::render_local` (`engine.rs`). Le dispatch :
+A diagram's rendering goes through **4 runtime environments** depending on its type.
+Everything goes through the Tauri command `render_diagram` (`commands.rs`), which calls
+`engine::render_local` (`engine.rs`). The dispatch:
 
-- **Natif Rust** (`NATIVE_TYPES = svgbob, pikchr`) — rendu synchrone dans le
-  processus via les crates `svgbob` / `pikchr`.
-- **JVM** (`JAVA_TYPES = plantuml, c4plantuml, ditaa`) — jars embarqués via
+- **Native Rust** (`NATIVE_TYPES = svgbob, pikchr`) — synchronous rendering in the
+  process via the `svgbob` / `pikchr` crates.
+- **JVM** (`JAVA_TYPES = plantuml, c4plantuml, ditaa`) — jars embedded via
   `include_bytes!` (`assets/plantuml-mit.jar`, `assets/ditaa-0.11.0-standalone.jar`),
-  extraits sur disque puis exécutés en sous-process **uniquement si Java est
-  détecté** (`java_available`). Sinon message explicite. ditaa a son propre
-  pipeline (`render_ditaa`, args ditaa + `--svg`, pas le `-pipe` de PlantUML) :
-  intercepté avant la garde `JAVA_TYPES` dans le dispatch.
-- **TeX** (`TEX_TYPES = tikz`, 3.18.0) — **rien d'embarqué** : `render_tikz`
-  compile avec la distribution du poste, **uniquement si `latex` et `dvisvgm`
-  sont sur le PATH** (`tex_available`, sondé une fois). Document LaTeX complet
-  (forme Kroki) ou `tikzpicture` nue, enrobée par `tikz_document`. Chaîne :
-  `latex` → DVI avec le pilote PGF `pgfsys-dvisvgm.def` (passé en ligne de
-  commande, donc valable pour tout document), puis `dvisvgm --no-fonts`, qui
-  convertit le texte en tracés. Quatre pièges, tous traités :
-  **(1)** dvisvgm n'a de contours que pour les polices **Type 1** — avec
-  `\usepackage[T1]{fontenc}` seul (polices EC, bitmap), il écrit le SVG
-  **sans le texte**, en simple avertissement ; d'où `lmodern` préchargé avant
-  la classe s'il est installé, et `missing_glyph_fonts` qui transforme
-  l'avertissement en erreur ;
-  **(2)** ses `id` de glyphes (`g20-11`) sont les mêmes dans chaque SVG :
-  insérées dans la même page, deux figures se voleraient leurs glyphes —
-  `scope_svg_ids` les préfixe d'un hash du source ;
-  **(3)** MiKTeX ouvre sa fenêtre d'installation de paquets en plein rendu —
-  `--disable-installer` (option propre à MiKTeX, d'où `TexTools::miktex`) ;
-  **(4)** un premier appel à un MiKTeX neuf reconstruit ses bases (~15 s) —
-  délai de 60 s par étape, processus tué au-delà. Sécurité : dossier
-  temporaire, `-no-shell-escape`, `openin_any=p` (TeX Live). Test réel
-  (sauté sans TeX) : `cargo test --manifest-path src-tauri/Cargo.toml tikz_tests`.
-- **JS/WASM** (`JS_TYPES` : mermaid, graphviz, d2, bpmn, excalidraw, vega/vegalite,
-  dbml, erd, nomnoml, wavedrom, bytefield) — délégués à une **webview cachée** (label
-  `RENDERER_LABEL = "renderer"`, voir `engine::ensure_renderer`). Le backend émet
-  un événement `render-job` ; `ui/renderer/renderer.js` exécute le moteur JS et
-  rappelle `render_job_done` ; `engine::complete_job` débloque l'attente. Cette
-  webview est démarrée **au boot** (`setup` dans `main.rs`) pour amortir le
-  chargement des moteurs.
+  extracted to disk then run as a subprocess **only if Java is
+  detected** (`java_available`). Otherwise an explicit message. ditaa has its own
+  pipeline (`render_ditaa`, ditaa args + `--svg`, not PlantUML's `-pipe`):
+  intercepted before the `JAVA_TYPES` guard in the dispatch.
+- **TeX** (`TEX_TYPES = tikz`, 3.18.0) — **nothing embedded**: `render_tikz`
+  compiles with the workstation's distribution, **only if `latex` and `dvisvgm`
+  are on the PATH** (`tex_available`, probed once). Full LaTeX document
+  (Kroki form) or bare `tikzpicture`, wrapped by `tikz_document`. Chain:
+  `latex` → DVI with the PGF driver `pgfsys-dvisvgm.def` (passed on the command
+  line, hence valid for any document), then `dvisvgm --no-fonts`, which
+  converts text to paths. Four pitfalls, all handled:
+  **(1)** dvisvgm only has outlines for **Type 1** fonts — with
+  `\usepackage[T1]{fontenc}` alone (EC fonts, bitmap), it writes the SVG
+  **without the text**, as a mere warning; hence `lmodern` preloaded before
+  the class if installed, and `missing_glyph_fonts` which turns
+  the warning into an error;
+  **(2)** its glyph `id`s (`g20-11`) are the same in every SVG:
+  inserted in the same page, two figures would steal each other's glyphs —
+  `scope_svg_ids` prefixes them with a hash of the source;
+  **(3)** MiKTeX opens its package installation window mid-render —
+  `--disable-installer` (MiKTeX-specific option, hence `TexTools::miktex`);
+  **(4)** a first call to a fresh MiKTeX rebuilds its databases (~15 s) —
+  60 s timeout per step, process killed beyond that. Security: temporary
+  folder, `-no-shell-escape`, `openin_any=p` (TeX Live). Real test
+  (skipped without TeX): `cargo test --manifest-path src-tauri/Cargo.toml tikz_tests`.
+- **JS/WASM** (`JS_TYPES`: mermaid, graphviz, d2, bpmn, excalidraw, vega/vegalite,
+  dbml, erd, nomnoml, wavedrom, bytefield) — delegated to a **hidden webview** (label
+  `RENDERER_LABEL = "renderer"`, see `engine::ensure_renderer`). The backend emits
+  a `render-job` event; `ui/renderer/renderer.js` runs the JS engine and
+  calls back `render_job_done`; `engine::complete_job` unblocks the wait. This
+  webview is started **at boot** (`setup` in `main.rs`) to amortize the
+  loading of the engines.
 
-Les **alias** de types (`dot`→graphviz, `c4`→c4plantuml, `vega-lite`→vegalite,
-`puml`→plantuml…) sont résolus par `engine::resolve_alias`, **dupliqué côté
-frontend** — garder les deux en phase quand on ajoute un alias.
+Type **aliases** (`dot`→graphviz, `c4`→c4plantuml, `vega-lite`→vegalite,
+`puml`→plantuml…) are resolved by `engine::resolve_alias`, **duplicated on the
+frontend side** — keep both in sync when adding an alias.
 
-`renderer.js` mappe chaque type sur une fonction dans l'objet `ENGINES`. Détails
-non triviaux : **d2** est en import dynamique (~8 Mo) et ses appels sont
-**sérialisés** (un seul échange compile/render à la fois sur son worker) ; **dbml**
-et **erd** (parseur maison `ui/renderer/erd.js`) génèrent du DOT rendu ensuite par le
-graphviz WASM déjà chargé ; **bpmn** rend dans un conteneur hors écran ; **vega**
-utilise l'`expressionInterpreter` (pas d'`eval`) ; **excalidraw** est en import
-dynamique (~8 Mo) et rend via `exportToSvg` — ses polices manuscrites (14 Mo) ne sont
-**pas** embarquées : les `@font-face` vides sont retirés et les familles réécrites en
-police système (`fixExcalidrawFonts`).
+`renderer.js` maps each type to a function in the `ENGINES` object. Non-trivial
+details: **d2** is a dynamic import (~8 MB) and its calls are
+**serialized** (a single compile/render exchange at a time on its worker); **dbml**
+and **erd** (in-house parser `ui/renderer/erd.js`) generate DOT that is then rendered by the
+already-loaded graphviz WASM; **bpmn** renders in an offscreen container; **vega**
+uses the `expressionInterpreter` (no `eval`); **excalidraw** is a
+dynamic import (~8 MB) and renders via `exportToSvg` — its handwriting fonts (14 MB) are
+**not** embedded: empty `@font-face` rules are removed and the families rewritten to a
+system font (`fixExcalidrawFonts`).
 
-### Serveur externe optionnel
+### Optional external server
 
-Si un serveur Kroki externe est configuré dans les réglages, `kroki::render`
-(`kroki.rs`) prend le relais via HTTP `reqwest` et couvre **tous** les types. Le
-cache (`KrokiState.cache`) ne stocke que les succès, clé = hash(mode, type,
-source, options) ; un re-render retente donc naturellement les erreurs.
+If an external Kroki server is configured in the settings (« Réglages »), `kroki::render`
+(`kroki.rs`) takes over via HTTP `reqwest` and covers **all** types. The
+cache (`KrokiState.cache`) only stores successes, key = hash(mode, type,
+source, options); a re-render therefore naturally retries errors.
 
-## Modules backend (`src-tauri/src/`)
+## Backend modules (`src-tauri/src/`)
 
-- `main.rs` — bootstrap Tauri : enregistre `single-instance` **en premier**
-  (forward des args d'une 2ᵉ invocation), tous les `State`, les commandes, et le
-  `setup` qui démarre watcher + webview de rendu + serveur HTTP + 1ʳᵉ fenêtre.
-- `commands.rs` — toutes les commandes `#[tauri::command]` (frontière front↔back).
-- `engine.rs` — dispatch du rendu intégré (cf. ci-dessus).
-- `manager.rs` — fenêtres, onglets, détachement/rattachement par drag
-  (`WindowFromPoint` Win32 au relâchement de la souris).
-- `drop_target.rs` (Windows) — `IDropTarget` Win32 custom installé sur chaque
-  fenêtre. wry n'extrait que `CF_HDROP` (Explorateur) ; on révoque son target et
-  on enregistre le nôtre pour aussi accepter les chemins en `CF_UNICODETEXT` /
-  `text/uri-list` (drags depuis Cursor/VS Code). L'ouverture est faite côté Rust ;
-  l'overlay est piloté par l'événement `drop-overlay` (cf. `filedrop.js`).
-- `plugins.rs` — registre des plugins (cf. « Système de plugins » ci-dessous) :
-  scan des manifestes, install/désinstall des `.kdext` (zip), protocole custom
-  `plugin://` servant les fichiers aux workers, `plugin_read_sibling` confiné.
-- `session.rs` — sessions `.kdws` (JSON : fenêtres → fichiers ordonnés + onglet
-  actif) : parse/résolution (chemins relatifs au dossier du `.kdws`, `/` à
-  l'écriture), ouverture **toujours dans au moins une fenêtre neuve** (la
-  fenêtre cible n'est reprise pour la fenêtre 1 que si elle n'a aucun onglet —
-  démarrage sur un `.kdws`, fenêtre « déposer un fichier » ; sinon la session
-  s'ouvre à côté sans se mélanger au travail en cours, les suivantes toujours
-  neuves ; focus et `session-report` vont à la 1ʳᵉ fenêtre de la session ;
-  entrées invalides signalées via l'event `session-report` → toast) et sauvegarde
-  (commande `save_session`, chemins relativisés). Routage par
-  `manager::open_mixed_paths`, entonnoir commun CLI / seconde instance / drops /
-  dialogue d'ouverture. Pas de restauration automatique au démarrage.
-- `server.rs` — API HTTP Kroki locale (`tiny_http`), 127.0.0.1 uniquement.
-- `kroki.rs` — client serveur externe + cache.
-- `watcher.rs` — rechargement auto sur changement disque (`notify`).
-- `state.rs` — `AppState`, `SettingsState`, etc. (settings persistés dans
-  `%APPDATA%\kroki-deskapp\settings.json`, à côté de `plugins\` et comme lui
-  hors du dossier d'identité Tauri — `plugins::app_dir`).
+- `main.rs` — Tauri bootstrap: registers `single-instance` **first**
+  (forwarding the args of a 2nd invocation), all the `State`s, the commands, and the
+  `setup` that starts watcher + render webview + HTTP server + 1st window.
+- `commands.rs` — all the `#[tauri::command]` commands (front↔back boundary).
+- `engine.rs` — dispatch of the built-in rendering (see above).
+- `manager.rs` — windows, tabs, detaching/reattaching by drag
+  (Win32 `WindowFromPoint` on mouse release).
+- `drop_target.rs` (Windows) — custom Win32 `IDropTarget` installed on every
+  window. wry only extracts `CF_HDROP` (Explorer); we revoke its target and
+  register our own to also accept paths as `CF_UNICODETEXT` /
+  `text/uri-list` (drags from Cursor/VS Code). Opening is done on the Rust side;
+  the overlay is driven by the `drop-overlay` event (see `filedrop.js`).
+- `plugins.rs` — plugin registry (see « Plugin system » below):
+  manifest scan, install/uninstall of `.kdext` (zip), custom `plugin://`
+  protocol serving files to the workers, confined `plugin_read_sibling`.
+- `session.rs` — `.kdws` sessions (JSON: windows → ordered files + active
+  tab): parse/resolution (paths relative to the `.kdws` folder, `/` on
+  write), opening **always in at least one new window** (the target
+  window is reused for window 1 only if it has no tab —
+  startup on a `.kdws`, the « déposer un fichier » ("drop a file") window; otherwise the session
+  opens alongside without mixing with ongoing work, the following ones always
+  new; focus and `session-report` go to the session's 1st window;
+  invalid entries reported via the `session-report` event → toast) and saving
+  (command `save_session`, relativized paths). Routing through
+  `manager::open_mixed_paths`, common funnel for CLI / second instance / drops /
+  open dialog. No automatic restore at startup.
+- `server.rs` — local Kroki HTTP API (`tiny_http`), 127.0.0.1 only.
+- `kroki.rs` — external server client + cache.
+- `watcher.rs` — auto-reload on disk change (`notify`).
+- `state.rs` — `AppState`, `SettingsState`, etc. (settings persisted in
+  `%APPDATA%\kroki-deskapp\settings.json`, next to `plugins\` and, like it,
+  outside the Tauri identity folder — `plugins::app_dir`).
 
 ## Frontend (`ui/`)
 
-- `ui/js/` — fenêtre principale : `render.js` (markdown-it + fences Kroki, appelle
-  `render_diagram`), `tabs.js`, `teardrag.js` (détachement d'onglets), `filedrop.js`,
-  `settings.js` (réglages + accès au dialog Plugins), `theme.js` (override
-  auto/light/dark), `info.js` (dialog « Informations » : version, runtimes,
-  accès Nouveautés), `changelog.js` (dialog « Nouveautés », markdown-it dédié
-  sans fence Kroki + DOMPurify), `export.js` (export du rendu de l'onglet
-  actif en HTML autonome : CSS inlinées, images locales en data-URI via la
-  commande `export_html`), `findword.js` (surlignage des occurrences du mot
-  sélectionné),
-  `globalsearch.js` (panneau de recherche dans tous les onglets, `Ctrl+Maj+F` :
-  cherche dans le source relu via `read_document`, saute vers la ligne par
-  `scrollToLine` et surligne via la Custom Highlight API `search-occurrences`),
-  `docsearch.js` (barre de recherche dans le document affiché, `Ctrl+F`, cf.
-  ci-dessous), `searchopts.js` (options `Aa`/`ab`/`.*` → RegExp, cf. ci-dessous),
-  `textmatch.js` (occurrences → `Range`, partagé par les trois recherches),
-  `icons.js` (registre des icônes de barre d'outils, cf. ci-dessous),
-  `loading.js` (voile de chargement, cf. ci-dessous),
-  `main.js`, `app.js` (helpers + ré-export `invoke`).
-- **Deux zooms** (3.17.0) : le zoom texte (`Ctrl+molette`, `setZoom`) et le
-  zoom de page (`Maj+molette`, `setPageZoom`) se composent dans un **seul**
-  `zoom` CSS sur `#views` (`applyZoom`, `main.js`). Le `zoom` CSS seul n'est
-  qu'un zoom texte : la colonne logique rétrécit d'autant que l'échelle
-  grandit, donc une figure en `max-width: 100%` garde sa taille à l'écran. Le
-  zoom de page maintient les enfants de `.doc-view` à la largeur qu'ils
-  auraient à l'échelle 1 (`--page-w` dans `app.css`, calculée depuis
-  `--page-zoom` et le padding horizontal `--pad-x`) : mise en page identique
-  à toute échelle, aucun reflux, débordement horizontal. C'est ce qui rend le
-  zoom autour du curseur exact : les coordonnées logiques d'un point de contenu
-  sont invariantes, seul le défilement est reposé. Tout code qui mesure des
-  rects contre `scrollTop`/`scrollLeft` doit diviser par l'échelle **totale**
-  (`box.height / clientHeight`, cf. `revealCurrent` dans `docsearch.js`), et
-  toute règle qui dimensionne un enfant direct de `.doc-view` doit passer par
-  `--page-w`, pas par `100%`.
-- **Voile de chargement** (3.14.0) : `ui/js/loading.js` couvre l'attente d'un
-  rendu long (~1,4 s pour un `.tex` de 100 Ko). Trois contraintes, toutes
-  contre-intuitives et toutes vérifiées par `tests/test_loading.mjs` :
-  **(1)** la phase lourde (markdown-it + KaTeX + DOMPurify + insertion DOM) est
-  **synchrone** — un `setTimeout` ne peut donc pas s'y déclencher, et le délai
-  anti-flash de 180 ms ne couvre que les phases *asynchrones* (transformation
-  par un plugin). D'où `beforeHeavyRender`, qui décide sur la **taille** du
-  markdown (seuil 60 000 caractères) et pose le voile d'avance ;
-  **(2)** poser le voile ne suffit pas à l'afficher : sans rendre la main au
-  navigateur (double `requestAnimationFrame`), il ne serait peint qu'une fois
-  le rendu terminé ; **(3)** son animation doit porter **uniquement** sur
-  `transform`/`opacity`, seules propriétés que Chromium anime sur le
-  compositeur — toute autre se figerait pendant le blocage, exactement quand
-  le voile doit rassurer. Seule la preview le déclenche (`isPreview`) : les
-  vues source et dérivée ne font que colorer du texte (~100 ms) et
-  clignoteraient. L'overlay vit dans `#content`, hors de la vue, en
-  `pointer-events: none` — le contenu précédent reste visible et défilable
-  pendant un rechargement sur modification disque.
-- **Icônes des barres d'outils** (3.12.0) : `ui/js/icons.js` est le **registre**
-  des icônes désactivables (id du bouton, libellé, défaut). Deux groupes : la
-  barre de fenêtre (`#tabbar-actions`, masquée directement par `applyIcons`) et
-  la pile d'actions de vue (`#view-actions`, dont `updateViewActions` dans
-  `main.js` croise `iconEnabled(id)` avec la pertinence pour le document). Le
-  réglage persiste dans `settings.json` (`SettingsData::icons`) sous forme
-  **partielle** : seules les cases explicitement cochées/décochées y figurent,
-  toute icône absente suit son `def` — un défaut modifié plus tard s'applique
-  donc aux postes qui n'y ont jamais touché. Le dialog est construit par
-  `settings.js` en clonant le `<svg>` du bouton réel (une icône ajoutée à
-  `index.html` n'a qu'à être déclarée dans le registre). Réglage global :
-  propagé aux autres fenêtres par l'event `icons-changed` (même protocole
-  `from` que `theme-changed`), lu au boot par la commande `get_icons`. Deux
-  garde-fous : l'engrenage Réglages est `locked` (jamais masquable — seul accès
-  au dialog), et `enforceIconAvailability` (`main.js`) ramène les vues à un état
-  atteignable quand on désactive « Code source », « Markdown intermédiaire » ou
-  « Pleine largeur ».
-- **Les trois recherches** (3.13.0) : le surlignage du mot sélectionné
-  (`findword.js`), la recherche dans le document (`docsearch.js`, `Ctrl+F`) et
-  la recherche multi-documents (`globalsearch.js`, `Ctrl+Maj+F`) partagent
-  `searchopts.js` — `buildMatcher` compile la requête et les options
-  (casse / mot entier / regex) en **une RegExp globale**, seule forme de motif
-  circulant ensuite (`collectMatchRanges`, `findHits`). Deux pièges y sont
-  traités une fois pour toutes : `\b` est ASCII-only (il couperait `été` en
-  deux) — d'où des lookarounds sur un `\w` étendu ; et une regex peut matcher
-  du vide (`a*`) — d'où `iterMatches`, qui saute ces correspondances au lieu de
-  boucler sur `lastIndex`. Un motif invalide **lève** : chaque appelant en fait
-  un état affiché (champ rouge), jamais une exception qui remonte.
-  `docsearch.js` cherche dans le **DOM rendu** de la vue active (pas le source) :
-  il suit donc le mode d'affichage, et tout ce qui remplace ce DOM
-  (`showActive`, `toggleSource`, `toggleDerived`) doit appeler
-  `refreshDocSearch()` — les `Range` mémorisés pointent sinon des nœuds
-  détachés. Depuis la 3.22.0, l'occurrence courante est mémorisée **par
-  document** (`positions`, clé = vue, valable pour la même requête/options),
-  et `collectMatchRanges` (`textmatch.js`, donc les trois recherches) **ignore
-  le contenu replié** — corps de `<details>` fermé, éléments `hidden` ; test
-  structurel, pas `checkVisibility()` qui rejetterait les `display: contents`.
-  Un `toggle` de `<details>` dans la vue relance Ctrl+F sur la même occurrence
-  (`anchor`). `#find-ruler` (hors de `#views`, donc hors zoom) porte un trait
-  par occurrence sur la barre de défilement, redessiné via un
-  `ResizeObserver` sur la vue **et ses enfants directs** (la boîte de la vue ne
-  change pas quand son contenu grandit). `Ctrl+F`, `F3` et `Ctrl+G` sont **interceptés** (`preventDefault`
-  dans `initShortcuts`) pour neutraliser la barre de recherche native de la
-  webview. Sommaire, `#find-bar` et `#search-panel` partagent la même ancre à
-  l'écran : ils sont exclusifs (hooks `beforeOpen`).
-- **Coloration de la vue « code source »** (3.11.0) : `sourcehl.js` peint la vue
-  produite par `renderSource` **après coup**, sans toucher au nombre de lignes
-  ni aux hauteurs — l'alignement preview ↔ source (`data-line`) et le
-  `scrollToLine` déjà fait par l'appelant restent donc valides, même quand la
-  coloration arrive d'un plugin (asynchrone). `sourceHighlightFor` (`plugins.js`)
-  choisit la grammaire : hljs de l'hôte pour le markdown, sinon la grammaire du
-  plugin qui sert l'extension, cherchée par convention `<ext>-source` puis
-  `<ext>` (`tex-source` ; cf. `doc/plugin-protocol.md`
-  §6.4). La convention part de l'**extension** : latex-doc déclare donc
-  `tex-source` et `latex-source` pour la même grammaire. Le point délicat est `hlsplit.js` : un coloriseur rend **un** flot HTML
-  où un `<span>` chevauche les lignes (fence, chaîne, commentaire), qu'il faut
-  recouper en refermant/rouvrant la pile de spans. Module pur, testé hors
-  navigateur par `node tests/test_hlsplit.mjs` (accepte des `.md` en arguments).
-  Toute anomalie (découpe qui ne recouvre pas les lignes, erreur de grammaire,
-  vue rebasculée entre-temps) laisse la vue en texte brut : **l'alignement prime
-  sur la couleur**. Conséquence pour les recherches : une ligne colorée est
-  éclatée en plusieurs nœuds texte, d'où `textmatch.js` qui recolle les nœuds
-  d'une même `.src-line` avant de chercher (hors vue source, chaque nœud reste
-  isolé — sinon des occurrences fantômes apparaîtraient entre deux blocs).
-- **Composants des plugins de document** : un plugin qui émet du HTML inline
-  (accordéons, encarts) s'appuie sur les classes génériques `kd-fold`
-  (`<details>` dépliable) et `kd-note` (encart de documentation), stylées dans
-  `ui/css/app.css` et documentées au §6.7 du protocole — l'hôte ne porte aucune
-  classe propre à un plugin. Un lien relatif `doc#fragment` émis dans un SVG
-  (`xlink:href`) est cliquable comme un lien markdown (`initLinks`,
-  `main.js`), fragment mémorisé dans `pendingAnchor` et consommé par
+- `ui/js/` — main window: `render.js` (markdown-it + Kroki fences, calls
+  `render_diagram`), `tabs.js`, `teardrag.js` (tab detaching), `filedrop.js`,
+  `settings.js` (settings + access to the Plugins dialog), `theme.js` (auto/light/dark
+  override), `info.js` (« Informations » dialog: version, runtimes,
+  access to What's new), `changelog.js` (« Nouveautés » dialog, dedicated markdown-it
+  without Kroki fence + DOMPurify), `export.js` (export of the active tab's
+  rendering as standalone HTML: inlined CSS, local images as data-URI via the
+  `export_html` command), `findword.js` (highlighting of occurrences of the selected
+  word),
+  `globalsearch.js` (search panel across all tabs, `Ctrl+Shift+F`:
+  searches the source re-read via `read_document`, jumps to the line via
+  `scrollToLine` and highlights via the Custom Highlight API `search-occurrences`),
+  `docsearch.js` (search bar in the displayed document, `Ctrl+F`, see
+  below), `searchopts.js` (`Aa`/`ab`/`.*` options → RegExp, see below),
+  `textmatch.js` (occurrences → `Range`, shared by the three searches),
+  `icons.js` (registry of toolbar icons, see below),
+  `loading.js` (loading overlay, see below),
+  `main.js`, `app.js` (helpers + `invoke` re-export).
+- **Two zooms** (3.17.0): text zoom (`Ctrl+wheel`, `setZoom`) and
+  page zoom (`Shift+wheel`, `setPageZoom`) compose into a **single** CSS
+  `zoom` on `#views` (`applyZoom`, `main.js`). CSS `zoom` alone is only
+  a text zoom: the logical column shrinks as much as the scale
+  grows, so a figure at `max-width: 100%` keeps its on-screen size. Page
+  zoom keeps the children of `.doc-view` at the width they would
+  have at scale 1 (`--page-w` in `app.css`, computed from
+  `--page-zoom` and the horizontal padding `--pad-x`): identical layout
+  at any scale, no reflow, horizontal overflow. This is what makes
+  zoom around the cursor exact: the logical coordinates of a content point
+  are invariant, only the scroll is re-set. Any code that measures
+  rects against `scrollTop`/`scrollLeft` must divide by the **total** scale
+  (`box.height / clientHeight`, see `revealCurrent` in `docsearch.js`), and
+  any rule that sizes a direct child of `.doc-view` must go through
+  `--page-w`, not `100%`.
+- **Loading overlay** (3.14.0): `ui/js/loading.js` covers the wait for a long
+  render (~1.4 s for a 100 KB `.tex`). Three constraints, all
+  counter-intuitive and all verified by `tests/test_loading.mjs`:
+  **(1)** the heavy phase (markdown-it + KaTeX + DOMPurify + DOM insertion) is
+  **synchronous** — a `setTimeout` therefore cannot fire during it, and the 180 ms
+  anti-flash delay only covers the *asynchronous* phases (transformation
+  by a plugin). Hence `beforeHeavyRender`, which decides on the markdown's **size**
+  (threshold 60,000 characters) and puts the overlay up in advance;
+  **(2)** putting the overlay up is not enough to display it: without yielding to the
+  browser (double `requestAnimationFrame`), it would only be painted once
+  the render is finished; **(3)** its animation must rely **only** on
+  `transform`/`opacity`, the only properties Chromium animates on the
+  compositor — any other would freeze during the blocking, exactly when
+  the overlay must reassure. Only the preview triggers it (`isPreview`): the
+  source and derived views merely color text (~100 ms) and
+  would flicker. The overlay lives in `#content`, outside the view, with
+  `pointer-events: none` — the previous content stays visible and scrollable
+  during a reload on a disk modification.
+- **Toolbar icons** (3.12.0): `ui/js/icons.js` is the **registry**
+  of the disableable icons (button id, label, default). Two groups: the window
+  bar (`#tabbar-actions`, hidden directly by `applyIcons`) and
+  the view action stack (`#view-actions`, in which `updateViewActions` in
+  `main.js` crosses `iconEnabled(id)` with relevance to the document). The
+  setting persists in `settings.json` (`SettingsData::icons`) in
+  **partial** form: only the boxes explicitly checked/unchecked appear there,
+  any absent icon follows its `def` — a default changed later therefore applies
+  to the workstations that never touched it. The dialog is built by
+  `settings.js` by cloning the real button's `<svg>` (an icon added to
+  `index.html` only needs to be declared in the registry). Global setting:
+  propagated to the other windows by the `icons-changed` event (same `from`
+  protocol as `theme-changed`), read at boot by the `get_icons` command. Two
+  safeguards: the Settings gear is `locked` (never hideable — the only access
+  to the dialog), and `enforceIconAvailability` (`main.js`) brings the views back to a
+  reachable state when "Source code" (« Code source »), "Intermediate markdown"
+  (« Markdown intermédiaire ») or "Full width" (« Pleine largeur ») is disabled.
+- **The three searches** (3.13.0): highlighting of the selected word
+  (`findword.js`), search in the document (`docsearch.js`, `Ctrl+F`) and
+  multi-document search (`globalsearch.js`, `Ctrl+Shift+F`) share
+  `searchopts.js` — `buildMatcher` compiles the query and the options
+  (case / whole word / regex) into **one global RegExp**, the only form of pattern
+  circulating afterwards (`collectMatchRanges`, `findHits`). Two pitfalls are
+  handled once and for all: `\b` is ASCII-only (it would split `été` in
+  two) — hence lookarounds on an extended `\w`; and a regex can match
+  empty (`a*`) — hence `iterMatches`, which skips those matches instead of
+  looping on `lastIndex`. An invalid pattern **throws**: each caller turns it into
+  a displayed state (red field), never an exception that bubbles up.
+  `docsearch.js` searches the **rendered DOM** of the active view (not the source):
+  it therefore follows the display mode, and anything that replaces this DOM
+  (`showActive`, `toggleSource`, `toggleDerived`) must call
+  `refreshDocSearch()` — otherwise the memorized `Range`s point to detached
+  nodes. Since 3.22.0, the current occurrence is memorized **per
+  document** (`positions`, key = view, valid for the same query/options),
+  and `collectMatchRanges` (`textmatch.js`, hence the three searches) **ignores
+  folded content** — body of a closed `<details>`, `hidden` elements; structural
+  test, not `checkVisibility()` which would reject `display: contents`.
+  A `toggle` of `<details>` in the view re-runs Ctrl+F on the same occurrence
+  (`anchor`). `#find-ruler` (outside `#views`, hence outside zoom) carries a tick
+  per occurrence on the scrollbar, redrawn via a
+  `ResizeObserver` on the view **and its direct children** (the view's box does not
+  change when its content grows). `Ctrl+F`, `F3` and `Ctrl+G` are **intercepted** (`preventDefault`
+  in `initShortcuts`) to neutralize the webview's native search bar.
+  The table of contents, `#find-bar` and `#search-panel` share the same on-screen anchor:
+  they are mutually exclusive (`beforeOpen` hooks).
+- **Highlighting of the « Code source » view** (3.11.0): `sourcehl.js` paints the view
+  produced by `renderSource` **after the fact**, without touching the line count
+  or the heights — the preview ↔ source alignment (`data-line`) and the
+  `scrollToLine` already done by the caller therefore remain valid, even when the
+  highlighting comes from a plugin (asynchronous). `sourceHighlightFor` (`plugins.js`)
+  picks the grammar: the host's hljs for markdown, otherwise the grammar of the
+  plugin serving the extension, looked up by convention `<ext>-source` then
+  `<ext>` (`tex-source`; see `doc/plugin-protocol.md`
+  §6.4). The convention starts from the **extension**: latex-doc therefore declares
+  `tex-source` and `latex-source` for the same grammar. The delicate point is `hlsplit.js`: a colorizer renders **one** HTML stream
+  where a `<span>` straddles lines (fence, string, comment), which must be
+  re-cut by closing/reopening the span stack. Pure module, tested outside the
+  browser by `node tests/test_hlsplit.mjs` (accepts `.md` files as arguments).
+  Any anomaly (split that does not cover the lines, grammar error,
+  view toggled in the meantime) leaves the view as plain text: **alignment takes precedence
+  over color**. Consequence for the searches: a colored line is
+  split into several text nodes, hence `textmatch.js` which re-glues the nodes
+  of the same `.src-line` before searching (outside the source view, each node stays
+  isolated — otherwise phantom occurrences would appear between two blocks).
+- **Components of document plugins**: a plugin that emits inline HTML
+  (accordions, callouts) relies on the generic classes `kd-fold`
+  (collapsible `<details>`) and `kd-note` (documentation callout), styled in
+  `ui/css/app.css` and documented in §6.7 of the protocol — the host carries no
+  plugin-specific class. A relative `doc#fragment` link emitted in an SVG
+  (`xlink:href`) is clickable like a markdown link (`initLinks`,
+  `main.js`), fragment memorized in `pendingAnchor` and consumed by
   `showActive`.
-- **Fichiers `.tex`/`.latex`** (documents LaTeX **autonomes**) : servis par le
-  **plugin `latex-doc`** (`plugins/latex-doc/tex.js`), qui génère un markdown
-  dérivé (mêmes ancres/`remapLine` via `anchors.js`) ; une fence ` ```latex `
-  dans un `.md` reçoit le même rendu (`fence:markdown`, sans titre de tête) —
-  ` ```tex ` n'est volontairement **pas** revendiqué, il reste disponible pour
-  afficher du code LaTeX. Principe : le plugin **ne rend aucune formule**, il
-  délimite en `$…$`/`$$…$$` et laisse le KaTeX de l'hôte faire. Trois mécanismes
-  portent la fidélité : **double parse** (le premier collecte les
-  `\newcommand`/`\newtheorem` du préambule, le second re-parse en déclarant ces
-  signatures au parseur — sans quoi `\hyp{h:iid}` serait lu comme une macro
-  suivie d'un groupe indépendant), **expansion** des macros utilisateur avant
-  KaTeX qui ne les connaît pas, et **marqueurs de référence** opaques résolus en
-  fin de parcours (les `\ref` en avant fonctionnent en une seule passe).
-  Numérotation maison des sections, des équations (`\tag{n}`) et des théorèmes
-  `amsthm` (compteurs partagés `[theorem]`, parents `[section]`) ; ancres
-  `<div id="…">` avant chaque objet numéroté — un `<div>` (bloc) évite le `<p>`
-  parasite qu'un `<a>` inline produirait, et `initLinks` (`main.js`) résout les
-  `href="#id"`. Chaque ancre numérotée (`eq-3`, `sec-2-1`) est **doublée** du ou
-  des `\label{}` qui la visent, repris **verbatim** (`#eq:sigmaU`) : seule cible
-  stable pour un lien venu d'un autre document
-  (`[…](../doc/modele.tex#eq:sigmaU)`, `CSS.escape` gère le `:`), l'ancre
-  numérotée se décalant à la moindre insertion en amont. La greffe se fait *sur*
-  la ligne d'ancre existante — aucune ligne créée, donc `anchors` (synchro
-  preview ↔ source) reste exact ; `removeLine` réaccorde l'index des ancres au
-  même titre que celui des lignes.
-  ⚠ Dissymétrie de l'AST dans `tabular` : le `&` **séparateur** de
-  cellule est un nœud `string`, le `\&` littéral est une macro. Le parseur
-  `unified-latex` est vendoré (`vendor/unified-latex.esm.js`, ~245 Ko,
-  régénérable par `build_vendor.py`). `texToMarkdown` ne lève jamais. Limites
-  assumées : fichier unique (pas de `\input` — pas de `read:siblings`), pas de
-  bibliographie (cf. README du plugin). Une `tikzpicture` devient une fence
-  ` ```tikz ` contenant un **document autonome** (`tikzPreamble` : paquets en
-  liste blanche, `babel` exclu, macros et bibliothèques du préambule, `\newlabel`
-  des `\ref` résolus par les marqueurs `t`) que l'hôte compile (moteur TeX) ;
-  texte des nœuds et source restent repliés dessous, pour le poste sans TeX.
-- **Fichiers `.html`/`.htm`** (pages statiques, dont les exports HTML de l'app,
-  3.9.0) : extensions **natives** (`DOC_EXTENSIONS` dans `manager.rs`, miroir
-  `NATIVE_DOC_EXTENSIONS` dans `plugins.js` — garder les deux en phase), mais
-  **hors pipeline markdown** : `renderActive` (`main.js`) route vers
-  `renderHtmlDocument` (`render.js`) qui affiche la page telle quelle dans une
-  iframe `srcdoc` sandboxée (`sandbox=""` : aucun script, aucune navigation ;
-  la CSP de l'app, héritée par le document srcdoc, s'applique en plus). La vue
-  porte `v.kind === "html"` et `v.markdown = null` : pile d'actions de vue
-  masquée (pas de source/sommaire/export/pleine largeur), onglets exclus de la
-  recherche globale (`globalsearch.js`). Les ressources relatives d'un HTML
-  tiers ne sont pas résolues (about:srcdoc n'a pas de base) — les exports de
-  l'app sont autonomes, seule limitation connue : les polices KaTeX.
-- **Formules math** : `render.js` branche `markdown-it-texmath` (mode `dollars` :
-  `$…$` inline, `$$…$$` display) sur **KaTeX** (`ui/vendor/katex/`), rendu local sans
-  réseau ni `eval`. `texmath.js` et `katex.min.js` sont chargés en `<script>`
-  classiques dans `index.html` (globals `window.texmath` / `window.katex`) ; le CSS
-  KaTeX charge ses polices depuis `vendor/katex/fonts/*.woff2` (seul le woff2 est
-  vendoré — Chromium prend le 1ᵉʳ format). La sortie KaTeX (HTML + MathML) traverse
-  DOMPurify : le profil `mathMl: true` (cf. `sanitizeHtml`) est requis pour ne pas
-  vider le MathML d'accessibilité.
-- **Plotly (moteur « live »)** : un bloc ` ```plotly ` est le seul rendu
-  **interactif** — il **court-circuite** le pipeline backend/SVG et s'exécute dans la
-  webview principale (`hydrateDiagrams`, branche `type === "plotly"`). La spec JSON
-  `{data, layout}` est soit inline, soit dans un fichier via `src=chemin.json`, lu par
-  la commande backend `read_data_file` (**confinée au dossier du doc** : rejet des chemins
-  absolus, canonicalisation des deux côtés + `starts_with` anti-traversée/symlink,
-  allowlist `.json` ; même confinement que `plugin_read_sibling`).
-  `vendor/plotly.min.js` (~4,8 Mo, UMD → `window.Plotly`) est injecté en `<script>` à la
-  première figure (`ensurePlotly`). Aucune CSP à changer : `'unsafe-eval'` y est déjà
-  (pour d2) et le script est servi en `'self'`. Le `<div>` survit à DOMPurify, le graphe
-  est injecté **après** sanitization (comme les SVG Kroki). Pas concerné par
-  `resolve_alias` (ne passe pas par le backend de rendu). **Anti-doublon** : si une
-  image (`![…](x.png)`) précède immédiatement un bloc ` ```plotly src=x.json ` de même
-  *stem*, c'est son fallback statique (portable hors-app / si Plotly échoue) ; une fois
-  le rendu interactif réussi, `hidePairedFallbackImage` masque l'image pour éviter
-  d'afficher la figure deux fois. En cas d'échec, le PNG reste visible.
-- `ui/renderer/` — page de la webview cachée de rendu et ses moteurs vendorés.
-- Vendors (`ui/vendor/`, `ui/renderer/vendor/`) sont des bundles pré-buildés
-  committés. `vendor/dbml.js` est un bundle esbuild de `@softwaretechnik/dbml-renderer`
-  réduit à `run(src, "dot")` (viz.js exclu). `vendor/excalidraw.esm.js` est un bundle
-  esbuild de `@excalidraw/excalidraw` (`exportToSvg` + `restore`, polices `.woff2`/CSS
-  exclues : `--loader:.woff2=dataurl --loader:.css=empty`). `erd.js` n'est **pas** un
-  vendor : c'est notre parseur maison erd→DOT.
+- **`.tex`/`.latex` files** (**standalone** LaTeX documents): served by the
+  **`latex-doc` plugin** (`plugins/latex-doc/tex.js`), which generates a derived
+  markdown (same anchors/`remapLine` via `anchors.js`); a ` ```latex ` fence
+  in a `.md` gets the same rendering (`fence:markdown`, without a title heading) —
+  ` ```tex ` is deliberately **not** claimed, it remains available to
+  display LaTeX code. Principle: the plugin **renders no formula**, it
+  delimits with `$…$`/`$$…$$` and lets the host's KaTeX do it. Three mechanisms
+  carry the fidelity: **double parse** (the first collects the preamble's
+  `\newcommand`/`\newtheorem`, the second re-parses declaring these
+  signatures to the parser — without which `\hyp{h:iid}` would be read as a macro
+  followed by an independent group), **expansion** of user macros before
+  KaTeX, which does not know them, and opaque **reference markers** resolved at
+  the end of the traversal (forward `\ref`s work in a single pass).
+  In-house numbering of sections, equations (`\tag{n}`) and `amsthm`
+  theorems (shared counters `[theorem]`, parents `[section]`); anchors
+  `<div id="…">` before each numbered object — a (block) `<div>` avoids the stray `<p>`
+  that an inline `<a>` would produce, and `initLinks` (`main.js`) resolves the
+  `href="#id"`. Each numbered anchor (`eq-3`, `sec-2-1`) is **doubled** with the
+  `\label{}`(s) that target it, taken **verbatim** (`#eq:sigmaU`): the only stable
+  target for a link coming from another document
+  (`[…](../doc/modele.tex#eq:sigmaU)`, `CSS.escape` handles the `:`), the numbered
+  anchor shifting at the slightest upstream insertion. The grafting is done *onto*
+  the existing anchor line — no line created, so `anchors` (preview ↔ source
+  sync) stays exact; `removeLine` readjusts the anchor index just
+  as it does the line index.
+  ⚠ AST asymmetry in `tabular`: the cell **separator** `&` is a
+  `string` node, the literal `\&` is a macro. The `unified-latex` parser
+  is vendored (`vendor/unified-latex.esm.js`, ~245 KB,
+  regenerable by `build_vendor.py`). `texToMarkdown` never throws. Accepted
+  limits: single file (no `\input` — no `read:siblings`), no
+  bibliography (see the plugin's README). A `tikzpicture` becomes a
+  ` ```tikz ` fence containing a **standalone document** (`tikzPreamble`: whitelisted
+  packages, `babel` excluded, preamble macros and libraries, `\newlabel`
+  of the `\ref`s resolved by the `t` markers) that the host compiles (TeX engine);
+  node text and source remain folded underneath, for the TeX-less workstation.
+- **`.html`/`.htm` files** (static pages, including the app's HTML exports,
+  3.9.0): **native** extensions (`DOC_EXTENSIONS` in `manager.rs`, mirror
+  `NATIVE_DOC_EXTENSIONS` in `plugins.js` — keep both in sync), but
+  **outside the markdown pipeline**: `renderActive` (`main.js`) routes to
+  `renderHtmlDocument` (`render.js`) which displays the page as is in a
+  sandboxed `srcdoc` iframe (`sandbox=""`: no script, no navigation;
+  the app's CSP, inherited by the srcdoc document, applies in addition). The view
+  carries `v.kind === "html"` and `v.markdown = null`: view action stack
+  hidden (no source/table of contents/export/full width), tabs excluded from the
+  global search (`globalsearch.js`). Relative resources of a third-party HTML
+  are not resolved (about:srcdoc has no base) — the app's exports
+  are standalone, the only known limitation: the KaTeX fonts.
+- **Math formulas**: `render.js` plugs `markdown-it-texmath` (`dollars` mode:
+  `$…$` inline, `$$…$$` display) into **KaTeX** (`ui/vendor/katex/`), rendered locally with no
+  network or `eval`. `texmath.js` and `katex.min.js` are loaded as classic `<script>`s
+  in `index.html` (globals `window.texmath` / `window.katex`); the KaTeX CSS
+  loads its fonts from `vendor/katex/fonts/*.woff2` (only the woff2 is
+  vendored — Chromium takes the 1st format). The KaTeX output (HTML + MathML) goes through
+  DOMPurify: the `mathMl: true` profile (see `sanitizeHtml`) is required so as not to
+  empty the accessibility MathML.
+- **Plotly (« live » engine)**: a ` ```plotly ` block is the only **interactive**
+  rendering — it **short-circuits** the backend/SVG pipeline and runs in the
+  main webview (`hydrateDiagrams`, branch `type === "plotly"`). The JSON spec
+  `{data, layout}` is either inline, or in a file via `src=path.json`, read by
+  the backend command `read_data_file` (**confined to the doc's folder**: absolute
+  paths rejected, canonicalization on both sides + `starts_with` anti-traversal/symlink,
+  `.json` allowlist; same confinement as `plugin_read_sibling`).
+  `vendor/plotly.min.js` (~4.8 MB, UMD → `window.Plotly`) is injected as a `<script>` at the
+  first figure (`ensurePlotly`). No CSP change needed: `'unsafe-eval'` is already there
+  (for d2) and the script is served from `'self'`. The `<div>` survives DOMPurify, the graph
+  is injected **after** sanitization (like the Kroki SVGs). Not concerned by
+  `resolve_alias` (does not go through the render backend). **Anti-duplicate**: if an
+  image (`![…](x.png)`) immediately precedes a ` ```plotly src=x.json ` block with the same
+  *stem*, it is its static fallback (portable outside the app / if Plotly fails); once
+  the interactive render has succeeded, `hidePairedFallbackImage` hides the image to avoid
+  displaying the figure twice. On failure, the PNG stays visible.
+- `ui/renderer/` — page of the hidden render webview and its vendored engines.
+- Vendors (`ui/vendor/`, `ui/renderer/vendor/`) are pre-built bundles
+  committed to the repo. `vendor/dbml.js` is an esbuild bundle of `@softwaretechnik/dbml-renderer`
+  reduced to `run(src, "dot")` (viz.js excluded). `vendor/excalidraw.esm.js` is an
+  esbuild bundle of `@excalidraw/excalidraw` (`exportToSvg` + `restore`, `.woff2`/CSS fonts
+  excluded: `--loader:.woff2=dataurl --loader:.css=empty`). `erd.js` is **not** a
+  vendor: it is our in-house erd→DOT parser.
 
-## Système de plugins (3.0.0)
+## Plugin system (3.0.0)
 
-La spec du protocole v1 est **`doc/plugin-protocol.md`** — la relire avant de
-toucher à l'hôte ou d'écrire un plugin. Résumé opérationnel :
+The spec of protocol v1 is **`doc/plugin-protocol.md`** — re-read it before
+touching the host or writing a plugin. Operational summary:
 
-- Un plugin = dossier `%APPDATA%\kroki-deskapp\plugins\<id>\` (chemin neutre,
-  hors identifiant Tauri) avec `manifest.json` ; distribué en archive zip
-  `.kdext` (drop sur la fenêtre, double-clic si l'installeur a associé
-  l'extension, ligne de commande, ou dialog Plugins → dialog de confiance ; le
-  tri « archive vs document » est fait une fois pour toutes dans
-  `manager::open_mixed_paths`, entonnoir commun à toutes ces voies ;
-  `pack_plugin.py` (racine du dépôt) pour empaqueter). Boucle de dev : copier le dossier
-  du plugin directement dans `plugins\<id>\` et relancer l'app.
-- **Exécution** : worker sandboxé côté frontend (`ui/js/plugins.js`, runtime
-  `ui/js/kd_runtime.js` injecté en blob qui importe l'entry via le protocole
-  `plugin://` — d'où `plugin:`/`http://plugin.localhost` en
-  `script-src`/`connect-src` de la CSP). Démarrage paresseux, timeouts,
-  3 échecs consécutifs → « en panne ». Le backend (`plugins.rs`) n'exécute
-  jamais le code des plugins : manifestes, fichiers, confinement.
-- **Capacités v1** : `document:markdown` (routage dans `renderActive`,
-  dégradé §7.3 = bandeau + source en fence), `fence:svg`/`fence:html`/
-  `fence:markdown` (routage dans la règle fence + `hydrateDiagrams` de
-  `render.js` ; le natif prime ; le format markdown est re-rendu par
-  markdown-it + DOMPurify puis hydraté récursivement, profondeur bornée à 2,
-  `data-source-line` dérivés retirés), `highlight:code` (post-pass
-  `hydratePluginHighlights`, sanitizé spans `hljs-*`), `read:siblings`
-  (`host/readFile` → `plugin_read_sibling`, allowlist `siblingExtensions`). `document:html`/`*:webview`/`runtime:
-  "process"` sont **réservés, non implémentés**.
-- **Extensions effectives** = `DOC_EXTENSIONS` (natives) ∪ plugins actifs :
-  dialog d'ouverture, drops (`drop_target.rs`/`filedrop.js`), `open_link`.
-  `plotly` reste natif (fence interceptée avant les plugins).
-- **Markdown intermédiaire** : un bouton `{…}` (pile d'actions de vue) affiche
-  le markdown généré par le plugin d'un document transformé — brut, liseré
-  accent, position réalignée via les ancres. Disponible en release depuis la
-  3.12.0, mais **désactivé par défaut** : il s'active dans les Réglages →
-  « Icônes affichées » (cf. « Icônes des barres d'outils » ci-dessous) et
-  n'apparaît que sur un document effectivement transformé (`v.lineMap`).
-- Un plugin first-party vit dans le dépôt (`plugins/`, externalisable) :
-  **`latex-doc`** (`.tex`/`.latex` + fence `latex` + coloration
-  `tex-source`/`latex-source`). D'autres peuvent y être montés par jonction
-  depuis leur propre dépôt (exclus localement, `.git/info/exclude`).
-  Tout changement de ces rendus se fait là et se teste en
-  copiant le dossier dans `plugins\<id>\`, **sans rebuild de l'app** — sauf si
-  l'hôte lui-même change (`ui/js/*` reste embarqué dans le binaire) ; `plugins/`
-  n'étant pas embarqué dans le binaire, un changement qui s'y limite **ne
-  justifie pas de bump de version de l'application** (le plugin a la sienne).
-  `plugins/` contient aussi les **trois exemples pédagogiques** du §12 de la
-  spec (`csv-tables`, `barchart`, `ini-highlight`) — un par point d'extension,
-  à garder en phase avec le code inline de `doc/plugin-protocol.md`.
-- **Plugins livrés avec l'installeur** (3.16.0, spec §9.5) : le MSI embarque les
-  `.kdext` des plugins de la stratégie d'embarquement (cf. § « Installeur
-  Windows ») et laisse cocher ceux à installer (par défaut : `latex-doc`
-  coché, les trois exemples décochés). Le `.deb` embarque les mêmes et retient
-  les cochés, faute de pouvoir poser la question (cf. § « Paquet
-  Debian/Ubuntu (.deb) »).
-  Les cochés atterrissent dans `resource_dir()/bundled-plugins/`, d'où
-  `plugins::seed_bundled` les installe et les met à jour au
-  démarrage, **avant** `plugins::init()` pour que le premier scan voie l'état
-  final. Seule voie d'installation sans dialog de confiance — même installeur
-  que l'exe, donc même chaîne de confiance. Trois règles, toutes nécessaires :
-  jamais de régression de version (un `.kdext` plus récent posé à la main est
-  conservé) ; un plugin supprimé depuis le dialog Plugins est mémorisé dans
-  `SettingsData::removed_plugins` et **pas** réinstallé — sans quoi « Supprimer »
-  serait annulé au lancement suivant ; le réinstaller à la main efface cette
-  mémoire. Le dossier des plugins étant per-user et les deux installeurs
+- A plugin = a folder `%APPDATA%\kroki-deskapp\plugins\<id>\` (neutral path,
+  outside the Tauri identifier) with `manifest.json`; distributed as a zip archive
+  `.kdext` (drop onto the window, double-click if the installer associated
+  the extension, command line, or Plugins dialog → trust dialog; the
+  "archive vs document" sorting is done once and for all in
+  `manager::open_mixed_paths`, funnel common to all these paths;
+  `pack_plugin.py` (repo root) to package). Dev loop: copy the plugin's folder
+  directly into `plugins\<id>\` and relaunch the app.
+- **Execution**: sandboxed worker on the frontend side (`ui/js/plugins.js`, runtime
+  `ui/js/kd_runtime.js` injected as a blob that imports the entry via the `plugin://`
+  protocol — hence `plugin:`/`http://plugin.localhost` in the CSP's
+  `script-src`/`connect-src`). Lazy start, timeouts,
+  3 consecutive failures → "en panne" (broken). The backend (`plugins.rs`) never
+  runs plugin code: manifests, files, confinement.
+- **Capabilities v1**: `document:markdown` (routing in `renderActive`,
+  degraded mode §7.3 = banner + source as a fence), `fence:svg`/`fence:html`/
+  `fence:markdown` (routing in the fence rule + `hydrateDiagrams` of
+  `render.js`; native takes precedence; the markdown format is re-rendered by
+  markdown-it + DOMPurify then hydrated recursively, depth bounded to 2,
+  derived `data-source-line` removed), `highlight:code` (post-pass
+  `hydratePluginHighlights`, sanitized `hljs-*` spans), `read:siblings`
+  (`host/readFile` → `plugin_read_sibling`, `siblingExtensions` allowlist). `document:html`/`*:webview`/`runtime:
+  "process"` are **reserved, not implemented**.
+- **Effective extensions** = `DOC_EXTENSIONS` (native) ∪ active plugins:
+  open dialog, drops (`drop_target.rs`/`filedrop.js`), `open_link`.
+  `plotly` stays native (fence intercepted before the plugins).
+- **Intermediate markdown** (« Markdown intermédiaire »): a `{…}` button (view action stack) displays
+  the markdown generated by the plugin of a transformed document — raw, accent-colored
+  thin border, position realigned via the anchors. Available in release since
+  3.12.0, but **disabled by default**: it is enabled in Settings →
+  « Icônes affichées » ("Displayed icons"; see « Toolbar icons » above) and
+  only appears on a document that was actually transformed (`v.lineMap`).
+- A first-party plugin lives in the repo (`plugins/`, externalizable):
+  **`latex-doc`** (`.tex`/`.latex` + `latex` fence + `tex-source`/`latex-source`
+  highlighting). Others can be mounted there by junction
+  from their own repo (locally excluded, `.git/info/exclude`).
+  Any change to these renderings is made there and tested by
+  copying the folder into `plugins\<id>\`, **without rebuilding the app** — unless
+  the host itself changes (`ui/js/*` stays embedded in the binary); since `plugins/`
+  is not embedded in the binary, a change limited to it **does not
+  justify an app version bump** (the plugin has its own).
+  `plugins/` also contains the **three pedagogical examples** of §12 of the
+  spec (`csv-tables`, `barchart`, `ini-highlight`) — one per extension point,
+  to be kept in sync with the inline code of `doc/plugin-protocol.md`.
+- **Plugins shipped with the installer** (3.16.0, spec §9.5): the MSI embeds the
+  `.kdext` of the plugins of the bundling strategy (see § « Windows installer
+  (MSI) ») and lets the user check those to install (default: `latex-doc`
+  checked, the three examples unchecked). The `.deb` embeds the same and retains
+  the checked ones, being unable to ask the question (see § « Debian/Ubuntu
+  package (.deb) »).
+  The checked ones land in `resource_dir()/bundled-plugins/`, whence
+  `plugins::seed_bundled` installs and updates them at
+  startup, **before** `plugins::init()` so that the first scan sees the final
+  state. Only installation path without a trust dialog — same installer
+  as the exe, hence same chain of trust. Three rules, all necessary:
+  never a version regression (a newer `.kdext` placed by hand is
+  kept); a plugin deleted from the Plugins dialog is memorized in
+  `SettingsData::removed_plugins` and **not** reinstalled — otherwise "Supprimer" ("Delete")
+  would be undone at the next launch; reinstalling it by hand clears that
+  memory. Since the plugins folder is per-user and both installers are
   per-machine,
-  l'installation ne peut pas être faite par l'installeur : elle a lieu au
-  premier lancement de chaque session utilisateur. Build portable = dossier
-  absent = no-op. Décocher un plugin **n'en désinstalle pas** un déjà présent :
-  le seeding ajoute et met à jour, jamais ne retire — le choix se fait à
-  l'installation, la suppression depuis le dialog Plugins. La liste n'est
-  qu'en **un** endroit, la stratégie d'embarquement : fragment WiX et overlay
-  `.deb` en sont générés. **Test sans
-  installeur** : déposer les `.kdext` dans
+  the installation cannot be done by the installer: it happens at the
+  first launch of each user session. Portable build = folder
+  absent = no-op. Unchecking a plugin **does not uninstall** one already present:
+  seeding adds and updates, never removes — the choice is made at
+  install time, removal from the Plugins dialog. The list lives
+  in **one** place only, the bundling strategy: the WiX fragment and the `.deb` overlay
+  are generated from it. **Test without
+  installer**: drop the `.kdext` into
   `src-tauri/target/debug/bundled-plugins/` —
-  `resource_dir()` est le dossier de l'exécutable, y compris en debug.
-- **File d'installation** : les voies d'ajout d'un `.kdext` (drop Windows,
-  double-clic, ligne de commande, sélecteur natif) **empilent** l'archive côté
-  Rust (`plugins::request_install`) et n'émettent `plugin-install-request` que
-  comme signal ; le frontend récupère la charge utile par
-  `take_pending_plugin_installs`. Ce détour est nécessaire : une archive passée
-  au lancement est traitée dans le `setup`, donc **avant** que la webview ait
-  enregistré son écouteur — un événement porteur du chemin serait perdu, et le
-  double-clic ne ferait rien tant que l'application n'est pas déjà ouverte.
-  `drainPendingInstalls` (`plugins_ui.js`) vide la file après le `listen` et
-  enchaîne les dialogs de confiance en séquence.
+  `resource_dir()` is the executable's folder, debug included.
+- **Install queue**: the paths that add a `.kdext` (Windows drop,
+  double-click, command line, native picker) **queue** the archive on the
+  Rust side (`plugins::request_install`) and emit `plugin-install-request` only
+  as a signal; the frontend retrieves the payload via
+  `take_pending_plugin_installs`. This detour is necessary: an archive passed
+  at launch is handled in `setup`, hence **before** the webview has
+  registered its listener — an event carrying the path would be lost, and the
+  double-click would do nothing unless the application is already open.
+  `drainPendingInstalls` (`plugins_ui.js`) empties the queue after the `listen` and
+  chains the trust dialogs in sequence.
 
-## Sécurité / CSP (ne pas casser)
+## Security / CSP (do not break)
 
-- Le HTML inline des documents passe par **DOMPurify**. Les SVG des moteurs sont
-  insérés **tels quels** (DOMPurify viderait les `<foreignObject>` de mermaid) ; la
-  CSP (pas d'`'unsafe-inline'` pour les scripts) neutralise tout `<script>` injecté.
-- La CSP autorise `'unsafe-eval'` + workers `blob:` **uniquement** parce que le
-  runtime WASM de **d2** utilise `new Function` dans un module worker. Ne pas
-  ajouter de sink `eval` alimenté par du contenu de document.
+- The documents' inline HTML goes through **DOMPurify**. The engines' SVGs are
+  inserted **as is** (DOMPurify would empty mermaid's `<foreignObject>`s); the
+  CSP (no `'unsafe-inline'` for scripts) neutralizes any injected `<script>`.
+- The CSP allows `'unsafe-eval'` + `blob:` workers **only** because the
+  WASM runtime of **d2** uses `new Function` in a module worker. Do not
+  add an `eval` sink fed by document content.
 
-## Contraintes plateforme
+## Platform constraints
 
-- **Windows = cible principale** (WebView2, API Win32, `windows_subsystem =
-  "windows"`). Linux est supporté en dégradé (WebKitGTK, fallbacks
-  `#[cfg(not(windows))]`, pas de drag inter-fenêtres) — builds via
-  `scripts/Dockerfile.linux` (cf. « Builds Linux »).
-- Profil release agressif (`lto`, `codegen-units=1`, `panic=abort`, `opt-level=s`,
-  `strip`) → builds release lents ; préférer `cargo run` (debug) en développement.
+- **Windows = main target** (WebView2, Win32 API, `windows_subsystem =
+  "windows"`). Linux is supported in degraded mode (WebKitGTK, `#[cfg(not(windows))]`
+  fallbacks, no inter-window drag) — builds via
+  `scripts/Dockerfile.linux` (see « Linux builds »).
+- Aggressive release profile (`lto`, `codegen-units=1`, `panic=abort`, `opt-level=s`,
+  `strip`) → slow release builds; prefer `cargo run` (debug) during development.

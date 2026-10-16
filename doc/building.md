@@ -1,84 +1,84 @@
-# Compiler Kroki Desk
+# Building Kroki Desk
 
-## Prérequis
+## Prerequisites
 
-- **Rust stable** (cargo) — seul outil requis pour le binaire de l'hôte.
-- **Python 3.10+** (bibliothèque standard seule) pour `build_dist.py` et
+- **Rust stable** (cargo) — the only tool required for the host binary.
+- **Python 3.10+** (standard library only) for `build_dist.py` and
   `pack_plugin.py`.
-- **Windows** : WebView2 Runtime (préinstallé sur Windows 10/11). Le MSI
-  télécharge WiX v3 dans `%LOCALAPPDATA%\tauri` au premier build.
-- **Linux natif** : les paquets système listés dans `scripts/Dockerfile.linux`
+- **Windows**: WebView2 Runtime (preinstalled on Windows 10/11). The MSI build
+  downloads WiX v3 into `%LOCALAPPDATA%\tauri` on the first run.
+- **Native Linux**: the system packages listed in `scripts/Dockerfile.linux`
   (WebKitGTK 4.1, GTK 3, `xdg-utils`…).
-- **Docker** (daemon démarré) pour les artefacts Linux distribuables, y
-  compris depuis Windows.
-- **Node.js** pour les tests uniquement (scripts ESM sans dépendance npm).
+- **Docker** (daemon running) for the distributable Linux artifacts, including
+  from Windows.
+- **Node.js** for tests only (ESM scripts with no npm dependency).
 
-Il n'y a **pas de bundler frontend** : `ui/` est statique, ses dépendances sont
-vendorées dans le dépôt. Aucun `npm install`.
+There is **no frontend bundler**: `ui/` is static, its dependencies are
+vendored in the repository. No `npm install`.
 
-## Deux voies
+## Two routes
 
-| Besoin | Commande |
+| Need | Command |
 | --- | --- |
-| Tous les artefacts d'une version | `python build_dist.py` |
-| Développer (build debug + lancement) | `cargo run-app` |
-| Seulement le binaire de l'hôte | `cargo build-app` |
+| All of a version's artifacts | `python build_dist.py` |
+| Develop (debug build + launch) | `cargo run-app` |
+| Only the host binary | `cargo build-app` |
 
-`build_dist.py` est la voie de référence pour produire une version : il
-enchaîne les étapes dans le bon ordre, empaquette les plugins dont les
-installeurs ont besoin et vérifie ce qu'ils embarquent. Les alias cargo
-restent la boucle de développement, et la voie minimale pour qui veut seulement
-l'exécutable.
+`build_dist.py` is the reference way to produce a release: it
+chains the steps in the right order, packs the plugins the installers
+need and checks what they embed. The cargo aliases
+remain the development loop, and the minimal route for anyone who only wants
+the executable.
 
 ## `build_dist.py`
 
-Génère, depuis Windows comme depuis Linux, l'intégralité des artefacts dans
-`dist/`, dans l'ordre du coût croissant (une étape lente ou en panne ne retarde
-pas un artefact bon marché) :
+Generates, from Windows as well as from Linux, all the artifacts in
+`dist/`, in order of increasing cost (a slow or broken step does not delay
+a cheap artifact):
 
-1. les archives `.kdext` de tous les plugins de `plugins/` ;
-2. le binaire natif de l'hôte (`.exe` sous Windows, binaire Linux sous Linux) ;
-3. l'installeur MSI (Windows uniquement, sauté d'office ailleurs) ;
-4. via Docker (image `kroki-linux-build`, Debian bookworm) : l'AppImage, le
-   binaire Linux nu et le paquet `.deb`.
+1. the `.kdext` archives of all the plugins in `plugins/`;
+2. the host's native binary (`.exe` on Windows, Linux binary on Linux);
+3. the MSI installer (Windows only, skipped outright elsewhere);
+4. via Docker (`kroki-linux-build` image, Debian bookworm): the AppImage, the
+   bare Linux binary and the `.deb` package.
 
-Chaque étape se retire par son `--skip-…` (`--skip-plugins`, `--skip-native`,
-`--skip-msi`, `--skip-appimage`, `--skip-binary`, `--skip-deb`) ou s'isole par
-son `--…-only` (`--native-only`, `--plugins-only`, `--msi-only`, `--deb-only`,
-mutuellement exclusifs). S'y ajoutent `--skip-image-build`, `--compile-only`
-(compilation Linux de vérification, aucun artefact) et `--test` (test runtime
-headless sous Xvfb). Sans Docker : `--skip-appimage --skip-binary --skip-deb`.
+Each step is removed with its `--skip-…` (`--skip-plugins`, `--skip-native`,
+`--skip-msi`, `--skip-appimage`, `--skip-binary`, `--skip-deb`) or isolated with
+its `--…-only` (`--native-only`, `--plugins-only`, `--msi-only`, `--deb-only`,
+mutually exclusive). Also available: `--skip-image-build`, `--compile-only`
+(verification-only Linux compilation, no artifact) and `--test` (headless
+runtime test under Xvfb). Without Docker: `--skip-appimage --skip-binary --skip-deb`.
 
-Le MSI et le `.deb` embarquent les `.kdext` : `--skip-plugins` leur fait
-réutiliser ceux déjà présents dans `dist/`, il ne les retire pas de
-l'installeur.
+The MSI and the `.deb` embed the `.kdext` archives: `--skip-plugins` makes them
+reuse those already present in `dist/`, it does not remove them from the
+installer.
 
-`python build_dist.py --help` liste toutes les options et des exemples.
+`python build_dist.py --help` lists all the options and examples.
 
-## Alias cargo
+## Cargo aliases
 
-Définis dans `.cargo/config.toml`, ils pilotent le crate `src-tauri/` depuis
-la racine du dépôt :
+Defined in `.cargo/config.toml`, they drive the `src-tauri/` crate from
+the repository root:
 
 ```bash
-cargo run-app         # build debug + lance l'app
-cargo build-app       # build release → dist/
+cargo run-app         # debug build + launches the app
+cargo build-app       # release build → dist/
 cargo lint-app        # clippy
 cargo fmt-app         # rustfmt
-cargo build-msi       # installeur MSI (Windows ; requiert les .kdext dans dist/)
-cargo build-appimage  # AppImage (Linux ; installe tauri-cli en local au besoin)
-cargo build-deb       # paquet .deb (Linux ; requiert les .kdext dans dist/)
+cargo build-msi       # MSI installer (Windows; requires the .kdext in dist/)
+cargo build-appimage  # AppImage (Linux; installs tauri-cli locally if needed)
+cargo build-deb       # .deb package (Linux; requires the .kdext in dist/)
 ```
 
-Le profil release est agressif (LTO, `codegen-units=1`) : préférer
-`cargo run-app` pendant le développement.
+The release profile is aggressive (LTO, `codegen-units=1`): prefer
+`cargo run-app` during development.
 
-## Artefacts dans `dist/`
+## Artifacts in `dist/`
 
-Chaque artefact est publié **postfixé de la version** (source unique : le champ
-`version` de `src-tauri/Cargo.toml`), doublé d'un fichier **non versionné**
-pointant sur le même contenu — hardlink si le système de fichiers le permet
-(sans droit administrateur, NTFS comme ext4), copie sinon :
+Each artifact is published **suffixed with the version** (single source: the
+`version` field of `src-tauri/Cargo.toml`), paired with an **unversioned** file
+pointing to the same content — a hardlink if the file system allows it
+(no administrator rights needed, NTFS as well as ext4), a copy otherwise:
 
 ```
 kroki_deskapp-3.24.0.exe          kroki_deskapp.exe
@@ -86,55 +86,55 @@ kroki_deskapp-3.24.0.msi          kroki_deskapp.msi
 kroki_deskapp-3.24.0-linux-x86_64-debian12.AppImage   …
 ```
 
-Les artefacts Linux portent le tag de la distro qui compile (lu dans
-`/etc/os-release` : `debian12` pour le conteneur, `ubuntu24.04` pour un hôte
-Ubuntu…) : un build natif et un build Docker coexistent dans `dist/`. Le
-distribuable est le `-debian12` — glibc bookworm, donc compatibilité large ;
-compilé sur une distro plus récente, un binaire ne tourne pas sur plus ancien.
+Linux artifacts carry the tag of the distro doing the build (read from
+`/etc/os-release`: `debian12` for the container, `ubuntu24.04` for an
+Ubuntu host…): a native build and a Docker build coexist in `dist/`. The
+distributable is the `-debian12` one — glibc bookworm, hence broad
+compatibility; a binary built on a newer distro does not run on older ones.
 
-## Plugins embarqués dans les installeurs
+## Plugins bundled in the installers
 
-Les plugins que le MSI et le `.deb` embarquent sont décidés par un fichier
-texte à la racine du dépôt, une ligne par plugin :
+The plugins that the MSI and the `.deb` embed are decided by a text
+file at the repository root, one line per plugin:
 
 ```
-# <id> [on]   — on : coché (MSI) / installé au premier lancement (.deb)
+# <id> [on]   — on: checked (MSI) / installed at first launch (.deb)
 latex-doc      on
 csv-tables
 ```
 
-`bundled-plugins.txt` (ignoré par git) fait foi s'il existe ; sinon
-`bundled-plugins.default.txt`, suivi, donne la sélection par défaut. L'ordre
-des lignes est celui de la page du MSI. Le nom affiché et les extensions à
-associer sont lus dans le `manifest.json` de chaque archive `dist/<id>.kdext`,
-qui doit donc exister (`python build_dist.py --plugins-only`). Le fragment WiX
-et l'overlay `.deb` qui en découlent sont générés à chaque build ;
-`cargo run --manifest-path xtask/Cargo.toml -- bundled` les produit seuls,
-pour relecture.
+`bundled-plugins.txt` (ignored by git) takes precedence if it exists; otherwise
+`bundled-plugins.default.txt`, tracked, provides the default selection. The order
+of the lines is that of the MSI page. The display name and the extensions to
+associate are read from the `manifest.json` of each `dist/<id>.kdext` archive,
+which must therefore exist (`python build_dist.py --plugins-only`). The WiX
+fragment and the `.deb` overlay derived from it are generated on each build;
+`cargo run --manifest-path xtask/Cargo.toml -- bundled` produces them on their own,
+for review.
 
-La variable `KROKI_BUNDLED_PLUGINS` (chemin d'un fichier de stratégie) impose
-une stratégie précise. `python build_dist.py --channel public` l'utilise pour
-construire avec `bundled-plugins.default.txt` même si un `bundled-plugins.txt`
-local existe, et recopie chaque artefact produit dans `dist/public/<version>/`
-— le dossier à publier. `--channel local` (défaut) garde le choix ci-dessus ;
-`--channel all` enchaîne les deux en une passe. Le script s'arrête si les
-archives réellement embarquées dans le MSI ou le `.deb` diffèrent de la
-stratégie.
+The `KROKI_BUNDLED_PLUGINS` variable (path of a strategy file) forces a
+specific strategy. `python build_dist.py --channel public` uses it to
+build with `bundled-plugins.default.txt` even if a local `bundled-plugins.txt`
+exists, and copies each produced artifact into `dist/public/<version>/`
+— the folder to publish. `--channel local` (default) keeps the choice above;
+`--channel all` runs both in one pass. The script stops if the
+archives actually embedded in the MSI or the `.deb` differ from the
+strategy.
 
-## Outillage Linux (`scripts/`)
+## Linux tooling (`scripts/`)
 
-- `Dockerfile.linux` — image de build `kroki-linux-build` (Debian bookworm) ;
-  commandes `docker run` en en-tête du fichier ;
-- `linux_appimage_build.sh` — enrobe `cargo build-appimage` dans le conteneur ;
-- `linux_deb_build.sh` — idem pour `cargo build-deb` ;
-- `linux_runtime_run.sh` — test runtime headless (Xvfb).
+- `Dockerfile.linux` — `kroki-linux-build` build image (Debian bookworm);
+  `docker run` commands at the top of the file;
+- `linux_appimage_build.sh` — wraps `cargo build-appimage` in the container;
+- `linux_deb_build.sh` — same for `cargo build-deb`;
+- `linux_runtime_run.sh` — headless runtime test (Xvfb).
 
-Le build Windows n'est possible que depuis Windows (ni cross-compilation ni
-conteneur Windows).
+The Windows build is only possible from Windows (no cross-compilation or
+Windows container).
 
 ## Tests
 
-Les tests pilotent l'application **en cours d'exécution** via CDP
-(`tests/cdp.mjs` et les `tests/test_*.mjs`) ; deux suites tournent sans
+The tests drive the **running** application via CDP
+(`tests/cdp.mjs` and the `tests/test_*.mjs`); two suites run without the
 application (`tests/test_latex_plugin.mjs`, `tests/test_hlsplit.mjs`).
-Mode d'emploi en en-tête de chaque script.
+Usage is documented at the top of each script.

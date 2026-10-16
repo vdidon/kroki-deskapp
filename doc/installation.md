@@ -1,146 +1,145 @@
 # Installation
 
-Kroki Desk se distribue sous quatre formes. Le binaire portable reste le
-livrable principal ; les installeurs s'y **ajoutent** pour qui veut une
-installation en bonne et due forme (menu des applications, associations de
-fichiers, plugins livrés, désinstallation propre, mise à jour en place).
+Kroki Desk is distributed in four forms. The portable binary remains the
+main deliverable; the installers are **added** for those who want a proper
+installation (applications menu, file associations, bundled plugins, clean
+uninstall, in-place update).
 
-| Forme | Plateforme | Fichier |
+| Form | Platform | File |
 | --- | --- | --- |
-| Binaire portable | Windows 10/11 | `kroki_deskapp-<version>.exe` |
-| Installeur MSI | Windows 10/11 | `kroki_deskapp-<version>.msi` |
+| Portable binary | Windows 10/11 | `kroki_deskapp-<version>.exe` |
+| MSI installer | Windows 10/11 | `kroki_deskapp-<version>.msi` |
 | AppImage | Linux x86_64 | `kroki_deskapp-<version>-linux-x86_64-debian12.AppImage` |
-| Paquet Debian/Ubuntu | Debian 12+, Ubuntu 24.04+ | `kroki_deskapp-<version>-linux-x86_64-debian12.deb` |
-| Binaire Linux nu | Linux x86_64 avec `libwebkit2gtk-4.1` | `kroki_deskapp-<version>-linux-x86_64-debian12` |
+| Debian/Ubuntu package | Debian 12+, Ubuntu 24.04+ | `kroki_deskapp-<version>-linux-x86_64-debian12.deb` |
+| Bare Linux binary | Linux x86_64 with `libwebkit2gtk-4.1` | `kroki_deskapp-<version>-linux-x86_64-debian12` |
 
-Les **documents, réglages et plugins** de chaque utilisateur vivent dans son
-profil (`%APPDATA%\kroki-deskapp\` sous Windows, `~/.config/kroki-deskapp/`
-sous Linux) : ils sont partagés entre toutes les formes et survivent à une
-désinstallation.
+Each user's **documents, settings and plugins** live in their
+profile (`%APPDATA%\kroki-deskapp\` on Windows, `~/.config/kroki-deskapp/`
+on Linux): they are shared across all forms and survive an
+uninstall.
 
-## Binaires portables
+## Portable binaries
 
-Un seul fichier, sans installation ni droits administrateur : le frontend, les
-moteurs JS/WASM et les jars PlantUML/ditaa y sont embarqués.
+A single file, with no installation and no administrator rights: the frontend, the
+JS/WASM engines and the PlantUML/ditaa jars are embedded.
 
-- **Windows** : WebView2 Runtime requis, préinstallé depuis Windows 10 2004.
-- **AppImage** : GTK et WebKitGTK embarqués, rien à installer —
-  `chmod +x` puis lancer.
-- **Binaire Linux nu** : plus léger, mais la machine doit fournir
+- **Windows**: WebView2 Runtime required, preinstalled since Windows 10 2004.
+- **AppImage**: GTK and WebKitGTK embedded, nothing to install —
+  `chmod +x` then run.
+- **Bare Linux binary**: lighter, but the machine must provide
   `libwebkit2gtk-4.1`.
 
-Aucun plugin n'est préinstallé : les ajouter depuis le dialog Plugins
-(cf. [plugins](../README.md#plugins)).
+No plugin is preinstalled: add them from the Plugins dialog
+(see [plugins](../README.md#plugins)).
 
-## Installeur Windows (MSI)
+## Windows installer (MSI)
 
-L'installation est **par machine** (`Program Files`), donc élévation demandée.
-Une seule page de personnalisation : le choix des plugins livrés.
+The installation is **per-machine** (`Program Files`), so elevation is requested.
+A single customization page: the choice of bundled plugins.
 
-### Plugins livrés
+### Bundled plugins
 
-Le MSI embarque les plugins de la [stratégie
-d'embarquement](building.md#plugins-embarqués-dans-les-installeurs) ; la page
-laisse cocher ceux à installer. Avec la stratégie par défaut :
+The MSI embeds the plugins of the [bundling
+strategy](building.md#plugins-bundled-in-the-installers); the page
+lets you check the ones to install. With the default strategy:
 
-| Propriété | Plugin | Apporte | Coché |
+| Property | Plugin | Provides | Checked |
 | --- | --- | --- | --- |
-| `PLUGIN_LATEX_DOC` | `latex-doc` | `.tex` `.latex`, fences ` ```latex ` | oui |
-| `PLUGIN_CSV_TABLES` | `csv-tables` | `.csv` | non |
-| `PLUGIN_BARCHART` | `barchart` | fences ` ```barchart ` | non |
-| `PLUGIN_INI_HIGHLIGHT` | `ini-highlight` | coloration ` ```ini ` | non |
+| `PLUGIN_LATEX_DOC` | `latex-doc` | `.tex` `.latex`, ` ```latex ` fences | yes |
+| `PLUGIN_CSV_TABLES` | `csv-tables` | `.csv` | no |
+| `PLUGIN_BARCHART` | `barchart` | ` ```barchart ` fences | no |
+| `PLUGIN_INI_HIGHLIGHT` | `ini-highlight` | ` ```ini ` highlighting | no |
 
-Les trois derniers sont les exemples pédagogiques de la [spécification du
-protocole de plugins](plugin-protocol.md) : embarqués pour être installables
-sans réseau, pas pour être installés par défaut.
+The last three are the teaching examples from the [plugin protocol
+specification](plugin-protocol.md): embedded so they can be installed
+offline, not to be installed by default.
 
-Les plugins cochés s'installent au **premier lancement** de chaque utilisateur
-(le dossier des plugins est dans son profil) et se mettent à jour avec
-l'application. Trois règles :
+Checked plugins are installed at each user's **first launch**
+(the plugins folder is in their profile) and are updated along with the
+application. Three rules:
 
-- une version plus récente installée à la main n'est jamais remplacée par une
-  plus ancienne ;
-- un plugin supprimé depuis le dialog Plugins n'est pas réinstallé ;
-- décocher un plugin ne désinstalle pas celui qui serait déjà en place — la
-  suppression se fait depuis l'application.
+- a newer version installed by hand is never replaced by an
+  older one;
+- a plugin removed from the Plugins dialog is not reinstalled;
+- unchecking a plugin does not uninstall one that is already in place —
+  removal is done from the application.
 
-### Associations de fichiers
+### File associations
 
-Elles n'ont pas de page. Seules celles des formats servis par un plugin
-dépendent de la case correspondante.
+They have no page. Only those of the formats served by a plugin
+depend on the corresponding checkbox.
 
-| Extensions | Effet | Installé si |
+| Extensions | Effect | Installed if |
 | --- | --- | --- |
-| `.kdws` `.kdext` | double-clic → Kroki Desk | toujours |
-| `.md` `.markdown` `.mdown` `.mkd` `.txt` `.html` `.htm` | « Ouvrir avec » | toujours |
-| extensions d'un plugin (`.tex` `.latex`, `.csv`…) | double-clic → Kroki Desk | plugin coché |
+| `.kdws` `.kdext` | double-click → Kroki Desk | always |
+| `.md` `.markdown` `.mdown` `.mkd` `.txt` `.html` `.htm` | "Open with" | always |
+| a plugin's extensions (`.tex` `.latex`, `.csv`…) | double-click → Kroki Desk | plugin checked |
 
-Installer un plugin, c'est choisir Kroki Desk pour ses formats : l'installeur
-les réclame en application par défaut. Windows garde toutefois le dernier mot —
-un format pour lequel vous avez déjà choisi une application la conserve, Kroki
-Desk n'y apparaît qu'en suggestion. Les formats natifs partagés (Markdown,
-texte, HTML) ne sont jamais réclamés : Kroki Desk s'ajoute seulement à « Ouvrir
-avec », sans toucher à vos applications par défaut.
+Installing a plugin means choosing Kroki Desk for its formats: the installer
+claims them as the default application. Windows still has the last word —
+a format for which you have already chosen an application keeps it, Kroki
+Desk only appears as a suggestion. Shared native formats (Markdown,
+text, HTML) are never claimed: Kroki Desk is only added to "Open
+with", without touching your default applications.
 
-### Lancement par nom
+### Launching by name
 
-Le MSI enregistre l'application dans *App Paths* : `start "" kroki_deskapp …`
-(cmd), `Start-Process kroki_deskapp` (PowerShell) et Win+R la trouvent sans
-modifier le PATH. Bash et `CreateProcess` ne lisent pas cette clé.
+The MSI registers the application in *App Paths*: `start "" kroki_deskapp …`
+(cmd), `Start-Process kroki_deskapp` (PowerShell) and Win+R find it without
+modifying the PATH. Bash and `CreateProcess` do not read this key.
 
-### Installation silencieuse
+### Silent installation
 
-Les choix de la page se passent en propriétés publiques :
+The page's choices are passed as public properties:
 
 ```
 msiexec /i kroki_deskapp.msi /qn PLUGIN_CSV_TABLES=1 PLUGIN_LATEX_DOC=""
 ```
 
-installe le plugin CSV — et l'association `.csv` avec lui — sans le plugin
-LaTeX ni ses associations.
+installs the CSV plugin — and the `.csv` association with it — without the
+LaTeX plugin or its associations.
 
-## Paquet Debian/Ubuntu (.deb)
+## Debian/Ubuntu package (.deb)
 
-À installer avec **apt**, qui résout les dépendances — `dpkg -i` ne le fait
-pas :
+Install with **apt**, which resolves dependencies — `dpkg -i` does not:
 
 ```bash
 sudo apt install ./kroki_deskapp-<version>-linux-x86_64-debian12.deb
-sudo apt remove kroki-desk    # désinstallation
+sudo apt remove kroki-desk    # uninstall
 ```
 
-Il pose l'application dans `/usr/bin` (donc lançable par `kroki_deskapp`),
-l'inscrit au menu des applications et associe les types de fichiers. Cible :
-Debian 12+ et Ubuntu 24.04+ — le paquet exige `libc6 (>= 2.36)`, ce qui exclut
+It puts the application in `/usr/bin` (so it can be launched as `kroki_deskapp`),
+registers it in the applications menu and associates the file types. Target:
+Debian 12+ and Ubuntu 24.04+ — the package requires `libc6 (>= 2.36)`, which rules out
 Ubuntu 22.04.
 
-### Plugins livrés
+### Bundled plugins
 
-Le paquet embarque les mêmes plugins que le MSI, mais un `.deb` n'a pas
-d'interface pour vous laisser choisir. Ceux que la stratégie coche sont
-installés au premier lancement de chaque utilisateur (avec la stratégie par
-défaut : `latex-doc`), les autres seulement **déposés à côté**.
+The package embeds the same plugins as the MSI, but a `.deb` has no
+interface to let you choose. Those the strategy checks are
+installed at each user's first launch (with the default
+strategy: `latex-doc`), the others are only **dropped alongside**.
 
-Les plugins déposés à côté s'installent depuis le dialog Plugins (« Ajouter un
-plugin… »), en pointant `/usr/lib/Kroki Desk/example-plugins/`. Les règles de
-mise à jour sont celles du MSI.
+Plugins dropped alongside are installed from the Plugins dialog (the "Add a
+plugin…" button, « Ajouter un plugin… »), pointing to `/usr/lib/Kroki Desk/example-plugins/`. The
+update rules are those of the MSI.
 
-### Associations de fichiers
+### File associations
 
-Kroki Desk s'ajoute à « Ouvrir avec » pour `.md` `.markdown` `.mdown` `.mkd`
-`.html` `.htm` et pour les formats des plugins installés qui ont un type MIME
-standard (`.tex` `.latex`), sans déloger vos applications par défaut. Pour
-`.kdws`, `.kdext` et les formats propres à un plugin installé, il est le seul
-candidat déclaré : le double-clic l'ouvre directement. Rien n'est imposé —
-sous Linux, l'application par défaut est un choix utilisateur
-(`~/.config/mimeapps.list`) qu'un paquet n'a pas à écrire.
+Kroki Desk is added to "Open with" for `.md` `.markdown` `.mdown` `.mkd`
+`.html` `.htm` and for the formats of installed plugins that have a
+standard MIME type (`.tex` `.latex`), without displacing your default applications. For
+`.kdws`, `.kdext` and the formats specific to an installed plugin, it is the only
+declared candidate: double-clicking opens it directly. Nothing is forced —
+on Linux, the default application is a user choice
+(`~/.config/mimeapps.list`) that a package should not write.
 
-Deux différences avec le MSI, assumées :
+Two differences from the MSI, by design:
 
-- **`.txt` n'est pas associé.** Linux n'a pas d'association par extension :
-  `.txt` *est* `text/plain`, et le déclarer ferait apparaître Kroki Desk dans le
-  « Ouvrir avec » de tout fichier texte (`.py`, `.conf`, `.log`…), qu'il ne sait
-  pas ouvrir. Un `.txt` reste ouvrable par glisser-déposer ou par le sélecteur
-  de l'application.
-- **Les formats d'un plugin non installé ne sont pas associés** (`.csv` avec la
-  stratégie par défaut) : le plugin qui les lit n'est pas là.
+- **`.txt` is not associated.** Linux has no per-extension association:
+  `.txt` *is* `text/plain`, and declaring it would make Kroki Desk appear in the
+  "Open with" of every text file (`.py`, `.conf`, `.log`…), which it cannot
+  open. A `.txt` can still be opened by drag-and-drop or through the application's
+  file picker.
+- **The formats of a plugin that is not installed are not associated** (`.csv` with the
+  default strategy): the plugin that reads them is not there.

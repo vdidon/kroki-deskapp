@@ -1,898 +1,862 @@
 # Changelog
 
-Toutes les modifications notables de Kroki Desk sont consignées dans ce fichier.
+All notable changes to Kroki Desk are recorded in this file.
 
-Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/)
-et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [3.24.0] — 2026-10-16
 
-### Ajouté
-- **Double-clic sur les formats des plugins installés par le MSI.** Les
-  extensions d'un plugin coché à l'installation ouvrent désormais Kroki Desk
-  par défaut (`.tex`, `.latex`, `.csv`…), au lieu de n'apparaître que dans
-  « Ouvrir avec ». Un format pour lequel vous avez déjà choisi une autre
-  application la conserve.
-- **Sélection des plugins embarqués configurable au build.** Les plugins
-  livrés avec le MSI et le paquet `.deb`, et ceux cochés par défaut, sont
-  décrits par un simple fichier texte (`bundled-plugins.default.txt`,
-  surchargé localement par `bundled-plugins.txt`) ; noms et extensions sont
-  lus dans les manifestes des plugins.
+### Added
+- **Double-click on the formats of plugins installed by the MSI.** The
+  extensions of a plugin ticked during installation now open Kroki Desk by
+  default (`.tex`, `.latex`, `.csv`…), instead of only showing up under
+  "Open with". A format for which you have already chosen another application
+  keeps that choice.
+- **Bundled plugin selection configurable at build time.** The plugins
+  shipped with the MSI and the `.deb` package, and those ticked by default,
+  are described by a simple text file (`bundled-plugins.default.txt`,
+  overridden locally by `bundled-plugins.txt`); names and extensions are read
+  from the plugin manifests.
 
-### Modifié
-- **Réglages déplacés dans `%APPDATA%\kroki-deskapp\settings.json`**
-  (Linux : `~/.config/kroki-deskapp/`), à côté des plugins. Les réglages d'une
-  version précédente ne sont pas repris : thème, icônes et serveur Kroki sont
-  à refaire une fois, et un plugin supprimé auparavant peut être réinstallé
-  au premier lancement.
-- Identifiant de l'application et éditeur affiché par l'installeur renommés.
+### Changed
+- **Settings moved to `%APPDATA%\kroki-deskapp\settings.json`**
+  (Linux: `~/.config/kroki-deskapp/`), next to the plugins. Settings from a
+  previous version are not carried over: theme, icons and Kroki server have to
+  be set again once, and a plugin removed earlier may be reinstalled on first
+  launch.
+- Application identifier and publisher shown by the installer renamed.
 
 ## [3.23.1] — 2026-10-14
 
-### Corrigé
-- **Icône blanche sur l'épingle de la barre des tâches après une mise à jour
-  par le MSI.** Le raccourci du menu Démarrer prenait son icône dans le cache
-  de Windows Installer, dossier propre à chaque version et supprimé à la mise à
-  jour suivante ; l'épingle, copie figée du raccourci, se retrouvait sans
-  icône. Le raccourci la lit désormais dans l'exécutable. Une épingle déjà
-  abîmée est à refaire une fois (désépingler, puis réépingler).
+### Fixed
+- **White icon on the taskbar pin after an update through the MSI.** The Start
+  menu shortcut took its icon from the Windows Installer cache, a folder
+  specific to each version and deleted at the next update; the pin, a frozen
+  copy of the shortcut, ended up with no icon. The shortcut now reads it from
+  the executable. A pin that is already damaged has to be redone once (unpin,
+  then pin again).
 
 ## [3.23.0] — 2026-10-12
 
-### Ajouté
-- **Option `-d` (`--detach`) en ligne de commande.** `kroki_deskapp -d
-  "doc.md"` lance l'application détachée du terminal et rend la main
-  immédiatement : depuis bash (Git Bash, Linux), le terminal n'attend plus la
-  fermeture de l'application, et la fermer n'emporte plus l'application.
+### Added
+- **`-d` (`--detach`) command-line option.** `kroki_deskapp -d "doc.md"`
+  launches the application detached from the terminal and returns
+  immediately: from bash (Git Bash, Linux), the terminal no longer waits for
+  the application to close, and closing the terminal no longer takes the
+  application down with it.
 
 ## [3.22.0] — 2026-10-05
 
-### Ajouté
-- **Repères des occurrences sur la barre de défilement.** Pendant une
-  recherche dans le document (`Ctrl+F`), un trait marque chaque occurrence
-  sur la barre de défilement, à sa hauteur dans le document — l'occurrence
-  courante en orange. On voit d'un coup d'œil où se concentrent les résultats.
-  Les repères suivent le redimensionnement, les zooms et les figures qui
-  finissent de s'afficher ; la barre reste saisissable au travers.
+### Added
+- **Match markers on the scrollbar.** During an in-document search
+  (`Ctrl+F`), a tick marks each match on the scrollbar, at its height in the
+  document — the current match in orange. You can see at a glance where the
+  results are concentrated. The markers follow window resizing, zooms and
+  figures that finish rendering; the scrollbar remains grabbable through them.
 
-### Corrigé
-- **Chaque document garde sa propre occurrence courante.** Atteindre
-  l'occurrence 3 dans un onglet puis passer à un autre ne place plus ce
-  dernier à l'occurrence 3 : chaque document reprend celle qu'on y avait
-  atteinte (tant que la requête n'a pas changé), ou la première.
-- **Le contenu replié n'est plus compté dans la recherche.** Les occurrences
-  situées dans un accordéon fermé (sources repliées,
-  sections dépliables d'un plugin…) étaient comptées et la navigation y sautait sans rien montrer.
-  Elles sont désormais ignorées par les trois recherches ; ouvrir ou fermer un
-  accordéon met le compteur à jour en restant sur l'occurrence courante.
+### Fixed
+- **Each document keeps its own current match.** Reaching match 3 in one tab
+  and then switching to another no longer puts the latter on match 3: each
+  document resumes the match you had reached in it (as long as the query has
+  not changed), or the first one.
+- **Collapsed content is no longer counted in the search.** Matches located
+  inside a closed accordion (collapsed sources, a plugin's expandable
+  sections…) were counted and navigation jumped to them without showing
+  anything. They are now ignored by all three searches; opening or closing an
+  accordion updates the counter while staying on the current match.
 
 ## [3.21.0] — 2026-09-25
 
-### Ajouté
-- **Détacher un onglet depuis son menu contextuel.** Le clic droit sur un
-  onglet propose « Détacher dans une nouvelle fenêtre » : le document s'ouvre
-  dans une fenêtre de même taille, décalée par rapport à la fenêtre d'origine —
-  le même résultat qu'en tirant l'onglet hors de la barre, sans avoir à le
-  faire glisser. L'entrée est désactivée sur le seul onglet d'une fenêtre.
+### Added
+- **Detach a tab from its context menu.** Right-clicking a tab offers
+  "Detach into a new window" (« Détacher dans une nouvelle fenêtre »): the
+  document opens in a window of the same size, offset from the original
+  window — the same result as dragging the tab out of the bar, without having
+  to drag it. The entry is disabled on a window's only tab.
 
 ## [3.20.0] — 2026-09-24
 
-### Ajouté
-- **Liens vers une ligne : `fichier.md#L75`.** Un lien dont le fragment est un
-  numéro de ligne, à la manière de GitHub et VS Code (`#L75`, ou une plage
-  `#L75-L80` dont seul le début compte), ouvre le document et amène cette ligne
-  du source en haut de la vue — dans le même document comme vers un autre, en
-  preview comme en vue code source, y compris pour les documents transformés
-  par un plugin (`.tex`…), où le numéro désigne la ligne du fichier
-  d'origine. Jusqu'ici, le document s'ouvrait mais restait en haut. Si le
-  document porte réellement un élément d'identifiant `L75`, c'est lui qui prime.
-- **Ouvrir un document à une référence depuis la ligne de commande.**
-  `kroki_deskapp.exe "modele.tex#eq:sigmaU"` ouvre le document et défile
-  jusqu'à la référence, avec la même syntaxe que les liens : `\label` LaTeX,
-  section numérotée (`#sec-2-1`), ancre posée par un plugin, titre markdown ou
-  numéro de ligne (`#L42`). Fonctionne que l'application soit déjà ouverte ou
-  non — c'est ce qui permet à un agent de montrer directement le passage dont
-  il parle. Un nom de fichier contenant lui-même `#` reste ouvrable tel quel.
-- **Installeur : l'application se lance par son nom.** Le MSI l'enregistre
-  dans *App Paths* : `start kroki_deskapp …`, `Start-Process kroki_deskapp …`
-  et Win+R `kroki_deskapp` fonctionnent sans connaître son dossier
-  d'installation ni la mettre dans le PATH.
+### Added
+- **Links to a line: `fichier.md#L75`.** A link whose fragment is a line
+  number, in the style of GitHub and VS Code (`#L75`, or a range `#L75-L80`
+  of which only the start counts), opens the document and brings that source
+  line to the top of the view — within the same document or to another one,
+  in preview as in source view, including for documents transformed by a
+  plugin (`.tex`…), where the number designates the line of the original
+  file. Until now, the document opened but stayed at the top. If the
+  document actually contains an element with the identifier `L75`, that
+  element takes precedence.
+- **Open a document at a reference from the command line.**
+  `kroki_deskapp.exe "modele.tex#eq:sigmaU"` opens the document and scrolls
+  to the reference, with the same syntax as links: LaTeX `\label`, numbered
+  section (`#sec-2-1`), anchor set by a plugin, markdown heading or line
+  number (`#L42`). Works whether or not the application is already open —
+  which lets an agent directly show the passage it is talking about. A file
+  name that itself contains `#` can still be opened as is.
+- **Installer: the application launches by name.** The MSI registers it in
+  *App Paths*: `start kroki_deskapp …`, `Start-Process kroki_deskapp …` and
+  Win+R `kroki_deskapp` work without knowing its installation folder or
+  adding it to the PATH.
 
 ## [3.19.0] — 2026-09-17
 
-### Ajouté
-- **Menu contextuel sur les onglets.** Un clic droit sur un onglet propose
-  « Copier le chemin » (chemin complet du fichier), « Afficher dans
-  l'explorateur de fichiers » (ouvre le dossier, fichier sélectionné),
-  « Fermer les onglets à gauche », « Fermer les onglets à droite » et
-  « Fermer les autres onglets ». L'onglet cliqué reste ouvert et devient
-  l'onglet actif si celui qui l'était a été fermé. Les entrées sans objet
-  (premier onglet, dernier onglet, onglet seul) sont grisées.
+### Added
+- **Context menu on tabs.** Right-clicking a tab offers "Copy path" (« Copier
+  le chemin »; full path of the file), "Show in file explorer" (« Afficher
+  dans l'explorateur de fichiers »; opens the folder with the file selected),
+  "Close tabs to the left" (« Fermer les onglets à gauche »), "Close tabs to
+  the right" (« Fermer les onglets à droite ») and "Close other tabs"
+  (« Fermer les autres onglets »). The clicked tab stays open and becomes the
+  active tab if the previously active one was closed. Entries that do not
+  apply (first tab, last tab, single tab) are greyed out.
 
 ## [3.18.1] — 2026-09-16
 
-### Corrigé
-- **Sommaire et liens internes atterrissent de nouveau sur leur cible.** Sur un
-  gros document, un clic dans le sommaire pouvait s'arrêter plusieurs sections
-  avant la cible et y rester : les blocs encore jamais affichés n'avaient
-  qu'une hauteur estimée, et le recalage censé rattraper l'écart après coup
-  abandonnait parfois en chemin. La mise en page paresseuse introduite en
-  3.14.1 est retirée : tout le document est mis en page à l'ouverture, les
-  sauts (sommaire, liens `#ancre`, liens vers un autre document, synchro
-  preview ↔ code source) visent donc des positions exactes du premier coup.
+### Fixed
+- **Table of contents and internal links land on their target again.** On a
+  large document, a click in the table of contents could stop several sections
+  short of the target and stay there: blocks never displayed yet only had an
+  estimated height, and the readjustment meant to make up for the gap
+  afterwards sometimes gave up along the way. The lazy layout introduced in
+  3.14.1 is removed: the whole document is laid out on opening, so jumps
+  (table of contents, `#anchor` links, links to another document, preview ↔
+  source view sync) now aim at exact positions on the first try.
 
 ### Notes
-- Contrepartie assumée : l'ouverture d'un très gros document mathématique
-  retrouve son temps d'avant la 3.14.1 (de l'ordre de 1,4 s au lieu de ~0,6 s
-  pour 100 Ko de source et près d'un millier de formules). Le voile de
-  chargement couvre cette attente. Les bascules preview ↔ code source restent
-  rapides : le DOM de chaque vue est toujours conservé.
+- Accepted trade-off: opening a very large math document goes back to its
+  pre-3.14.1 time (around 1.4 s instead of ~0.6 s for 100 KB of source and
+  nearly a thousand formulas). The loading overlay covers this wait. Switching
+  between preview and source view stays fast: each view's DOM is still kept.
 
 ## [3.18.0] — 2026-09-16
 
-### Ajouté
-- **Figures TikZ dessinées, si une distribution TeX est installée.** Un bloc
-  ` ```tikz ` (document LaTeX complet, comme l'attend Kroki, ou simple
-  `tikzpicture`) est désormais rendu en local par la distribution du poste —
-  MiKTeX ou TeX Live, `latex` et `dvisvgm` sur le PATH — au lieu d'exiger un
-  serveur Kroki externe. Même logique que Java pour PlantUML : rien n'est
-  embarqué, la détection est faite une fois, et le dialog « Informations »
-  affiche un nouveau groupe « Moteur TeX ». Le texte est converti en tracés :
-  le SVG ne dépend d'aucune police. Environ 1 à 2 s par figure, mises en cache.
-  C'est ce qui permet au plugin `latex-doc` 1.4.0 de dessiner les
-  `tikzpicture` des documents `.tex`.
-- La compilation se fait dans un dossier temporaire, sans `\write18`, avec un
-  délai maximal de 60 s, et sans installation automatique de paquets sous
-  MiKTeX (sa fenêtre s'ouvrirait en plein rendu) : un paquet manquant donne un
-  message d'erreur qui le nomme. Une erreur TeX est rapportée avec sa ligne.
+### Added
+- **TikZ figures drawn, if a TeX distribution is installed.** A ` ```tikz `
+  block (full LaTeX document, as Kroki expects it, or a bare `tikzpicture`) is
+  now rendered locally by the workstation's distribution — MiKTeX or TeX
+  Live, with `latex` and `dvisvgm` on the PATH — instead of requiring an
+  external Kroki server. Same approach as Java for PlantUML: nothing is
+  bundled, detection is done once, and the "Information" dialog
+  (« Informations ») shows a new "TeX engine" (« Moteur TeX ») group. Text is
+  converted to outlines: the SVG does not depend on any font. About 1 to 2 s
+  per figure, cached. This is what lets the `latex-doc` plugin 1.4.0 draw the
+  `tikzpicture`s of `.tex` documents.
+- Compilation runs in a temporary folder, without `\write18`, with a maximum
+  delay of 60 s, and without automatic package installation under MiKTeX (its
+  window would pop up mid-render): a missing package yields an error message
+  that names it. A TeX error is reported with its line.
 
 ## [3.17.1] — 2026-09-07
 
-### Modifié
-- **Une session `.kdws` s'ouvre toujours dans au moins une fenêtre neuve.**
-  Jusqu'ici sa première fenêtre se greffait sur la fenêtre cible — celle du
-  drop, ou la première fenêtre ouverte pour un double-clic quand l'application
-  tournait déjà : les onglets de la session venaient se mêler au travail en
-  cours, sans moyen de les en distinguer. La fenêtre cible n'est désormais
-  reprise que si elle est encore vide (démarrage sur un `.kdws`, fenêtre
-  « déposer un fichier ») ; dès qu'elle contient un onglet, la session s'ouvre
-  à côté. Le focus et le rapport d'ouverture suivent la première fenêtre de la
-  session.
+### Changed
+- **A `.kdws` session now always opens in at least one new window.** Until
+  now its first window was grafted onto the target window — the one of the
+  drop, or the first window opened for a double-click when the application
+  was already running: the session's tabs ended up mixed with the work in
+  progress, with no way to tell them apart. The target window is now reused
+  only if it is still empty (startup on a `.kdws`, "drop a file" window
+  (« déposer un fichier »)); as soon as it contains a tab, the session opens
+  next to it. Focus and the opening report follow the session's first window.
 
 ## [3.17.0] — 2026-09-03
 
-### Ajouté
-- **Zoom de page à la molette (`Maj+molette`).** Le zoom existant
-  (`Ctrl+molette`) est un zoom *texte* : il grossit les caractères et reflue
-  la colonne, mais une figure qui occupe déjà toute la largeur garde
-  exactement sa taille — impossible de s'approcher d'un diagramme trop dense
-  pour être lu en un écran. `Maj+molette` ajoute un vrai zoom de page : rien
-  ne reflue, tout grossit — texte, figures, tableaux — et la page déborde en
-  défilement horizontal, ce qui permet d'en parcourir une sous-partie. Le
-  zoom se fait autour du curseur (le point survolé reste en place), de 1 à 8.
-  Les deux zooms se composent ; `Ctrl+0` les remet tous deux à 1. La
-  recherche `Ctrl+F` centre désormais aussi horizontalement une occurrence
-  hors champ.
+### Added
+- **Page zoom with the wheel (`Shift+wheel`).** The existing zoom
+  (`Ctrl+wheel`) is a *text* zoom: it enlarges characters and reflows the
+  column, but a figure that already spans the full width keeps exactly its
+  size — impossible to get close to a diagram too dense to be read on one
+  screen. `Shift+wheel` adds a true page zoom: nothing reflows, everything
+  grows — text, figures, tables — and the page overflows into horizontal
+  scrolling, which lets you browse a sub-part of it. Zooming is centered on
+  the cursor (the hovered point stays in place), from 1 to 8. The two zooms
+  combine; `Ctrl+0` resets both to 1. The `Ctrl+F` search now also centers an
+  off-screen match horizontally.
 
 ## [3.16.0] — 2026-08-28
 
-### Ajouté
-- **Installeur Windows (`.msi`) avec associations de fichiers.** L'application
-  se distribuait jusqu'ici en exécutable unique à copier ; il fallait associer
-  les types de fichiers à la main pour ouvrir un document par double-clic. Un
-  installeur MSI s'ajoute désormais au binaire portable — qui reste produit et
-  distribué tel quel. Il pose l'application dans `Program Files`, l'inscrit dans
-  « Applications installées » (désinstallation propre, mise à jour en place
-  d'une version à l'autre) et associe les types de fichiers.
+### Added
+- **Windows installer (`.msi`) with file associations.** The application used
+  to be distributed as a single executable to copy; file types had to be
+  associated by hand to open a document by double-click. An MSI installer is
+  now added alongside the portable binary — which is still produced and
+  distributed as is. It places the application in `Program Files`, registers
+  it under "Installed apps" (clean uninstall, in-place update from one version
+  to the next) and associates the file types.
 
-  Rien n'est imposé pour autant : Kroki Desk **s'ajoute** à « Ouvrir avec »
-  pour tout ce qu'il sait lire — `.md`, `.markdown`, `.mdown`, `.mkd`, `.txt`,
-  `.html`, `.htm` — sans remplacer l'application par défaut. Le double-clic
-  direct n'est réclamé que pour les formats qui lui appartiennent : `.kdws`
-  (sessions) et `.kdext` (plugins), ainsi que ceux des plugins installés. Pour
-  les autres, ce serait de toute façon sans effet : Windows protège le choix de
-  l'utilisateur et ne déloge jamais un format déjà attribué — le réclamer ne
-  ferait qu'écraser une valeur système que la désinstallation ne rétablirait
-  pas.
-- **Double-clic sur une archive `.kdext` : installation du plugin.** Corollaire
-  de l'association ci-dessus. Une archive de plugin n'est pas un document ;
-  ouverte depuis l'Explorateur, la ligne de commande ou une seconde instance,
-  elle part désormais vers le flux d'installation — dialog de confiance compris,
-  exactement comme un glisser-déposer sur la fenêtre. Elle s'affichait sinon
-  comme un onglet de contenu binaire.
-- **Tous les plugins livrés avec l'installeur, au choix.** Le MSI embarque les
-  archives de l'intégralité des plugins du dépôt et une page de l'installeur
-  laisse cocher ceux à installer : `latex-doc` (`.tex`, `.latex`) l'est
-  d'emblée, les trois exemples de la spécification du
-  protocole — `csv-tables` (`.csv`), `barchart`, `ini-highlight` — sont
-  disponibles décochés. L'application installe les plugins retenus
-  silencieusement à son premier lancement : associer `.tex` sans
-  fournir le plugin correspondant n'aurait donné qu'un rendu dégradé.
+  Nothing is forced, though: Kroki Desk **adds itself** to "Open with" for
+  everything it can read — `.md`, `.markdown`, `.mdown`, `.mkd`, `.txt`,
+  `.html`, `.htm` — without replacing the default application. Direct
+  double-click is only claimed for the formats that belong to it: `.kdws`
+  (sessions) and `.kdext` (plugins), as well as those of installed plugins.
+  For the others, it would have no effect anyway: Windows protects the user's
+  choice and never dislodges a format that is already assigned — claiming it
+  would only overwrite a system value that uninstalling would not restore.
+- **Double-click on a `.kdext` archive: plugin installation.** A corollary of
+  the association above. A plugin archive is not a document; opened from File
+  Explorer, the command line or a second instance, it now goes to the
+  installation flow — trust dialog included, exactly like a drag-and-drop onto
+  the window. It used to show up as a tab with binary content.
+- **All plugins shipped with the installer, your choice.** The MSI bundles the
+  archives of all the plugins in the repository and an installer page lets you
+  tick the ones to install: `latex-doc` (`.tex`, `.latex`) is ticked from the
+  start, while the three examples from the protocol specification —
+  `csv-tables` (`.csv`), `barchart`, `ini-highlight` — are available unticked.
+  The application silently installs the selected plugins on its first launch:
+  associating `.tex` without providing the matching plugin would only have
+  given a degraded rendering.
 
-  **Cette sélection commande aussi les associations** : `.tex` et `.latex` ne
-  sont associés qu'avec `latex-doc`,
-  `.csv` qu'avec `csv-tables` — associer un format dont le plugin est absent
-  n'aurait donné qu'un onglet en erreur.
+  **This selection also drives the associations**: `.tex` and `.latex` are
+  only associated with `latex-doc`, and `.csv` only with `csv-tables` —
+  associating a format whose plugin is absent would only have given a tab in
+  error.
 
-  Les plugins retenus sont ensuite **maintenus à jour** — installer une version
-  plus récente de Kroki Desk met à jour ceux qu'elle apporte, sans rien
-  demander. Trois garde-fous : une version plus récente installée à la main
-  n'est jamais ramenée en arrière ; un plugin supprimé depuis le dialog Plugins
-  n'est **pas** réinstallé au démarrage suivant ; et le réinstaller à la main le
-  remet dans le circuit des mises à jour automatiques. Décocher un plugin dans
-  l'installeur ne désinstalle pas celui qui serait déjà en place — la
-  suppression se fait depuis l'application. C'est la seule voie d'installation
-  qui se dispense du dialog de confiance : ces archives viennent du même
-  installeur que l'exécutable, donc de la même chaîne de confiance. Le
-  glisser-déposer et le dialog Plugins, eux, le conservent.
-- **Paquet Debian/Ubuntu (`.deb`).** Pendant Linux de l'installeur Windows,
-  aux côtés du binaire nu et de l'AppImage qui restent produits tels quels. Il
-  s'installe par `sudo apt install ./kroki_deskapp-linux-x86_64-debian12.deb`,
-  place l'application au menu, associe les types de fichiers et se désinstalle
-  par `sudo apt remove kroki-desk`. Debian 12 et Ubuntu 24.04 ou plus récent.
+  The selected plugins are then **kept up to date** — installing a newer
+  version of Kroki Desk updates the ones it ships, without asking anything.
+  Three safeguards: a newer version installed by hand is never rolled back; a
+  plugin removed from the Plugins dialog is **not** reinstalled at the next
+  startup; and reinstalling it by hand puts it back into the automatic update
+  loop. Unticking a plugin in the installer does not uninstall one that is
+  already in place — removal is done from the application. This is the only
+  installation route that skips the trust dialog: these archives come from the
+  same installer as the executable, hence the same chain of trust.
+  Drag-and-drop and the Plugins dialog, on the other hand, keep it.
+- **Debian/Ubuntu package (`.deb`).** The Linux counterpart of the Windows
+  installer, alongside the bare binary and the AppImage, which are still
+  produced as is. It installs with
+  `sudo apt install ./kroki_deskapp-linux-x86_64-debian12.deb`, adds the
+  application to the menu, associates the file types and uninstalls with
+  `sudo apt remove kroki-desk`. Debian 12 and Ubuntu 24.04 or newer.
 
-  Les mêmes plugins sont livrés, avec la même sélection par défaut —
-  `latex-doc` installé au premier lancement, les trois
-  exemples de la spécification simplement déposés dans
-  `/usr/lib/Kroki Desk/example-plugins/`, installables ensuite depuis le dialog
-  Plugins sans réseau. Un paquet Debian n'a pas d'interface pour poser la
-  question à l'installation ; le choix se fait donc après, pas pendant.
+  The same plugins are shipped, with the same default selection —
+  `latex-doc` installed on first launch, the three specification examples
+  simply dropped into `/usr/lib/Kroki Desk/example-plugins/`, which can then
+  be installed from the Plugins dialog without a network. A Debian package has
+  no interface to ask the question at install time; the choice is therefore
+  made afterwards, not during.
 
-  Les associations suivent l'esprit de la version Windows : Kroki Desk
-  **s'ajoute** à « Ouvrir avec » pour `.md`, `.markdown`, `.mdown`, `.mkd`,
-  `.html`, `.htm`, `.tex` et `.latex` sans déloger vos applications par défaut,
-  et le double-clic direct fonctionne pour `.kdws` et `.kdext`,
-  dont il est le seul gestionnaire déclaré. Rien n'est imposé : sous Linux,
-  l'application par défaut reste un réglage de l'utilisateur. Une seule
-  différence assumée, `.txt` n'est pas associé — le système n'y distingue pas
-  les extensions, et le réclamer aurait fait apparaître Kroki Desk pour tout
-  fichier texte, y compris ceux qu'il ne sait pas ouvrir.
+  The associations follow the spirit of the Windows version: Kroki Desk
+  **adds itself** to "Open with" for `.md`, `.markdown`, `.mdown`, `.mkd`,
+  `.html`, `.htm`, `.tex` and `.latex` without dislodging your default
+  applications, and direct double-click works for `.kdws` and `.kdext`, of
+  which it is the only declared handler. Nothing is forced: on Linux, the
+  default application remains a user setting. One deliberate difference:
+  `.txt` is not associated — the system does not distinguish extensions
+  there, and claiming it would have made Kroki Desk show up for every text
+  file, including those it cannot open.
 
 ## [3.15.1] — 2026-08-25
 
-### Corrigé
-- **`diagramsnet` manquait à l'inventaire des moteurs du dialog « Informations ».**
-  Le type était accepté dans une fence — l'écriture ` ```diagramsnet ` produisait
-  bien un bloc de diagramme — mais il n'apparaissait dans aucun des quatre groupes
-  de runtimes : ni parmi les moteurs intégrés, ni parmi ceux qui réclament un
-  serveur Kroki externe. Qui cherchait s'il pouvait dessiner du draw.io ne
-  trouvait donc rien, et n'apprenait la réponse qu'en voyant échouer le rendu. Il
-  est désormais listé là où il appartient, avec les onze autres types reconnus par
-  Kroki mais non embarqués. Aucun changement de rendu : le comportement était
-  correct, c'est l'inventaire affiché qui était incomplet.
+### Fixed
+- **`diagramsnet` was missing from the engine inventory of the "Information" dialog (« Informations »).**
+  The type was accepted in a fence — writing ` ```diagramsnet ` did produce a
+  diagram block — but it appeared in none of the four runtime groups: neither
+  among the built-in engines nor among those that require an external Kroki
+  server. Anyone checking whether draw.io could be drawn found nothing, and
+  only learned the answer by watching the rendering fail. It is now listed
+  where it belongs, along with the eleven other types recognized by Kroki but
+  not bundled. No change to rendering: the behavior was correct, it was the
+  displayed inventory that was incomplete.
 
 ## [3.15.0] — 2026-08-24
 
-### Ajouté
-- **L'écran d'accueil liste tous les raccourcis clavier.** Il n'en montrait que
-  trois sur la quinzaine que l'application reconnaît ; les autres n'étaient
-  découvrables qu'en survolant un bouton de barre d'outils — ou pas du tout pour
-  ceux qui n'ont pas de bouton (`Ctrl+Tab`, `F3`, zoom, `F5`). Ils sont désormais
-  groupés par catégorie — fichiers et fenêtres, recherche, affichage — sous la
-  zone de dépôt, avec les gestes souris équivalents (`Ctrl`+molette, clic molette
-  sur un onglet, détachement par glisser).
+### Added
+- **The welcome screen lists all keyboard shortcuts.** It only showed three of
+  the fifteen or so that the application recognizes; the others could only be
+  discovered by hovering over a toolbar button — or not at all for those that
+  have no button (`Ctrl+Tab`, `F3`, zoom, `F5`). They are now grouped by
+  category — files and windows, search, display — under the drop zone, with
+  the equivalent mouse gestures (`Ctrl`+wheel, middle-click on a tab, detach
+  by dragging).
 
 ## [3.14.2] — 2026-08-21
 
-### Modifié
-- **Les bascules preview ↔ code source ↔ markdown intermédiaire sont
-  instantanées.** Chaque retour en preview reconstruisait le document de zéro —
-  markdown-it, KaTeX, DOMPurify puis des dizaines de milliers de nœuds — pour
-  réafficher exactement le même contenu. Le rendu de chaque vue est désormais
-  conservé et simplement réaffiché : sur un document de 100 Ko, le retour en
-  preview passe de **~500 ms à ~80 ms**. Les diagrammes déjà rendus le restent,
-  au lieu d'être recalculés.
-- **La position de lecture est mieux tenue lors d'une bascule.** Conséquence du
-  point précédent : la vue retrouve les hauteurs qu'elle avait déjà mesurées,
-  là où une vue reconstruite repartait d'estimations. La dérive signalée en
-  3.14.1 tombe de ~780 px à quelques dizaines de pixels dès le deuxième
-  aller-retour.
+### Changed
+- **Switching between preview ↔ source view ↔ intermediate markdown is
+  instant.** Every return to preview rebuilt the document from scratch —
+  markdown-it, KaTeX, DOMPurify, then tens of thousands of nodes — to
+  redisplay exactly the same content. Each view's rendering is now kept and
+  simply redisplayed: on a 100 KB document, returning to preview goes from
+  **~500 ms to ~80 ms**. Diagrams that were already rendered stay rendered,
+  instead of being recomputed.
+- **The reading position is better preserved when switching.** A consequence
+  of the previous point: the view recovers the heights it had already
+  measured, whereas a rebuilt view started again from estimates. The drift
+  reported in 3.14.1 drops from ~780 px to a few tens of pixels from the
+  second round trip onward.
 
 ### Notes
-- Le rendu conservé est abandonné dès que le document change — modification sur
-  disque, changement de thème ou d'icônes, rafraîchissement manuel — de sorte
-  qu'aucune vue ne peut afficher un contenu périmé.
+- The kept rendering is discarded as soon as the document changes — change on
+  disk, theme or icon change, manual refresh — so that no view can display
+  stale content.
 
 ## [3.14.1] — 2026-08-21
 
-### Modifié
-- **Mise en page paresseuse des documents volumineux : ouverture ~2× plus
-  rapide.** Les blocs situés hors de l'écran ne sont plus mis en page tant
-  qu'ils n'en approchent pas. Sur un document mathématique, les formules pèsent
-  96 % des nœuds — 52 000 sur 54 000 pour 100 Ko de source — alors que quelques
-  dizaines de blocs seulement sont visibles à un instant donné. Le même
-  document de 100 Ko s'ouvre en ~630 ms contre ~1 400 ms, soit 1 870 ms avant
-  les optimisations de cette série.
-  Le contenu reste entier dans la page : la recherche dans le document, la
-  recherche multi-documents, le sommaire et les liens internes retrouvent
-  exactement les mêmes résultats qu'avant, et l'impression met en page le
-  document entier. Les sauts de défilement se recalent une fois les blocs
-  traversés réellement mis en page — un lien interne ou une entrée de sommaire
-  atterrit au pixel près, comme avant.
+### Changed
+- **Lazy layout of large documents: opening ~2× faster.** Blocks located
+  off-screen are no longer laid out until they get close to it. In a math
+  document, formulas account for 96% of the nodes — 52,000 out of 54,000 for
+  100 KB of source — while only a few dozen blocks are visible at any given
+  time. The same 100 KB document opens in ~630 ms versus ~1,400 ms, i.e.
+  1,870 ms before this series' optimizations.
+  The content stays whole in the page: in-document search, multi-document
+  search, the table of contents and internal links find exactly the same
+  results as before, and printing lays out the entire document. Scroll jumps
+  are readjusted once the blocks crossed have actually been laid out — an
+  internal link or a table-of-contents entry lands pixel-perfect, as before.
 
 ### Notes
-- La synchro preview ↔ code source peut, sur un très gros document, revenir
-  quelques centaines de pixels à côté de sa position de départ après un
-  aller-retour : la bascule reconstruit la vue, qui perd les hauteurs déjà
-  mesurées. Sans effet sur la lecture, mais perceptible.
+- Preview ↔ source view sync can, on a very large document, come back a few
+  hundred pixels away from its starting position after a round trip: the
+  switch rebuilds the view, which loses the heights already measured. No
+  effect on reading, but noticeable.
 
 ## [3.14.0] — 2026-08-21
 
-### Ajouté
-- **Voile de chargement pendant le rendu d'un document.** Un gros document
-  laissait l'onglet vide sans rien afficher : un spinner et « Rendu du
-  document… » couvrent désormais l'attente, à l'ouverture comme aux bascules
-  preview / code source / markdown intermédiaire. Il n'apparaît que si le rendu
-  dépasse ~180 ms, ou d'emblée si le document est assez volumineux pour que la
-  phase bloquante empêche ce délai de se déclencher. Le contenu déjà affiché
-  reste défilable dessous lors d'un rechargement sur modification disque, et
-  l'animation, portée par `transform`, continue de tourner pendant que le
-  thread principal est occupé.
+### Added
+- **Loading overlay while a document renders.** A large document used to
+  leave the tab empty with nothing displayed: a spinner and "Rendering
+  document…" (« Rendu du document… ») now cover the wait, on opening as well
+  as when switching between preview / source view / intermediate markdown. It
+  only appears if rendering exceeds ~180 ms, or right away if the document is
+  large enough that the blocking phase would prevent that delay from
+  triggering. The content already displayed stays scrollable underneath
+  during a reload caused by a change on disk, and the animation, driven by
+  `transform`, keeps spinning while the main thread is busy.
 
-### Modifié
-- **Le rendu des gros documents LaTeX est ~25 % plus rapide** (plugin
-  `latex-doc` 1.2.1) : la passe de collecte des définitions ne parse plus que
-  le préambule. Mesuré sur un document de 100 Ko, 933 formules — 1 870 ms →
-  1 400 ms.
+### Changed
+- **Rendering of large LaTeX documents is ~25% faster** (`latex-doc` plugin
+  1.2.1): the definition-collection pass now only parses the preamble.
+  Measured on a 100 KB document with 933 formulas — 1,870 ms → 1,400 ms.
 
 ## [3.13.0] — 2026-08-21
 
-### Ajouté
-- **Recherche dans le document (`Ctrl+F`), maison.** Une barre compacte
-  s'ouvre dans le coin haut-droit de la zone de lecture : champ, compteur
-  `n/m`, occurrence précédente / suivante et fermeture. Toutes les occurrences
-  sont surlignées, la courante dans une teinte contrastée. `Entrée` /
-  `Maj+Entrée` et `F3` / `Maj+F3` parcourent les résultats, `Échap` ferme. La
-  recherche porte sur ce qui est affiché : elle suit le mode courant (preview,
-  code source, markdown intermédiaire) et se recalcule à chaque bascule.
-- **Options `Aa` / `ab` / `.*` dans les deux recherches.** Collées à droite du
-  champ, à la manière d'un éditeur : respecter la casse, mot entier,
-  expression régulière. Un motif invalide passe le champ en rouge au lieu de
-  vider silencieusement les résultats.
-- **Bouton de fermeture** sur le panneau de recherche multi-documents
-  (`Ctrl+Maj+F`), à droite du champ.
+### Added
+- **In-document search (`Ctrl+F`), built in.** A compact bar opens in the
+  top-right corner of the reading area: field, `n/m` counter,
+  previous / next match and close. All matches are highlighted, the current
+  one in a contrasting shade. `Enter` / `Shift+Enter` and `F3` / `Shift+F3`
+  step through the results, `Esc` closes. The search applies to what is
+  displayed: it follows the current mode (preview, source view, intermediate
+  markdown) and is recomputed on each switch.
+- **`Aa` / `ab` / `.*` options in both searches.** Attached to the right of
+  the field, editor-style: match case, whole word, regular expression. An
+  invalid pattern turns the field red instead of silently emptying the
+  results.
+- **Close button** on the multi-document search panel (`Ctrl+Shift+F`), to the
+  right of the field.
 
-### Modifié
-- **La barre de recherche native de la webview est remplacée.** `Ctrl+F`, `F3`
-  et `Ctrl+G` ouvrent désormais la barre de l'application. L'ancien panneau
-  d'options (« Respecter la casse », « Mot entier », « Respecter les signes
-  diacritiques ») disparaît avec elle : hors thème, hors traduction et sans
-  rapport avec le modèle d'onglets de l'application.
+### Changed
+- **The webview's native search bar is replaced.** `Ctrl+F`, `F3` and `Ctrl+G`
+  now open the application's bar. The old options panel ("Match case"
+  (« Respecter la casse »), "Whole word" (« Mot entier »), "Match diacritics"
+  (« Respecter les signes diacritiques »)) goes away with it: unthemed,
+  untranslated and unrelated to the application's tab model.
 
 ### Notes
-- « Mot entier » reconnaît les lettres accentuées, le grec et le cyrillique
-  (`été`, `naïve` sont des mots entiers) là où le `\b` de JavaScript s'arrête à
-  l'ASCII.
-- Sommaire, recherche dans le document et recherche multi-documents partagent
-  la même ancre à l'écran : ouvrir l'un ferme les autres.
+- "Whole word" recognizes accented letters, Greek and Cyrillic (`été`, `naïve`
+  are whole words) where JavaScript's `\b` stops at ASCII.
+- Table of contents, in-document search and multi-document search share the
+  same anchor on screen: opening one closes the others.
 
 ## [3.12.0] — 2026-08-04
 
-### Ajouté
-- **Choix des icônes affichées, dans les Réglages.** Une section « Icônes
-  affichées » liste les icônes des deux barres — celles de la fenêtre (ouvrir,
-  session, recherche, rafraîchir, nouvelle fenêtre, informations) et celles du
-  document (sommaire, code source, markdown intermédiaire, pleine largeur,
-  export) — chacune avec son aperçu et sa case. Le réglage est commun à toutes
-  les fenêtres et persiste au redémarrage.
-- **Vue « markdown intermédiaire » disponible en release.** Le bouton qui
-  affiche le markdown généré par un plugin de document (`.tex`…)
-  n'est plus réservé aux builds debug : il s'active dans les Réglages,
-  et reste **désactivé par défaut**. Il n'apparaît que sur les documents
-  effectivement transformés par un plugin.
+### Added
+- **Choice of displayed icons, in the Settings (« Réglages »).** A "Displayed
+  icons" (« Icônes affichées ») section lists the icons of the two bars — the
+  window's (open, session, search, refresh, new window, information) and the
+  document's (table of contents, source view, intermediate markdown, full
+  width, export) — each with its preview and its checkbox. The setting is
+  shared by all windows and persists across restarts.
+- **"Intermediate markdown" view available in release builds.** The button
+  that shows the markdown generated by a document plugin (`.tex`…) is no
+  longer reserved for debug builds: it is enabled in the Settings, and stays
+  **disabled by default**. It only appears on documents actually transformed
+  by a plugin.
 
 ### Notes
-- Seules les icônes explicitement cochées ou décochées sont enregistrées ;
-  toutes les autres suivent leur défaut. Un défaut modifié dans une version
-  ultérieure s'appliquera donc aux icônes jamais touchées, sans écraser un
-  choix fait. « Réinitialiser » efface ces choix et rend la main aux défauts.
-- L'icône « Réglages » reste toujours visible : c'est le seul point d'accès à
-  ce dialogue.
-- Masquer une icône ne retire pas la fonction quand elle a un raccourci
-  (Ctrl+O, Ctrl+Maj+F, Ctrl+Maj+N, F5 restent actifs). Désactiver « Code
-  source », « Markdown intermédiaire » ou « Pleine largeur » ramène les vues
-  concernées à l'affichage normal, pour ne pas les laisser dans un état qu'on
-  ne pourrait plus quitter.
+- Only icons explicitly ticked or unticked are saved; all the others follow
+  their default. A default changed in a later version will therefore apply to
+  icons never touched, without overwriting a choice already made. "Reset"
+  (« Réinitialiser ») erases these choices and hands control back to the
+  defaults.
+- The "Settings" (« Réglages ») icon always remains visible: it is the only
+  access point to this dialog.
+- Hiding an icon does not remove the function when it has a shortcut (Ctrl+O,
+  Ctrl+Shift+F, Ctrl+Shift+N, F5 remain active). Disabling "Source view"
+  (« Code source »), "Intermediate markdown" (« Markdown intermédiaire ») or
+  "Full width" (« Pleine largeur ») brings the views concerned back to normal
+  display, so as not to leave them in a state that could no longer be exited.
 
 ## [3.11.1] — 2026-07-31
 
-### Corrigé
-- **Vue « code source » : marges parasites en haut et à gauche.** La vue
-  reprenait le retrait de lecture destiné au preview centré, et réservait dans
-  sa gouttière la place de cinq chiffres quel que soit le document. La première
-  ligne colle désormais au haut de la zone et la gouttière est dimensionnée sur
-  le nombre de lignes réel — les numéros et le code gagnent la largeur perdue
-  (écart d'autant plus visible sous zoom de page).
+### Fixed
+- **Source view (« Code source »): stray margins at the top and left.** The view inherited the reading indent meant for the centered
+  preview, and reserved room for five digits in its gutter whatever the
+  document. The first line now sits flush with the top of the area and the
+  gutter is sized to the actual number of lines — the numbers and the code
+  gain the width that was lost (all the more visible under page zoom).
 
 ## [3.11.0] — 2026-07-31
 
-### Ajouté
-- **Coloration syntaxique de la vue « code source »** : le bouton *code source*
-  n'affiche plus du texte gris uniforme. Le Markdown est coloré par la
-  grammaire embarquée dans l'application ; les formats servis par un plugin le
-  sont par le plugin lui-même — `.tex`/`.latex` pour latex-doc,
-  coloration ajoutée dans sa version 1.1.0. Un format sans grammaire reste en texte brut, comme avant.
-  L'alignement preview ↔ source, les numéros de ligne et le repli des lignes
-  sont inchangés : la coloration est peinte par-dessus les lignes déjà posées,
-  sans en modifier ni le nombre ni la hauteur.
-- La recherche (`Ctrl+Maj+F`) et le surlignage du mot sélectionné trouvent
-  désormais les occurrences **à cheval sur deux couleurs** dans la vue source
-  (elles auraient été perdues, la coloration coupant une ligne en plusieurs
-  fragments de texte).
+### Added
+- **Syntax highlighting of the source view (« Code source »)**:
+  the *source code* button no longer shows uniform grey text. Markdown is
+  colored by the grammar bundled in the application; formats served by a
+  plugin are colored by the plugin itself — `.tex`/`.latex` for latex-doc,
+  highlighting added in its version 1.1.0. A format without a grammar stays
+  in plain text, as before. Preview ↔ source alignment, line numbers and line
+  folding are unchanged: the highlighting is painted over the lines already
+  laid out, without changing either their number or their height.
+- Search (`Ctrl+Shift+F`) and highlighting of the selected word now find
+  matches **spanning two colors** in the source view (they would have been
+  lost, since highlighting splits a line into several text fragments).
 
 ## [3.10.1] — 2026-07-21
 
-### Corrigé
-- **La 2ᵉ ligne d'onglets exploite toute la largeur de la fenêtre** : elle
-  s'arrêtait au niveau des boutons d'action alors que ceux-ci n'occupent que
-  la première ligne. Seule la 1ʳᵉ ligne s'arrête désormais avant les boutons,
-  les onglets excédentaires passent dessous et disposent de la largeur
-  entière — la compression des titres intervient plus tard et tronque moins.
+### Fixed
+- **The 2nd row of tabs uses the full width of the window**: it stopped at the
+  level of the action buttons even though those only occupy the first row.
+  Only the 1st row now stops before the buttons, the extra tabs go underneath
+  and have the full width available — title compression kicks in later and
+  truncates less.
 
 ## [3.10.0] — 2026-07-21
 
-### Ajouté
-- **Barre d'onglets sur deux lignes quand la place manque** : au lieu de
-  compresser les titres dès que la première ligne est pleine, les onglets
-  suivants passent sur une deuxième ligne en gardant leur largeur naturelle
-  (les boutons d'action restent en haut à droite). La compression des titres
-  ne reprend que lorsque les deux lignes sont pleines, répartie uniformément
-  pour tenir sur exactement deux lignes. La barre revient d'elle-même sur
-  une ligne quand des onglets sont fermés ou la fenêtre élargie. Le
-  glisser-déposer d'onglets (réordonnancement, détachement) fonctionne sur
-  les deux lignes.
+### Added
+- **Two-row tab bar when space runs out**: instead of compressing titles as
+  soon as the first row is full, the following tabs wrap onto a second row
+  while keeping their natural width (the action buttons stay at the top
+  right). Title compression only resumes when both rows are full, spread
+  evenly to fit exactly two rows. The bar goes back to one row by itself when
+  tabs are closed or the window is widened. Tab drag-and-drop (reordering,
+  detaching) works on both rows.
 
 ## [3.9.1] — 2026-07-18
 
-### Corrigé
-- **Icône floue à certaines échelles d'affichage Windows** : l'icône de
-  l'application (barre des tâches, barre de titre, Alt-Tab, Explorateur)
-  pouvait apparaître floue aux échelles 125 %/150 %/200 %, Windows devant
-  redimensionner une taille voisine. Le fichier `.ico` embarque désormais
-  les 16 tailles de la grille DPI Windows (16 → 256 px, dont 20, 30, 36,
-  40, 60, 72, 96, 180), encodées en BMP pour une compatibilité maximale
-  avec le shell : chaque contexte trouve une correspondance exacte, sans
-  mise à l'échelle.
+### Fixed
+- **Blurry icon at some Windows display scales**: the application icon
+  (taskbar, title bar, Alt-Tab, File Explorer) could look blurry at 125% /
+  150% / 200% scales, because Windows had to resize a neighboring size. The
+  `.ico` file now embeds all 16 sizes of the Windows DPI grid (16 → 256 px,
+  including 20, 30, 36, 40, 60, 72, 96, 180), encoded as BMP for maximum
+  compatibility with the shell: each context finds an exact match, with no
+  scaling.
 
 ## [3.9.0] — 2026-07-15
 
-### Ajouté
-- **Ouverture des pages HTML statiques** (`.html`, `.htm`) — notamment les
-  exports HTML de l'application, qui se relisent désormais dans Kroki Desk.
-  Dialogue Ouvrir, drag-drop, ligne de commande, sessions `.kdws` et liens
-  relatifs des documents acceptent ces extensions. La page est affichée telle
-  quelle dans un onglet, via une iframe sandboxée (aucun script exécuté) ;
-  les actions de vue (source, sommaire, export, recherche globale) ne
-  s'appliquent pas à ces onglets.
+### Added
+- **Opening of static HTML pages** (`.html`, `.htm`) — notably the
+  application's HTML exports, which can now be reread in Kroki Desk. The Open
+  dialog, drag-and-drop, command line, `.kdws` sessions and relative links
+  in documents accept these extensions. The page is displayed as is in a tab,
+  through a sandboxed iframe (no script executed); view actions (source view,
+  table of contents, export, global search) do not apply to these tabs.
 
 ## [3.8.0] — 2026-07-15
 
-### Ajouté
-- **Sessions `.kdws`** : un fichier JSON qui liste des documents à rouvrir,
-  groupés par fenêtre, dans l'ordre des onglets (onglet actif compris). Le
-  nouveau bouton « pile » de la barre d'onglets enregistre l'état courant
-  (toutes les fenêtres, la fenêtre appelante en tête) ; les chemins sont
-  relativisés par rapport à l'emplacement du `.kdws` quand c'est possible
-  (séparateur `/`, format portable Windows/Linux). Un `.kdws` s'ouvre par
-  drag-drop, dialogue Ouvrir, ligne de commande ou double-clic (après
-  association du type de fichier) : la première fenêtre de la session
-  s'ouvre dans la fenêtre cible, les suivantes dans des fenêtres neuves.
-  Les fichiers introuvables ou non pris en charge sont ignorés et signalés
-  (toast) ; l'application ne restaure toujours rien automatiquement au
-  démarrage.
+### Added
+- **`.kdws` sessions**: a JSON file that lists documents to reopen, grouped
+  by window, in tab order (active tab included). The new "stack" button in the
+  tab bar saves the current state (all windows, the calling window first);
+  paths are made relative to the `.kdws` location when possible (`/`
+  separator, portable Windows/Linux format). A `.kdws` opens by drag-and-drop,
+  the Open dialog, the command line or double-click (once the file type is
+  associated): the session's first window opens in the target window, the
+  following ones in new windows. Files that are missing or unsupported are
+  skipped and reported (toast); the application still does not restore
+  anything automatically at startup.
 
 ## [3.7.0] — 2026-07-15
 
-### Ajouté
-- **Export du rendu en page HTML autonome** : nouveau bouton (flèche de
-  téléchargement) dans la pile d'actions de vue, à droite du rendu. La page
-  exportée embarque les feuilles de style de l'application (thème forcé ou
-  automatique conservé), les diagrammes en SVG inline et les images locales en
-  data-URI — consultable dans n'importe quel navigateur, sans l'application ni
-  réseau. Les figures Plotly sont exportées figées (snapshot SVG, sans
-  interactivité) ; les polices KaTeX ne sont pas embarquées (repli sur les
-  polices système).
+### Added
+- **Export the rendered view as a standalone HTML page**: new button (download
+  arrow) in the view action stack, to the right of the rendered view. The
+  exported page embeds the application's stylesheets (forced or automatic theme
+  preserved), diagrams as inline SVG and local images as data URIs — viewable
+  in any browser, with no application and no network. Plotly figures are
+  exported frozen (SVG snapshot, no interactivity); KaTeX fonts are not
+  embedded (fallback to system fonts).
 
-### Modifié
-- **Barre d'onglets allégée** (deux boutons de moins) : la gestion des
-  **plugins** se fait désormais depuis Réglages → « Gérer les plugins… », et le
-  journal des modifications (**Nouveautés**) depuis le dialog d'information,
-  renommé **« Informations »** — qui affiche maintenant aussi la version de
-  l'application au-dessus de l'état des runtimes et moteurs.
+### Changed
+- **Slimmer tab bar** (two fewer buttons): **plugins** are now managed from
+  Settings → "Manage plugins…" (« Réglages → Gérer les plugins… »), and the
+  change log (**What's new**, « Nouveautés ») from the information dialog,
+  renamed **"Information"** (« Informations ») — which now also shows the
+  application version above the status of the runtimes and engines.
 
 ## [3.6.0] — 2026-07-15
 
-### Ajouté
-- **Changelog de plugin** (protocole v1, §3.1) : un plugin peut embarquer un
-  `CHANGELOG.md` à la racine de son archive `.kdext`. S'il est présent, sa
-  carte dans le dialog Plugins gagne un bouton **« Nouveautés »** qui
-  l'affiche dans le dialog changelog de l'application — rendu markdown
-  sanitizé par l'hôte, sans exécuter le plugin. Convention de nommage pure :
-  aucun champ de manifeste, compatible avec les plugins existants.
+### Added
+- **Plugin changelog** (protocol v1, §3.1): a plugin can ship a `CHANGELOG.md`
+  at the root of its `.kdext` archive. When present, its card in the Plugins
+  dialog gets a **"What's new"** (« Nouveautés ») button that shows it in the
+  application's changelog dialog — markdown rendered and sanitized by the host,
+  without running the plugin. Pure naming convention: no manifest field,
+  compatible with existing plugins.
 
 ## [3.5.0] — 2026-07-15
 
-### Ajouté
-- **Archives `.kdext` : toutes les méthodes de compression zip usuelles** sont
-  désormais acceptées à l'installation d'un plugin — Store (Copy), Deflate,
-  Deflate64, BZip2, LZMA et Zstandard (jusqu'ici : Deflate et Store seulement).
-  Une archive empaquetée avec 7-Zip passe donc quelle que soit la méthode
-  choisie, à l'exception de PPMd (écarté volontairement, usage marginal), dont
-  le refus affiche maintenant la cause réelle au lieu d'un « manifest.json
-  absent » trompeur.
+### Added
+- **`.kdext` archives: all the usual zip compression methods** are now
+  accepted when installing a plugin — Store (Copy), Deflate, Deflate64, BZip2,
+  LZMA and Zstandard (previously: Deflate and Store only). An archive packed
+  with 7-Zip therefore works whichever method is chosen, except for PPMd
+  (deliberately excluded, marginal use), whose rejection now shows the real
+  cause instead of a misleading "manifest.json missing" (« manifest.json
+  absent »).
 
 ## [3.4.0] — 2026-07-13
 
-### Ajouté
-- **Capacité de plugin `fence:markdown`** (protocole v1, §6.3) : un plugin peut
-  rendre un bloc fence en **markdown dérivé**, repassé dans le pipeline complet
-  de l'application (markdown-it + DOMPurify) puis hydraté récursivement —
-  diagrammes Kroki natifs et colorations plugin inclus. Profondeur
-  d'imbrication bornée, `data-source-line` dérivés neutralisés.
-- **Bouton « Ouvrir le dossier »** dans le dialog Plugins : ouvre le dossier
-  des plugins (`%APPDATA%\kroki-deskapp\plugins` sous Windows,
-  `$XDG_CONFIG_HOME/kroki-deskapp/plugins` sous Linux) dans le gestionnaire de
-  fichiers de la plateforme — le dossier est créé s'il n'existe pas encore.
-  Pratique pour la boucle de développement des plugins (copie directe d'un
-  dossier `plugins/<id>/`).
+### Added
+- **`fence:markdown` plugin capability** (protocol v1, §6.3): a plugin can
+  render a fence block as **derived markdown**, fed back through the
+  application's full pipeline (markdown-it + DOMPurify) and then hydrated
+  recursively — native Kroki diagrams and plugin highlighting included. Nesting
+  depth is bounded, derived `data-source-line` attributes are neutralized.
+- **"Open folder" button** (« Ouvrir le dossier ») in the Plugins dialog: opens
+  the plugins folder (`%APPDATA%\kroki-deskapp\plugins` on Windows,
+  `$XDG_CONFIG_HOME/kroki-deskapp/plugins` on Linux) in the platform's file
+  manager — the folder is created if it doesn't exist yet. Handy for the
+  plugin development loop (copying a `plugins/<id>/` folder directly).
 
 ## [3.2.0] — 2026-07-13
 
-### Ajouté
-- **Recherche dans tous les documents ouverts** (bouton loupe de la barre
-  d'onglets ou `Ctrl+Maj+F`) : un panneau cherche le texte tapé dans le
-  **source** de chaque onglet de la fenêtre (insensible à la casse, y compris
-  les onglets jamais affichés). Résultats groupés par document avec numéro de
-  ligne et extrait ; cliquer un résultat active l'onglet et amène la ligne en
-  haut de la vue (preview comme vue source), toutes les occurrences étant
-  surlignées dans la vue affichée tant que le panneau est ouvert. `Échap`
-  ferme le panneau.
+### Added
+- **Search across all open documents** (magnifier button in the tab bar or
+  `Ctrl+Shift+F`): a panel searches the typed text in the **source** of every
+  tab in the window (case-insensitive, including tabs that were never
+  displayed). Results are grouped by document with line number and excerpt;
+  clicking a result activates the tab and brings the line to the top of the
+  view (preview or source view), with all occurrences highlighted in the
+  displayed view as long as the panel is open. `Esc` closes the panel.
 
 ## [3.1.0] — 2026-07-13
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [3.0.0] — 2026-07-13
 
-### Ajouté
-- **Système de plugins** (protocole v1, spec `doc/plugin-protocol.md`) : des
-  archives `.kdext` ajoutent des types de fichiers (`document:markdown`), des
-  langages de fence (`fence:svg`/`fence:html`) et des colorations
-  (`highlight:code`) **sans recompiler l'application**. Chaque plugin tourne
-  dans un worker sandboxé (pas de DOM, pas de commandes Tauri, pas de disque —
-  messages JSON uniquement ; lecture des fichiers voisins opt-in et confinée au
-  dossier du document). Installation par glisser-déposer d'un `.kdext` sur la
-  fenêtre ou via le nouveau dialog **Plugins** de la toolbar (cartes
-  nom/description/version/état, suppression, bouton « Ajouter un plugin… ») ;
-  dialog de confiance systématique (éditeur, version, capacités en clair),
-  version précédente conservée en `.bak`. Les plugins vivent dans
-  `%APPDATA%\kroki-deskapp\plugins` (chemin sans identifiant d'éditeur).
-- **Script `scripts/pack_plugin.ps1`** : empaquette un dossier de plugin en
-  `.kdext` dans `dist/`.
+### Added
+- **Plugin system** (protocol v1, spec `doc/plugin-protocol.md`): `.kdext`
+  archives add file types (`document:markdown`), fence languages
+  (`fence:svg`/`fence:html`) and highlighters (`highlight:code`) **without
+  recompiling the application**. Each plugin runs in a sandboxed worker (no
+  DOM, no Tauri commands, no disk — JSON messages only; reading neighboring
+  files is opt-in and confined to the document's folder). Install by dragging a
+  `.kdext` onto the window or through the new **Plugins** dialog in the toolbar
+  (cards with name/description/version/status, removal, "Add a plugin…"
+  (« Ajouter un plugin… ») button); a trust dialog is always shown (publisher,
+  version, capabilities in plain language), previous version kept as `.bak`.
+  Plugins live in `%APPDATA%\kroki-deskapp\plugins` (path without a publisher
+  identifier).
+- **`scripts/pack_plugin.ps1` script**: packs a plugin folder into a `.kdext`
+  in `dist/`.
 
-### Modifié
-- **CSP** : le protocole `plugin://` (lecture seule, confiné au dossier des
-  plugins) est autorisé en `script-src`/`connect-src` pour le chargement des
-  modules et assets des plugins dans leur worker.
+### Changed
+- **CSP**: the `plugin://` protocol (read-only, confined to the plugins folder)
+  is allowed in `script-src`/`connect-src` so plugin modules and assets can be
+  loaded in their worker.
 
 ## [2.9.1] — 2026-07-10
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.9.0] — 2026-07-10
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.8.3] — 2026-07-09
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.8.2] — 2026-07-09
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.8.1] — 2026-07-09
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.8.0] — 2026-07-09
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.7.0] — 2026-07-08
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.6.0] — 2026-07-08
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.5.2] — 2026-07-08
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.5.1] — 2026-07-07
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.5.0] — 2026-07-07
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.4.0] — 2026-07-07
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.3.0] — 2026-07-07
 
-### Ajouté
-- **Bouton « Nouveautés »** dans la barre d'outils (icône horloge, à côté
-  des boutons runtimes et réglages) : affiche le journal des modifications
-  version par version, de la plus récente à la plus ancienne. Le changelog
-  est embarqué dans l'exécutable à la compilation — toujours en phase avec
-  la version installée, aucun accès réseau.
+### Added
+- **"What's new" button** (« Nouveautés ») in the toolbar (clock icon, next to
+  the runtimes and settings buttons): shows the change log version by version,
+  from newest to oldest. The changelog is embedded in the executable at
+  compile time — always in sync with the installed version, no network access.
 
 ## [2.2.2] — 2026-07-07
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.2.1] — 2026-07-07
 
-### Corrigé
-- **Libellé du groupe « Moteurs Java »** (fenêtre d'information des
-  runtimes) : la parenthèse « (PlantUML, ditaa) » est retirée — redondante
-  avec la liste des types affichée sous le groupe, et incomplète
-  (c4plantuml manquait).
+### Fixed
+- **Label of the "Java engines" group** (« Moteurs Java ») (runtimes
+  information window): the "(PlantUML, ditaa)" parenthetical is removed —
+  redundant with the list of types shown under the group, and incomplete
+  (c4plantuml was missing).
 
 ## [2.2.0] — 2026-07-07
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.1.1] — 2026-07-07
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.1.0] — 2026-07-07
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [2.0.0] — 2026-07-06
 
-### Ajouté
-- **Liens vers une section d'un autre document** : un lien markdown relatif
-  avec fragment (`[..](autre.md#section)`) ouvre le document cible dans un
-  onglet puis défile jusqu'à l'ancre. Les liens `xlink:href` des SVG graphviz
-  sont désormais cliquables.
+### Added
+- **Links to a section of another document**: a relative markdown link with a
+  fragment (`[..](second.md#section)`) opens the target document in a tab and
+  then scrolls to the anchor. `xlink:href` links in graphviz SVGs are now
+  clickable.
 
 ## [1.12.1] — 2026-07-06
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [1.12.0] — 2026-07-06
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [1.11.1] — 2026-07-06
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [1.11.0] — 2026-07-05
 
-### Modifié
-- Évolutions internes, sans effet sur les fonctionnalités de cette
-  distribution.
+### Changed
+- Internal changes, no effect on this distribution's features.
 
 ## [1.10.0] — 2026-07-05
 
-### Ajouté
-- **Surlignage des occurrences du mot sélectionné** : sélectionner un mot dans le
-  document met en évidence toutes ses autres occurrences (recherche insensible à la
-  casse), en ambre pour se distinguer du bleu de la sélection. Repose sur la CSS
-  Custom Highlight API — aucun nœud n'est injecté dans le DOM, donc les SVG des
-  diagrammes, le mode source et la sélection native (peinte par-dessus) restent
-  intacts. La mise en évidence disparaît dès que la sélection est vidée ou porte sur
-  plusieurs mots.
+### Added
+- **Highlighting of occurrences of the selected word**: selecting a word in the
+  document highlights all its other occurrences (case-insensitive search), in
+  amber to stand out from the blue of the selection. Built on the CSS Custom
+  Highlight API — no node is injected into the DOM, so diagram SVGs, source
+  view and the native selection (painted on top) stay intact. The highlight
+  disappears as soon as the selection is cleared or spans several words.
 
 ## [1.9.1] — 2026-07-04
 
-### Corrigé
-- **Frontmatter YAML** en tête de document (`---` … `---`, typique des fichiers
-  `SKILL.md`) : il était rendu en bouillie — le `---` d'ouverture devenait un
-  trait horizontal et le bloc `clé: valeur` un paragraphe aggloméré puis un titre
-  setext à cause du `---` de fermeture. Une règle de bloc markdown-it dédiée le
-  capte désormais et l'affiche en table clé/valeur lisible. Les numéros de ligne
-  source du reste du document sont préservés (alignement preview ↔ source intact).
+### Fixed
+- **YAML frontmatter** at the top of a document (`---` … `---`, typical of
+  `SKILL.md` files): it was rendered as a mess — the opening `---` became a
+  horizontal rule and the `key: value` block a lumped paragraph and then a
+  setext heading because of the closing `---`. A dedicated markdown-it block
+  rule now captures it and displays it as a readable key/value table. Source
+  line numbers for the rest of the document are preserved (preview ↔ source
+  alignment intact).
 
 ## [1.9.0] — 2026-07-01
 
-### Ajouté
-- **Bouton « pleine largeur »** dans la pile d'actions de la vue (sous le bouton
-  source) : bascule le preview entre sa largeur de lecture centrée (920 px) et
-  toute la largeur de la fenêtre. Utile surtout au dézoom, où la largeur logique
-  s'élargit et laissait sinon de larges marges vides sur les côtés. La position de
-  lecture est préservée à la bascule (on reste au niveau du titre affiché en haut,
-  comme pour le mode source). Les figures Plotly se réaccordent à la nouvelle
-  largeur ; la vue source reste pleine largeur.
+### Added
+- **"Full width" button** (« pleine largeur ») in the view action stack (below
+  the source button): toggles the preview between its centered reading width
+  (920 px) and the full window width. Mostly useful when zoomed out, where the
+  logical width grows and would otherwise leave wide empty margins on the
+  sides. The reading position is preserved when toggling (you stay at the
+  heading shown at the top, as with source mode). Plotly figures re-fit to the
+  new width; the source view stays full width.
 
 ## [1.8.1] — 2026-06-30
 
-### Corrigé
-- **Ancres de sommaire avec ponctuation spéciale** : les liens internes (sommaire
-  Markdown comme `[…](#…)`) vers un titre contenant ` — ` (tiret cadratin) ou `:`
-  ne pointaient sur rien — clic sans effet. La génération de slug collapsait les
-  espaces consécutifs en un seul tiret alors que GitHub en met un par espace
-  (`Titre — sous` → `titre--sous`). Slugs alignés sur GitHub : un tiret par espace.
+### Fixed
+- **Table-of-contents anchors with special punctuation**: internal links
+  (Markdown table of contents such as `[…](#…)`) to a heading containing ` — `
+  (em dash) or `:` pointed to nothing — clicking had no effect. Slug generation
+  collapsed consecutive spaces into a single hyphen whereas GitHub emits one
+  per space (`Titre — sous` → `titre--sous`). Slugs now match GitHub: one
+  hyphen per space.
 
 ## [1.8.0] — 2026-06-29
 
-### Ajouté
-- **Bouton « Rafraîchir » global** : ajouté dans la barre d'actions à côté du
-  bouton « Ouvrir », il relit **tous** les onglets ouverts depuis le disque et les
-  re-rend. Les raccourcis **F5** et **Ctrl+R** restent limités à l'onglet **actif**.
+### Added
+- **Global "Refresh" button** (« Rafraîchir »): added to the action bar next to
+  the "Open" button (« Ouvrir »), it re-reads **all** open tabs from disk and
+  re-renders them. The **F5** and **Ctrl+R** shortcuts remain limited to the
+  **active** tab.
 
 ## [1.7.0] — 2026-06-27
 
-### Ajouté
-- **Sommaire (table des matières)** : un bouton dédié, empilé au-dessus du bouton
-  « code source » dans le coin haut-droit de la zone de rendu, déroule à sa gauche
-  un panneau listant les chapitres et sous-chapitres (titres `#`…`######`,
-  indentés par niveau). Un clic sur une entrée saute directement au titre — vers
-  l'élément en mode *preview*, vers la ligne correspondante en mode *code source* —
-  et referme le panneau. Le panneau se ferme aussi par un clic à l'extérieur, la
-  touche `Échap` ou un changement d'onglet.
+### Added
+- **Table of contents**: a dedicated button, stacked above the "source" button
+  (« code source ») in the top-right corner of the rendering area, unfolds to
+  its left a panel listing chapters and sub-chapters (`#`…`######` headings,
+  indented by level). Clicking an entry jumps straight to the heading — to the
+  element in *preview* mode, to the matching line in *source* mode — and closes
+  the panel. The panel also closes on an outside click, the `Esc` key or a tab
+  change.
 
 ## [1.6.0] — 2026-06-27
 
-### Ajouté
-- **Affichage du code source d'un onglet** : un bouton flottant dans le coin
-  haut-droit de la zone de rendu bascule l'onglet **actif** (et lui seul) entre le
-  rendu *preview* et le **code source Markdown brut** en lecture seule (monospace,
-  numéros de ligne). Le comportement par défaut à l'ouverture reste le *preview*.
-  La bascule **préserve la position de lecture** : la première ligne affichée en
-  haut reste alignée entre les deux modes (mappage via `data-source-line` sur les
-  blocs du rendu).
+### Added
+- **Source view of a tab**: a floating button in the top-right corner of the
+  rendering area toggles the **active** tab (and only that one) between the
+  *preview* rendering and the read-only **raw Markdown source** (monospace,
+  line numbers). The default behavior on open remains the *preview*. Toggling
+  **preserves the reading position**: the first line shown at the top stays
+  aligned between the two modes (mapped through `data-source-line` on the
+  rendered blocks).
 
 ## [1.5.0] — 2026-06-26
 
-### Ajouté
-- **Réglage de thème (Réglages → Thème)** : *Automatique* (suit le système, défaut),
-  *Clair* ou *Sombre*, forçant l'apparence indépendamment du réglage Windows. Le
-  forçage couvre toute l'interface — chrome, **corps du document** (`github-markdown`)
-  et coloration syntaxique du code (`highlight.js`) — et pas seulement la palette de
-  l'app. Le choix est persisté et propagé à toutes les fenêtres ouvertes en direct. En
-  mode *Automatique*, l'interface continue de suivre les bascules système.
+### Added
+- **Theme setting (Settings → Theme)** (« Réglages → Thème »): *Automatic*
+  (follows the system, default), *Light* or *Dark*, forcing the appearance
+  independently of the Windows setting. The override covers the whole
+  interface — chrome, **document body** (`github-markdown`) and code syntax
+  highlighting (`highlight.js`) — not just the app palette. The choice is
+  persisted and propagated live to all open windows. In *Automatic* mode, the
+  interface keeps following system switches.
 
-### Corrigé
-- **Figures Plotly illisibles en thème sombre** : une figure ` ```plotly ` était
-  posée sur la carte blanche réservée aux diagrammes Kroki tout en recevant un texte
-  gris clair (gris sur blanc, illisible). Plotly est désormais rendu nativement en
-  sombre — fond transparent (la figure se fond dans la page), texte clair et
-  grilles/axes éclaircis sur tous les sous-graphes. Les diagrammes Kroki SVG
-  (mermaid, graphviz, plantuml…), dont les couleurs sont figées par leur moteur,
-  restent volontairement sur une carte blanche.
+### Fixed
+- **Plotly figures unreadable in dark theme**: a ` ```plotly ` figure was
+  placed on the white card reserved for Kroki diagrams while receiving light
+  gray text (gray on white, unreadable). Plotly is now rendered natively in
+  dark — transparent background (the figure blends into the page), light text
+  and lightened grids/axes on all subplots. Kroki SVG diagrams (mermaid,
+  graphviz, plantuml…), whose colors are fixed by their engine, deliberately
+  stay on a white card.
 
 ## [1.4.2] — 2026-06-26
 
-### Corrigé
-- **Survol (hover) décalé des figures Plotly sous zoom de page** : le zoom de page
-  (`Ctrl +/-`, `Ctrl+molette`), appliqué via la propriété CSS `zoom`, faussait le
-  hit-testing de Plotly — qui ne compense pas un `zoom` d'ancêtre : il dessine son
-  plan en pixels logiques mais localise le curseur en pixels visuels, si bien que
-  l'info-bulle pointait un autre point, avec un décalage croissant avec le zoom. La
-  figure neutralise désormais l'échelle héritée (`--plotly-inv-zoom`, échelle
-  effective 1:1) et son plan est réaccordé à la largeur de colonne via
-  `Plotly.relayout` en préservant le ratio d'aspect — et non via `Plots.resize`, qui
-  écrasait la hauteur d'un conteneur dépourvu de hauteur CSS.
+### Fixed
+- **Misplaced hover on Plotly figures under page zoom**: page zoom (`Ctrl +/-`,
+  `Ctrl+wheel`), applied through the CSS `zoom` property, skewed Plotly's
+  hit-testing — which doesn't compensate for an ancestor's `zoom`: it draws its
+  plot in logical pixels but locates the cursor in visual pixels, so the
+  tooltip pointed at another point, with an offset growing with the zoom. The
+  figure now neutralizes the inherited scale (`--plotly-inv-zoom`, effective
+  1:1 scale) and its plot is re-fit to the column width via `Plotly.relayout`
+  while preserving the aspect ratio — rather than via `Plots.resize`, which
+  overwrote the height of a container with no CSS height.
 
 ## [1.4.1] — 2026-06-26
 
-### Corrigé
-- **Double affichage des figures Plotly** : lorsqu'une image statique
-  (`![…](x.png)`) précède immédiatement un bloc ` ```plotly src=x.json ` de même
-  *stem* (son fallback portable), les deux étaient rendus et chaque figure
-  apparaissait en double. `hidePairedFallbackImage` masque désormais l'image une
-  fois le rendu interactif réussi ; en cas d'échec, le PNG reste visible.
+### Fixed
+- **Plotly figures displayed twice**: when a static image (`![…](x.png)`)
+  immediately precedes a ` ```plotly src=x.json ` block with the same *stem*
+  (its portable fallback), both were rendered and each figure appeared twice.
+  `hidePairedFallbackImage` now hides the image once the interactive rendering
+  succeeds; on failure, the PNG stays visible.
 
 ## [1.4.0] — 2026-06-26
 
-### Ajouté
-- **Graphiques Plotly interactifs** : un bloc ` ```plotly ` est rendu comme figure
-  **interactive** (survol / zoom / pan) dans la fenêtre principale, en
-  court-circuitant le pipeline SVG des moteurs Kroki. La spec `{data, layout}` est
-  fournie en JSON inline ou via `src=fichier.json`. Le bundle Plotly (~4,8 Mo) est
-  chargé à la demande à la première figure (script `'self'`, aucune modification de
-  CSP — `'unsafe-eval'` est déjà autorisé pour d2).
-- Commande backend `read_data_file` pour lire le JSON de spec, **confinée au dossier
-  du document** : rejet des chemins absolus, protection anti-traversée (`..` /
-  symlink) et allowlist `.json`.
+### Added
+- **Interactive Plotly charts**: a ` ```plotly ` block is rendered as an
+  **interactive** figure (hover / zoom / pan) in the main window, bypassing the
+  Kroki engines' SVG pipeline. The `{data, layout}` spec is provided as inline
+  JSON or via `src=file.json`. The Plotly bundle (~4.8 MB) is loaded on demand
+  at the first figure (`'self'` script, no CSP change — `'unsafe-eval'` is
+  already allowed for d2).
+- `read_data_file` backend command to read the spec JSON, **confined to the
+  document's folder**: absolute paths rejected, traversal protection (`..` /
+  symlink) and `.json` allowlist.
 
 ## [1.3.0] — 2026-06-26
 
-### Ajouté
-- **Formules mathématiques** LaTeX en ligne (`$…$`) et en bloc (`$$…$$`), rendues
-  par **KaTeX** embarqué (plugin `markdown-it-texmath`). Polices `.woff2` incluses
-  dans l'exécutable : rendu local, sans réseau ni `eval`. Le profil `mathMl` de
-  DOMPurify est activé pour préserver le MathML d'accessibilité.
+### Added
+- Inline (`$…$`) and block (`$$…$$`) LaTeX **math formulas**, rendered by
+  embedded **KaTeX** (`markdown-it-texmath` plugin). `.woff2` fonts are
+  included in the executable: local rendering, no network, no `eval`.
+  DOMPurify's `mathMl` profile is enabled to preserve accessibility MathML.
 
 ## [1.2.0] — 2026-06-15
 
-### Ajouté
-- Moteurs de diagrammes **erd** et **excalidraw** embarqués.
-- Moteur **ditaa** embarqué via un `.jar` (sortie SVG, exécuté en sous-process).
-- Dialogue **« Runtimes & moteurs »** : état de chaque moteur (supporté / prérequis
-  système manquant / non supporté).
-- **Glisser-déposer** de fichiers texte depuis Cursor / VS Code
-  (`CF_UNICODETEXT` / `text/uri-list`, au-delà du seul `CF_HDROP` de l'Explorateur).
-- **Glisser-déposer de dossiers** : expansion vers leurs fichiers Markdown directs.
-- Ouverture d'une **nouvelle fenêtre** lorsque l'exécutable est relancé.
-- Support **Linux** dégradé (compilation conditionnelle, rendu JS/WASM sous
-  WebKitGTK ; le drag inter-fenêtres reste spécifique à Windows).
+### Added
+- **erd** and **excalidraw** diagram engines embedded.
+- **ditaa** engine embedded via a `.jar` (SVG output, run as a subprocess).
+- **"Runtimes & engines"** dialog (« Runtimes & moteurs »): status of each
+  engine (supported / missing system prerequisite / unsupported).
+- **Drag and drop** of text files from Cursor / VS Code (`CF_UNICODETEXT` /
+  `text/uri-list`, beyond Explorer's `CF_HDROP` alone).
+- **Drag and drop of folders**: expanded to their direct Markdown files.
+- A **new window** opens when the executable is launched again.
+- Degraded **Linux** support (conditional compilation, JS/WASM rendering under
+  WebKitGTK; cross-window drag remains Windows-specific).
 
 ### Performance
-- Webview de rendu cachée démarrée hors du chemin critique de démarrage.
-- Moteurs de diagrammes chargés **à la demande** plutôt qu'au boot.
+- Hidden rendering webview started off the critical startup path.
+- Diagram engines loaded **on demand** rather than at boot.
 
-### Supprimé
-- `xdita.jar` orphelin retiré des assets.
+### Removed
+- Orphaned `xdita.jar` removed from the assets.
 
 ## [1.1.0] — 2026-06-10
 
-### Ajouté
-- Moteurs **d2**, **dbml** et **bpmn**.
+### Added
+- **d2**, **dbml** and **bpmn** engines.
 
 ## [1.0.0] — 2026-06-10
 
-### Ajouté
-- Version initiale : visionneuse Markdown native Windows (Tauri 2 / Rust),
-  rendu de diagrammes Kroki **intégré** (mermaid, plantuml, graphviz, svgbob,
-  pikchr, vega/vegalite…) sans serveur, sans Docker, sans réseau.
-- Markdown style GitHub : tables, listes de tâches, coloration syntaxique, ancres
-  de titres, liens relatifs entre `.md`, images locales.
-- **Onglets** (réordonnables, fermeture molette / `Ctrl+W`) et **multi-fenêtres**
-  avec détachement d'onglet par glisser-déposer.
-- Glisser-déposer de fichiers `.md`, rechargement automatique sur changement disque.
-- **CLI** à instance unique et **API Kroki locale** (HTTP `127.0.0.1`), plus la
-  prise en charge d'un serveur Kroki externe optionnel.
+### Added
+- Initial release: native Windows Markdown viewer (Tauri 2 / Rust), with
+  **built-in** Kroki diagram rendering (mermaid, plantuml, graphviz, svgbob,
+  pikchr, vega/vegalite…) with no server, no Docker, no network.
+- GitHub-style Markdown: tables, task lists, syntax highlighting, heading
+  anchors, relative links between `.md` files, local images.
+- **Tabs** (reorderable, closed with middle-click / `Ctrl+W`) and
+  **multi-window** with tab detaching by drag and drop.
+- Drag and drop of `.md` files, automatic reload on disk change.
+- Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
+  support for an optional external Kroki server.
 
 [3.24.0]: #3240--2026-10-16
 [3.23.1]: #3231--2026-10-14

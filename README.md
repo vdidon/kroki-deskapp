@@ -1,288 +1,285 @@
 # Kroki Desk
 
-Visionneuse Markdown de bureau pour **Windows et Linux**, avec rendu de
-diagrammes intégré compatible [Kroki](https://kroki.io) : les blocs de code dont
-le langage est un type de diagramme (`mermaid`, `plantuml`, `graphviz`, `d2`,
-`svgbob`, `vegalite`, …) sont rendus en SVG **sans serveur, sans Docker, sans
-réseau** — les moteurs sont embarqués dans l'exécutable. Extensible par
-[plugins](#plugins) : documents LaTeX, CSV, nouveaux types de fences…
+Desktop Markdown viewer for **Windows and Linux**, with built-in
+[Kroki](https://kroki.io)-compatible diagram rendering: code blocks whose
+language is a diagram type (`mermaid`, `plantuml`, `graphviz`, `d2`,
+`svgbob`, `vegalite`, …) are rendered to SVG **with no server, no Docker, no
+network** — the engines are embedded in the executable. Extensible through
+[plugins](#plugins): LaTeX documents, CSV, new fence types…
 
 ![Tauri 2](https://img.shields.io/badge/Tauri-2-blue) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078d4) ![Linux](https://img.shields.io/badge/Linux-Debian%2012%2B%20%7C%20Ubuntu%2024.04%2B-e95420)
 
 ## Installation
 
-| Plateforme | Portable | Installé |
+| Platform | Portable | Installed |
 | --- | --- | --- |
 | Windows 10/11 | `kroki_deskapp-<version>.exe` | `kroki_deskapp-<version>.msi` |
 | Linux x86_64 | `…-linux-x86_64-debian12.AppImage` | `…-linux-x86_64-debian12.deb` |
 
-Les binaires portables tiennent en un fichier, sans installation ni droits.
-Les installeurs y ajoutent l'entrée au menu, une désinstallation propre, les
-plugins livrés et les **associations de fichiers** : les deux formats propres
-à Kroki Desk — `.kdws` (session) et `.kdext` (plugin) — s'ouvrent au
-double-clic, Kroki Desk s'ajoute à « Ouvrir avec » pour les formats qu'il lit
-nativement (Markdown, HTML…), et chaque plugin installé apporte les
-associations de ses propres formats.
+The portable binaries are a single file, with no installation and no admin
+rights. The installers add a menu entry, a clean uninstall, the bundled
+plugins and **file associations**: the two formats specific to Kroki Desk —
+`.kdws` (session) and `.kdext` (plugin) — open on double-click, Kroki Desk is
+added to "Open with" for the formats it reads natively (Markdown, HTML…), and
+each installed plugin brings the associations for its own formats.
 
-Le `.deb` s'installe avec **apt**, qui résout les dépendances (`dpkg -i` ne le
-fait pas) :
+The `.deb` is installed with **apt**, which resolves dependencies (`dpkg -i`
+does not):
 
 ```bash
 sudo apt install ./kroki_deskapp-<version>-linux-x86_64-debian12.deb
 ```
 
-Détail — choix des plugins dans le MSI, installation silencieuse,
-associations par plateforme, binaire Linux nu : [doc/installation.md](doc/installation.md).
+Details — plugin selection in the MSI, silent installation, per-platform
+associations, bare Linux binary: [doc/installation.md](doc/installation.md).
 
-## Fonctionnalités
+## Features
 
-- **Rendu Markdown** style GitHub (tables, listes de tâches, coloration syntaxique,
-  ancres de titres, liens relatifs entre fichiers `.md`, images locales).
-- **Formules mathématiques** LaTeX en ligne (`$…$`) et en bloc (`$$…$$`), rendues
-  par KaTeX embarqué (polices incluses, aucun réseau).
-- **Diagrammes intégrés** avec la syntaxe Kroki (alias acceptés : ` ```dot ` →
-  graphviz, ` ```c4 ` → c4plantuml, ` ```vega-lite ` → vegalite…) ; les erreurs de
-  syntaxe sont affichées dans le document.
-- **Documents LaTeX (`.tex`)** — via le plugin `latex-doc` : un article LaTeX
-  autonome s'ouvre comme un document normal. Sections numérotées et alimentant
-  le sommaire, formules rendues par KaTeX, équations numérotées, théorèmes
-  `amsthm` (compteurs partagés compris), **références croisées `\ref`/`\eqref`
-  cliquables**, macros `\newcommand` du préambule expansées, tables et listes.
-  Une fence ` ```latex ` dans un `.md` reçoit le même rendu. Le rendu est
-  sémantique : la mise en page LaTeX (pagination, flottants, colonnes) n'est
-  pas reproduite, et les documents multi-fichiers (`\input`) et la bibliographie
-  ne sont pas pris en charge. Les figures TikZ sont dessinées si une
-  distribution TeX est installée sur le poste (cf. moteur `tikz`).
-- **Vue code source** (`</>`, pile d'actions de vue) : le fichier tel qu'il est
-  sur le disque, numéroté et **coloré** — Markdown, `.tex`/`.latex`
-  et les formats des plugins qui fournissent une grammaire ; un format sans grammaire s'affiche en texte brut. La
-  bascule preview ↔ source conserve la position de lecture.
-- **Onglets** : plusieurs fichiers par fenêtre, réordonnables à la souris,
-  fermeture par clic molette ou `Ctrl+W`.
-- **Multi-fenêtres** : `Ctrl+Maj+N`, ou en **détachant un onglet** — glissez un
-  onglet hors de la barre pour le sortir dans sa propre fenêtre, déposez-le sur une
-  autre fenêtre de l'application pour l'y rattacher (comme un navigateur).
-  Le détachement par glisser est propre à Windows ; sous Linux, les onglets se
-  réordonnent dans leur fenêtre.
-- **Glisser-déposer** de fichiers depuis le gestionnaire de fichiers (et, sous
-  Windows, depuis un éditeur comme VS Code).
-- **Recherche dans le document** (`Ctrl+F`) : barre compacte dans le coin
-  haut-droit de la zone de lecture — compteur `n/m`, occurrence précédente /
-  suivante (`Entrée`, `Maj+Entrée`, `F3`), fermeture. Toutes les occurrences
-  sont surlignées, la courante dans une teinte contrastée. La recherche porte
-  sur ce qui est affiché : elle suit le mode courant (preview, code source,
-  markdown intermédiaire).
-- **Recherche dans tous les documents ouverts** : la loupe de la barre
-  d'onglets (ou `Ctrl+Maj+F`) cherche le texte tapé dans le source de chaque
-  onglet ; résultats groupés par document avec numéro de ligne et extrait, un
-  clic active l'onglet, scrolle vers la ligne et surligne les occurrences dans
-  la vue.
-- **Options de recherche**, communes aux deux : `Aa` respecter la casse, `ab`
-  mot entier, `.*` expression régulière — collées à droite du champ, comme dans
-  un éditeur. « Mot entier » reconnaît les lettres accentuées (`été`,
-  `naïve`) ; un motif invalide passe le champ en rouge.
-- **Rechargement automatique** quand le fichier change sur disque.
-- **Export HTML** : la flèche de téléchargement (pile d'actions de vue)
-  enregistre le rendu de l'onglet actif en page HTML autonome — styles inlinés,
-  diagrammes en SVG, images locales en data-URI — consultable dans n'importe
-  quel navigateur, sans l'application ni réseau. Les fichiers `.html`/`.htm`
-  (dont ces exports) s'ouvrent aussi dans Kroki Desk : la page est affichée
-  telle quelle dans un onglet, via une iframe sandboxée (aucun script exécuté).
-- **Sessions `.kdws`** : le bouton « pile » de la barre d'onglets enregistre
-  l'état courant (toutes les fenêtres, onglets dans l'ordre, onglet actif) dans
-  un fichier JSON portable ; le rouvrir (drag-drop, dialogue Ouvrir, CLI, ou
-  double-clic — l'installeur associe `.kdws` à l'application) restaure le tout — la
-  première fenêtre de la session dans la fenêtre cible, les suivantes dans des
-  fenêtres neuves. Chemins relatifs résolus depuis le dossier du `.kdws`
-  (séparateur `/`, éditable à la main, committable à côté des documents) ;
-  fichiers manquants ignorés et signalés. L'application ne restaure jamais rien
-  automatiquement au démarrage : rouvrir une session est toujours un geste
-  explicite.
-- **CLI** : `kroki_deskapp "fichier.md" ["autre.md" …]` — instance unique :
-  les invocations suivantes ouvrent les fichiers dans la première fenêtre.
-  Un fichier peut porter une **référence**, avec la syntaxe des liens :
+- **Markdown rendering** in GitHub style (tables, task lists, syntax highlighting,
+  heading anchors, relative links between `.md` files, local images).
+- **LaTeX math** inline (`$…$`) and in blocks (`$$…$$`), rendered by the
+  embedded KaTeX (fonts included, no network).
+- **Built-in diagrams** with Kroki syntax (accepted aliases: ` ```dot ` →
+  graphviz, ` ```c4 ` → c4plantuml, ` ```vega-lite ` → vegalite…); syntax
+  errors are displayed in the document.
+- **LaTeX documents (`.tex`)** — via the `latex-doc` plugin: a standalone
+  LaTeX article opens like a regular document. Numbered sections feeding the
+  table of contents, formulas rendered by KaTeX, numbered equations, `amsthm`
+  theorems (including shared counters), **clickable `\ref`/`\eqref`
+  cross-references**, preamble `\newcommand` macros expanded, tables and lists.
+  A ` ```latex ` fence in a `.md` gets the same rendering. The rendering is
+  semantic: LaTeX page layout (pagination, floats, columns) is not
+  reproduced, and multi-file documents (`\input`) and bibliographies are not
+  supported. TikZ figures are drawn if a TeX distribution is installed on the
+  machine (see the `tikz` engine).
+- **Source view** (`</>`, view action stack): the file as it is on disk,
+  numbered and **colored** — Markdown, `.tex`/`.latex`, and the formats of
+  plugins that provide a grammar; a format without a grammar is shown as plain
+  text. Toggling preview ↔ source keeps the reading position.
+- **Tabs**: several files per window, reorderable with the mouse, closed with
+  a middle click or `Ctrl+W`.
+- **Multi-window**: `Ctrl+Shift+N`, or by **detaching a tab** — drag a tab out
+  of the bar to move it into its own window, drop it onto another window of the
+  application to reattach it (like a browser).
+  Detaching by dragging is Windows-only; on Linux, tabs can be reordered within
+  their window.
+- **Drag and drop** of files from the file manager (and, on Windows, from an
+  editor such as VS Code).
+- **Search in the document** (`Ctrl+F`): compact bar in the top-right corner of
+  the reading area — `n/m` counter, previous / next occurrence (`Enter`,
+  `Shift+Enter`, `F3`), close. All occurrences are highlighted, the current one
+  in a contrasting shade. The search covers what is displayed: it follows the
+  current mode (preview, source, intermediate markdown).
+- **Search across all open documents**: the magnifier in the tab bar
+  (or `Ctrl+Shift+F`) searches the typed text in the source of every tab;
+  results are grouped by document with line number and excerpt, and a click
+  activates the tab, scrolls to the line and highlights the occurrences in the
+  view.
+- **Search options**, shared by both: `Aa` match case, `ab` whole word, `.*`
+  regular expression — attached to the right of the field, as in an editor.
+  "Whole word" recognizes accented letters (`été`, `naïve`); an invalid pattern
+  turns the field red.
+- **Automatic reload** when the file changes on disk.
+- **HTML export**: the download arrow (view action stack) saves the rendering
+  of the active tab as a standalone HTML page — inlined styles, diagrams as
+  SVG, local images as data URIs — viewable in any browser, without the
+  application or a network. `.html`/`.htm` files (including these exports) also
+  open in Kroki Desk: the page is displayed as is in a tab, through a sandboxed
+  iframe (no script executed).
+- **`.kdws` sessions**: the "stack" button in the tab bar saves the current
+  state (all windows, tabs in order, active tab) to a portable JSON file;
+  reopening it (drag-drop, Open dialog, CLI, or double-click — the installer
+  associates `.kdws` with the application) restores everything — the first
+  window of the session in the target window, the following ones in new
+  windows. Relative paths are resolved from the `.kdws` folder (`/` separator,
+  hand-editable, committable next to the documents); missing files are skipped
+  and reported. The application never restores anything automatically at
+  startup: reopening a session is always an explicit action.
+- **CLI**: `kroki_deskapp "file.md" ["other.md" …]` — single instance:
+  subsequent invocations open the files in the first window.
+  A file can carry a **reference**, using link syntax:
   `"modele.tex#eq:sigmaU"` (`\label`), `"doc.md#section"`, `"doc.md#L42"`
-  (ligne du source) — le document s'ouvre et défile jusqu'à elle. Un nom de
-  fichier contenant lui-même `#` reste ouvrable : l'argument entier est essayé
-  comme chemin avant d'être coupé au dernier `#`. **`-d`** (`--detach`) relance
-  l'application détachée du terminal et rend la main aussitôt :
-  `kroki_deskapp -d "doc#ref"` depuis bash (Git Bash, Linux), qui sinon
-  ne la rendrait qu'à la fermeture de l'application si elle n'était pas déjà
-  ouverte. Installée, l'application se lance par son nom sans toucher au PATH
-  (`start ""`/`Start-Process` sous Windows, `/usr/bin` sous Linux — cf.
-  [installation](doc/installation.md#lancement-par-nom)).
-- **API Kroki locale** (optionnelle, activée par défaut sur
-  `http://127.0.0.1:8442`) : expose le rendu intégré aux outils tiers —
-  extensions VS Code, scripts… Routes : `POST /` (JSON), `POST /{type}/svg`
-  (texte brut), `GET /{type}/svg/{deflate+base64url}`, `GET /health` et
-  `GET /v1/health` (compat Kroki : `{"status":"pass","version":{…}}`, lu par
-  l'extension `markdown-kroki` à l'activation pour connaître les types rendus).
-- **Zoom texte** : `Ctrl+molette`, `Ctrl+=` / `Ctrl+-` — le texte grossit et
-  reflue dans la colonne, une figure pleine largeur garde sa taille.
-- **Zoom de page** : `Maj+molette`, autour du curseur — vrai zoom, sans
-  reflux : tout grossit, la page déborde en défilement horizontal, ce qui
-  permet de parcourir une figure trop dense pour tenir en un écran.
-  `Ctrl+0` remet les deux zooms à 1.
+  (source line) — the document opens and scrolls to it. A file name that itself
+  contains `#` remains openable: the whole argument is tried as a path before
+  being split at the last `#`. **`-d`** (`--detach`) relaunches the
+  application detached from the terminal and returns immediately:
+  `kroki_deskapp -d "doc#ref"` from bash (Git Bash, Linux), which otherwise
+  would only return when the application is closed if it was not already
+  open. Once installed, the application is launched by name without touching
+  the PATH (`start ""`/`Start-Process` on Windows, `/usr/bin` on Linux — see
+  [installation](doc/installation.md#launching-by-name)).
+- **Local Kroki API** (optional, enabled by default on
+  `http://127.0.0.1:8442`): exposes the built-in rendering to third-party
+  tools — VS Code extensions, scripts… Routes: `POST /` (JSON), `POST /{type}/svg`
+  (plain text), `GET /{type}/svg/{deflate+base64url}`, `GET /health` and
+  `GET /v1/health` (Kroki compat: `{"status":"pass","version":{…}}`, read by
+  the `markdown-kroki` extension on activation to learn which types are rendered).
+- **Text zoom**: `Ctrl+wheel`, `Ctrl+=` / `Ctrl+-` — the text grows and
+  reflows within the column, a full-width figure keeps its size.
+- **Page zoom**: `Shift+wheel`, around the cursor — true zoom, no reflow:
+  everything grows, the page overflows into horizontal scrolling, which lets
+  you pan across a figure too dense to fit on one screen.
+  `Ctrl+0` resets both zooms to 1.
 
-## Moteurs de rendu intégrés
+## Built-in rendering engines
 
-| Famille | Types | Exécution |
+| Family | Types | Execution |
 |---|---|---|
-| JS / WASM | mermaid, graphviz (+`dot`), **d2**, **bpmn**, **excalidraw**, vega, vegalite, nomnoml, wavedrom, bytefield | webview dédiée invisible |
-| JS → graphviz | **dbml**, **erd** (génèrent du DOT, rendu par le graphviz embarqué) | webview dédiée invisible |
-| Natif Rust | svgbob, pikchr | dans le processus |
-| JVM | plantuml, c4plantuml (stdlib C4 incluse), ditaa | `plantuml-mit.jar` et `ditaa-standalone.jar` embarqués, extraits et exécutés **si Java est présent** sur le poste |
-| TeX | **tikz** | compilé par la distribution TeX du poste (`latex` + `dvisvgm`, MiKTeX ou TeX Live) **si elle est présente** — rien n'est embarqué |
-| JS « live » | **plotly** (graphiques interactifs) | dans la vue affichée, pas de SVG figé |
+| JS / WASM | mermaid, graphviz (+`dot`), **d2**, **bpmn**, **excalidraw**, vega, vegalite, nomnoml, wavedrom, bytefield | dedicated invisible webview |
+| JS → graphviz | **dbml**, **erd** (generate DOT, rendered by the embedded graphviz) | dedicated invisible webview |
+| Native Rust | svgbob, pikchr | in-process |
+| JVM | plantuml, c4plantuml (C4 stdlib included), ditaa | `plantuml-mit.jar` and `ditaa-standalone.jar` embedded, extracted and run **if Java is present** on the machine |
+| TeX | **tikz** | compiled by the machine's TeX distribution (`latex` + `dvisvgm`, MiKTeX or TeX Live) **if present** — nothing is embedded |
+| JS "live" | **plotly** (interactive charts) | in the displayed view, no frozen SVG |
 
-Types Kroki **non** embarqués — ils dépendent d'un runtime Python
-(blockdiag/seqdiag/actdiag/nwdiag/rackdiag/packetdiag, wireviz, symbolator), ou
-n'ont pas de portage exploitable (structurizr, umlet,
-diagramsnet) : un message explicite s'affiche ; un **serveur Kroki
-externe** peut être configuré dans les réglages (⚙) pour les couvrir — il prend
-alors en charge tous les rendus.
+Kroki types **not** embedded — they depend on a Python runtime
+(blockdiag/seqdiag/actdiag/nwdiag/rackdiag/packetdiag, wireviz, symbolator), or
+have no usable port (structurizr, umlet,
+diagramsnet): an explicit message is displayed; an **external Kroki
+server** can be configured in the settings (⚙) to cover them — it then
+handles all renderings.
 
-> **excalidraw** : rendu via `@excalidraw/excalidraw` (`exportToSvg`). Les polices
-> manuscrites (Excalifont, ~14 Mo) ne sont **pas** embarquées pour garder le binaire
-> raisonnable ; le texte est rendu avec une police système (lisible, non manuscrite).
+> **excalidraw**: rendered via `@excalidraw/excalidraw` (`exportToSvg`). The
+> handwriting fonts (Excalifont, ~14 MB) are **not** embedded, to keep the binary
+> reasonably sized; text is rendered with a system font (readable, not handwritten).
 
-> **plotly** : seul moteur **interactif** (survol, zoom, pan). Contrairement aux
-> diagrammes Kroki rendus en SVG figé, il s'exécute dans la vue affichée. Un bloc
-> ` ```plotly ` contient soit une spec JSON Plotly (`{data, layout}`) inline, soit
-> `src=chemin.json` (lu relativement au document) pour garder le `.md` léger. Le
-> bundle `vendor/plotly.min.js` (~4,8 Mo) est chargé à la demande, à la première
-> figure rencontrée.
+> **plotly**: the only **interactive** engine (hover, zoom, pan). Unlike
+> Kroki diagrams rendered as frozen SVG, it runs in the displayed view. A
+> ` ```plotly ` block contains either an inline Plotly JSON spec (`{data, layout}`)
+> or `src=path.json` (read relative to the document) to keep the `.md` light. The
+> `vendor/plotly.min.js` bundle (~4.8 MB) is loaded on demand, at the first
+> figure encountered.
 
-## Raccourcis
+## Shortcuts
 
-La même liste est rappelée sur l’écran d’accueil de l’application (fenêtre sans
-onglet ouvert).
+The same list is shown on the application's welcome screen (window with no
+open tab).
 
-| Raccourci | Action |
+| Shortcut | Action |
 |---|---|
-| `Ctrl+O` | Ouvrir un fichier |
-| `Ctrl+W` | Fermer l'onglet (puis la fenêtre s'il n'y a plus d'onglet) |
-| `Ctrl+Tab` / `Ctrl+Maj+Tab` | Onglet suivant / précédent |
-| `Ctrl+Maj+N` | Nouvelle fenêtre |
-| `Ctrl+F` | Rechercher dans le document affiché (`Échap` ferme) |
-| `Entrée` / `Maj+Entrée`, `F3` / `Maj+F3`, `Ctrl+G` | Occurrence suivante / précédente |
-| `Ctrl+Maj+F` | Rechercher dans tous les documents ouverts (`Échap` ferme) |
-| `F5` / `Ctrl+R` | Recharger le document |
-| `Ctrl+=` / `Ctrl+-`, `Ctrl+molette` | Zoom texte (reflue) |
-| `Maj+molette` | Zoom de page autour du curseur (vrai zoom, défilement horizontal) |
-| `Ctrl+0` | Remettre les deux zooms à 1 |
+| `Ctrl+O` | Open a file |
+| `Ctrl+W` | Close the tab (then the window if no tab is left) |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
+| `Ctrl+Shift+N` | New window |
+| `Ctrl+F` | Search in the displayed document (`Esc` closes) |
+| `Enter` / `Shift+Enter`, `F3` / `Shift+F3`, `Ctrl+G` | Next / previous occurrence |
+| `Ctrl+Shift+F` | Search in all open documents (`Esc` closes) |
+| `F5` / `Ctrl+R` | Reload the document |
+| `Ctrl+=` / `Ctrl+-`, `Ctrl+wheel` | Text zoom (reflows) |
+| `Shift+wheel` | Page zoom around the cursor (true zoom, horizontal scrolling) |
+| `Ctrl+0` | Reset both zooms to 1 |
 
-## Réglages
+## Settings
 
-⚙ dans la barre d'onglets. Persistés dans `settings.json`, sous
-`%APPDATA%\kroki-deskapp\` (Windows) ou `~/.config/kroki-deskapp/` (Linux) :
+⚙ in the tab bar (Settings dialog, « Réglages »). Persisted in `settings.json`, under
+`%APPDATA%\kroki-deskapp\` (Windows) or `~/.config/kroki-deskapp/` (Linux):
 
-- **Serveur Kroki externe** (vide = rendu intégré, recommandé) ;
-- **API Kroki locale** : activation + port (8442 par défaut) ;
-- **Icônes affichées** : quelles icônes garder dans la barre de la fenêtre et
-  dans la pile d'actions du document. Réglage commun à toutes les fenêtres ;
-  seules les cases explicitement cochées ou décochées sont enregistrées, les
-  autres suivent leur défaut (« Réinitialiser » rend la main aux défauts).
-  L'icône ⚙ reste toujours visible, et masquer une icône ne désactive pas son
-  raccourci clavier. Le bouton **« markdown intermédiaire »** — la sortie brute
-  d'un plugin de document (`.tex`…), utile à la mise au point
-  d'un plugin — s'active ici ; il est désactivé par défaut.
+- **External Kroki server** (empty = built-in rendering, recommended);
+- **Local Kroki API**: enable + port (8442 by default);
+- **Displayed icons** (« Icônes affichées »): which icons to keep in the window
+  bar and in the document's view action stack. The setting is shared by all
+  windows; only the boxes explicitly checked or unchecked are saved, the
+  others follow their default ("Reset", « Réinitialiser », hands control back
+  to the defaults). The ⚙ icon always stays visible, and hiding an icon does
+  not disable its keyboard shortcut. The **"intermediate markdown"** button
+  (« markdown intermédiaire ») — the raw output of a document plugin
+  (`.tex`…), useful when developing a plugin — is enabled here; it is off by
+  default.
 
 ## Plugins
 
-Un plugin ajoute un format de document (`.tex`, `.csv`…), un type de fence ou
-une coloration syntaxique. Il s'exécute dans un worker isolé, sans accès au
-disque hors du dossier du document ouvert. Il se distribue en archive `.kdext`,
-à installer par glisser-déposer sur la fenêtre, double-clic ou dialog
-Plugins (⚙), après confirmation.
+A plugin adds a document format (`.tex`, `.csv`…), a fence type or
+syntax highlighting. It runs in an isolated worker, with no disk access outside
+the folder of the open document. It is distributed as a `.kdext` archive,
+installed by drag-and-drop onto the window, double-click, or the Plugins
+dialog (⚙), after confirmation.
 
-Plugins du dépôt (`plugins/`) :
+Plugins in the repository (`plugins/`):
 
-- [`latex-doc`](plugins/latex-doc/README.md) — documents LaTeX autonomes et
-  fences ` ```latex ` (installé par défaut avec les installeurs) ;
+- [`latex-doc`](plugins/latex-doc/README.md) — standalone LaTeX documents and
+  ` ```latex ` fences (installed by default with the installers);
 - [`csv-tables`](plugins/csv-tables/README.md),
   [`barchart`](plugins/barchart/README.md),
-  [`ini-highlight`](plugins/ini-highlight/README.md) — exemples pédagogiques,
-  un par point d'extension.
+  [`ini-highlight`](plugins/ini-highlight/README.md) — teaching examples,
+  one per extension point.
 
-Écrire un plugin : [doc/plugin-protocol.md](doc/plugin-protocol.md) (protocole
-v1, exemples commentés, empaquetage par `python pack_plugin.py`).
+Writing a plugin: [doc/plugin-protocol.md](doc/plugin-protocol.md) (protocol
+v1, commented examples, packaging with `python pack_plugin.py`).
 
-## Skill Claude Code
+## Claude Code skill
 
-[`skills/kroki-desk/`](skills/kroki-desk/SKILL.md) est un skill
-[Claude Code](https://docs.claude.com/en/docs/claude-code) qui écrit des
-documents Markdown destinés à Kroki Desk : choix du moteur parmi ceux que
-l'application rend réellement (sonde `/v1/health` de l'API locale), syntaxe
-par moteur, validation des diagrammes contre l'API locale, liens
-`fichier#fragment` stables. Il sait aussi ouvrir un document dans Kroki Desk
-installé à une référence précise (`\label`, titre, ligne). Pour l'utiliser,
-copier le dossier dans `~/.claude/skills/`.
+[`skills/kroki-desk/`](skills/kroki-desk/SKILL.md) is a
+[Claude Code](https://docs.claude.com/en/docs/claude-code) skill that writes
+Markdown documents intended for Kroki Desk: choice of engine among those the
+application actually renders (probing the local API's `/v1/health`), per-engine
+syntax, validation of diagrams against the local API, stable
+`file#fragment` links. It can also open a document in an installed Kroki Desk
+at a precise reference (`\label`, heading, line). To use it,
+copy the folder into `~/.claude/skills/`.
 
 ## Build
 
-Prérequis minimal : Rust stable. Il n'y a pas de bundler frontend, aucune étape
-`npm`.
+Minimal prerequisite: stable Rust. There is no frontend bundler, no `npm`
+step.
 
 ```bash
-cargo run-app            # développement : build debug + lancement
-cargo build-app          # binaire release de l'hôte → dist/
-python build_dist.py     # tous les artefacts de la version → dist/
+cargo run-app            # development: debug build + launch
+cargo build-app          # host release binary → dist/
+python build_dist.py     # all the version's artifacts → dist/
 ```
 
-`build_dist.py` (Python 3.10+, sans dépendance) est la voie de référence pour
-produire une version : plugins, binaire natif, MSI sous Windows, puis AppImage,
-binaire Linux et `.deb` via Docker. Chaque étape se retire par son `--skip-…`
-ou s'isole par son `--…-only`.
+`build_dist.py` (Python 3.10+, no dependencies) is the reference way to
+produce a release: plugins, native binary, MSI on Windows, then AppImage,
+Linux binary and `.deb` via Docker. Each step is removed with its `--skip-…`
+or isolated with its `--…-only`.
 
-Détail — prérequis par plateforme, options, nommage des artefacts, plugins
-embarqués dans les installeurs, outillage Linux, tests :
+Details — per-platform prerequisites, options, artifact naming, plugins
+bundled in the installers, Linux tooling, tests:
 [doc/building.md](doc/building.md).
 
 ## Architecture
 
-- `src-tauri/` — backend Rust (Tauri 2) :
-  - `engine.rs` : dispatch du rendu intégré (natif / webview / JVM) ;
-  - `server.rs` : API HTTP locale compatible Kroki (tiny_http) ;
-  - `manager.rs` : fenêtres, onglets, détachement/rattachement
-    (`WindowFromPoint` Win32 au relâchement) ;
-  - `watcher.rs` : rechargement automatique (notify) ;
-  - `kroki.rs` : client du serveur externe optionnel + cache des rendus ;
-  - `assets/plantuml-mit.jar` : PlantUML (licence MIT) embarqué via `include_bytes!` ;
-  - `assets/ditaa-0.11.0-standalone.jar` : ditaa (licence LGPL v3, Batik inclus pour
-    la sortie `--svg`) embarqué via `include_bytes!`, exécuté en sous-process.
-- `ui/` — frontend statique embarqué (aucun bundler) :
-  - markdown-it + fences Kroki, highlight.js, DOMPurify pour le HTML des documents ;
-  - `vendor/katex/` : KaTeX + ses polices `.woff2` et le plugin markdown-it-texmath
-    (`$…$` / `$$…$$`), rendu math local sans réseau ni `eval` ;
-  - `renderer/` : page de la webview de rendu et ses moteurs vendorés
-    (mermaid, graphviz WASM, d2 WASM, bpmn-js, vega + interpréteur sans `eval`,
-    nomnoml, wavedrom, bytefield-svg). `vendor/dbml.js` est un bundle esbuild de
-    `@softwaretechnik/dbml-renderer` réduit à `run(src, "dot")` (viz.js exclu) :
-    il produit du DOT, rendu ensuite par le graphviz WASM déjà chargé.
-- `plugins/` — plugins du dépôt (cf. [Plugins](#plugins)) ; l'hôte côté Rust
-  (`src-tauri/src/plugins.rs`) ne fait que scanner, installer et confiner,
-  le code des plugins tourne dans des workers (`ui/js/plugins.js`).
-- `xtask/`, `scripts/`, `build_dist.py` — build et publication des artefacts
-  (cf. [doc/building.md](doc/building.md)).
-- `tests/` — scripts Node pilotant l'application via CDP, et suites autonomes.
+- `src-tauri/` — Rust backend (Tauri 2):
+  - `engine.rs`: dispatch of the built-in rendering (native / webview / JVM);
+  - `server.rs`: local Kroki-compatible HTTP API (tiny_http);
+  - `manager.rs`: windows, tabs, detach/reattach
+    (Win32 `WindowFromPoint` on mouse release);
+  - `watcher.rs`: automatic reload (notify);
+  - `kroki.rs`: client for the optional external server + render cache;
+  - `assets/plantuml-mit.jar`: PlantUML (MIT license) embedded via `include_bytes!`;
+  - `assets/ditaa-0.11.0-standalone.jar`: ditaa (LGPL v3 license, Batik included for
+    the `--svg` output) embedded via `include_bytes!`, run as a subprocess.
+- `ui/` — embedded static frontend (no bundler):
+  - markdown-it + Kroki fences, highlight.js, DOMPurify for the documents' HTML;
+  - `vendor/katex/`: KaTeX + its `.woff2` fonts and the markdown-it-texmath plugin
+    (`$…$` / `$$…$$`), local math rendering with no network or `eval`;
+  - `renderer/`: page of the rendering webview and its vendored engines
+    (mermaid, graphviz WASM, d2 WASM, bpmn-js, vega + `eval`-free interpreter,
+    nomnoml, wavedrom, bytefield-svg). `vendor/dbml.js` is an esbuild bundle of
+    `@softwaretechnik/dbml-renderer` reduced to `run(src, "dot")` (viz.js excluded):
+    it produces DOT, then rendered by the already-loaded graphviz WASM.
+- `plugins/` — repository plugins (see [Plugins](#plugins)); the Rust-side host
+  (`src-tauri/src/plugins.rs`) only scans, installs and confines,
+  plugin code runs in workers (`ui/js/plugins.js`).
+- `xtask/`, `scripts/`, `build_dist.py` — building and publishing the artifacts
+  (see [doc/building.md](doc/building.md)).
+- `tests/` — Node scripts driving the application via CDP, and standalone suites.
 - `doc/` — [installation](doc/installation.md), [build](doc/building.md),
-  [protocole de plugins](doc/plugin-protocol.md).
-- `samples/` — documents de démonstration (`demo.md`, `moteurs.md`).
+  [plugin protocol](doc/plugin-protocol.md).
+- `samples/` — demo documents (`demo.md`, `engines.md`).
 
-### Notes de sécurité
+### Security notes
 
-Le HTML inline des documents passe par DOMPurify. Les SVG produits par les
-moteurs sont insérés tels quels (DOMPurify viderait les `<foreignObject>` des
-labels mermaid) : la CSP de l'application (aucun `'unsafe-inline'`) neutralise
-tout script ou gestionnaire d'événement embarqué — un `<script>` injecté via
-innerHTML ne s'exécute pas, et aucun code de l'app n'`eval()` le contenu des
-documents.
+Inline HTML in documents goes through DOMPurify. The SVGs produced by the
+engines are inserted as is (DOMPurify would empty the `<foreignObject>`s of
+mermaid labels): the application's CSP (no `'unsafe-inline'`) neutralizes
+any embedded script or event handler — a `<script>` injected via
+innerHTML does not run, and no app code `eval()`s document content.
 
-La CSP autorise `'unsafe-eval'` et les workers `blob:` : c'est requis par le
-moteur **d2**, dont le runtime WASM utilise `new Function` dans un *module
-worker*. Cela n'ouvre pas de faille côté document (pas de sink `eval` alimenté
-par du contenu non fiable, scripts injectés non exécutés) ; le seul `eval` réel
-est interne à d2, confiné à la webview de rendu — la même confiance que celle
-déjà accordée aux moteurs mermaid/PlantUML/graphviz. L'API locale n'écoute que
-sur 127.0.0.1.
+The CSP allows `'unsafe-eval'` and `blob:` workers: this is required by the
+**d2** engine, whose WASM runtime uses `new Function` in a *module
+worker*. This opens no hole on the document side (no `eval` sink fed by
+untrusted content, injected scripts not executed); the only real `eval` is
+internal to d2, confined to the rendering webview — the same trust already
+granted to the mermaid/PlantUML/graphviz engines. The local API only listens
+on 127.0.0.1.
