@@ -1,12 +1,38 @@
 # Kroki Desk
 
-Visionneuse Markdown native pour Windows avec rendu de diagrammes intégré,
-compatible [Kroki](https://kroki.io) : les blocs de code dont le langage est un
-type de diagramme (`mermaid`, `plantuml`, `graphviz`, `svgbob`, `vegalite`, …)
-sont rendus en SVG **sans serveur, sans Docker, sans réseau** — les moteurs sont
-embarqués dans l'exécutable.
+Visionneuse Markdown de bureau pour **Windows et Linux**, avec rendu de
+diagrammes intégré compatible [Kroki](https://kroki.io) : les blocs de code dont
+le langage est un type de diagramme (`mermaid`, `plantuml`, `graphviz`, `d2`,
+`svgbob`, `vegalite`, …) sont rendus en SVG **sans serveur, sans Docker, sans
+réseau** — les moteurs sont embarqués dans l'exécutable. Extensible par
+[plugins](#plugins) : documents LaTeX, CSV, nouveaux types de fences…
 
-![Tauri 2](https://img.shields.io/badge/Tauri-2-blue) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078d4)
+![Tauri 2](https://img.shields.io/badge/Tauri-2-blue) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078d4) ![Linux](https://img.shields.io/badge/Linux-Debian%2012%2B%20%7C%20Ubuntu%2024.04%2B-e95420)
+
+## Installation
+
+| Plateforme | Portable | Installé |
+| --- | --- | --- |
+| Windows 10/11 | `kroki_deskapp-<version>.exe` | `kroki_deskapp-<version>.msi` |
+| Linux x86_64 | `…-linux-x86_64-debian12.AppImage` | `…-linux-x86_64-debian12.deb` |
+
+Les binaires portables tiennent en un fichier, sans installation ni droits.
+Les installeurs y ajoutent l'entrée au menu, une désinstallation propre, les
+plugins livrés et les **associations de fichiers** : les deux formats propres
+à Kroki Desk — `.kdws` (session) et `.kdext` (plugin) — s'ouvrent au
+double-clic, Kroki Desk s'ajoute à « Ouvrir avec » pour les formats qu'il lit
+nativement (Markdown, HTML…), et chaque plugin installé apporte les
+associations de ses propres formats.
+
+Le `.deb` s'installe avec **apt**, qui résout les dépendances (`dpkg -i` ne le
+fait pas) :
+
+```bash
+sudo apt install ./kroki_deskapp-<version>-linux-x86_64-debian12.deb
+```
+
+Détail — choix des plugins dans le MSI, installation silencieuse,
+associations par plateforme, binaire Linux nu : [doc/installation.md](doc/installation.md).
 
 ## Fonctionnalités
 
@@ -36,7 +62,10 @@ embarqués dans l'exécutable.
 - **Multi-fenêtres** : `Ctrl+Maj+N`, ou en **détachant un onglet** — glissez un
   onglet hors de la barre pour le sortir dans sa propre fenêtre, déposez-le sur une
   autre fenêtre de l'application pour l'y rattacher (comme un navigateur).
-- **Glisser-déposer** de fichiers `.md` depuis l'Explorateur.
+  Le détachement par glisser est propre à Windows ; sous Linux, les onglets se
+  réordonnent dans leur fenêtre.
+- **Glisser-déposer** de fichiers depuis le gestionnaire de fichiers (et, sous
+  Windows, depuis un éditeur comme VS Code).
 - **Recherche dans le document** (`Ctrl+F`) : barre compacte dans le coin
   haut-droit de la zone de lecture — compteur `n/m`, occurrence précédente /
   suivante (`Entrée`, `Maj+Entrée`, `F3`), fermeture. Toutes les occurrences
@@ -69,7 +98,7 @@ embarqués dans l'exécutable.
   fichiers manquants ignorés et signalés. L'application ne restaure jamais rien
   automatiquement au démarrage : rouvrir une session est toujours un geste
   explicite.
-- **CLI** : `kroki_deskapp.exe "fichier.md" ["autre.md" …]` — instance unique :
+- **CLI** : `kroki_deskapp "fichier.md" ["autre.md" …]` — instance unique :
   les invocations suivantes ouvrent les fichiers dans la première fenêtre.
   Un fichier peut porter une **référence**, avec la syntaxe des liens :
   `"modele.tex#eq:sigmaU"` (`\label`), `"doc.md#section"`, `"doc.md#L42"`
@@ -79,11 +108,9 @@ embarqués dans l'exécutable.
   l'application détachée du terminal et rend la main aussitôt :
   `kroki_deskapp -d "doc#ref"` depuis bash (Git Bash, Linux), qui sinon
   ne la rendrait qu'à la fermeture de l'application si elle n'était pas déjà
-  ouverte. Pour un agent ou un script, lancer aussi par `start ""
-  kroki_deskapp …` (cmd) ou `Start-Process kroki_deskapp` (PowerShell) — le
-  MSI enregistre l'application dans *App Paths*, ce qui la rend lançable par
-  son nom par ces deux voies, sans PATH. Sous Linux, le `.deb` pose
-  `/usr/bin/kroki_deskapp`.
+  ouverte. Installée, l'application se lance par son nom sans toucher au PATH
+  (`start ""`/`Start-Process` sous Windows, `/usr/bin` sous Linux — cf.
+  [installation](doc/installation.md#lancement-par-nom)).
 - **API Kroki locale** (optionnelle, activée par défaut sur
   `http://127.0.0.1:8442`) : expose le rendu intégré aux outils tiers —
   extensions VS Code, scripts… Routes : `POST /` (JSON), `POST /{type}/svg`
@@ -147,8 +174,8 @@ onglet ouvert).
 
 ## Réglages
 
-⚙ dans la barre d'onglets. Persistés dans
-`%APPDATA%\kroki-deskapp\settings.json` :
+⚙ dans la barre d'onglets. Persistés dans `settings.json`, sous
+`%APPDATA%\kroki-deskapp\` (Windows) ou `~/.config/kroki-deskapp/` (Linux) :
 
 - **Serveur Kroki externe** (vide = rendu intégré, recommandé) ;
 - **API Kroki locale** : activation + port (8442 par défaut) ;
@@ -161,234 +188,45 @@ onglet ouvert).
   d'un plugin de document (`.tex`…), utile à la mise au point
   d'un plugin — s'active ici ; il est désactivé par défaut.
 
+## Plugins
+
+Un plugin ajoute un format de document (`.tex`, `.csv`…), un type de fence ou
+une coloration syntaxique. Il s'exécute dans un worker isolé, sans accès au
+disque hors du dossier du document ouvert. Il se distribue en archive `.kdext`,
+à installer par glisser-déposer sur la fenêtre, double-clic ou dialog
+Plugins (⚙), après confirmation.
+
+Plugins du dépôt (`plugins/`) :
+
+- [`latex-doc`](plugins/latex-doc/README.md) — documents LaTeX autonomes et
+  fences ` ```latex ` (installé par défaut avec les installeurs) ;
+- [`csv-tables`](plugins/csv-tables/README.md),
+  [`barchart`](plugins/barchart/README.md),
+  [`ini-highlight`](plugins/ini-highlight/README.md) — exemples pédagogiques,
+  un par point d'extension.
+
+Écrire un plugin : [doc/plugin-protocol.md](doc/plugin-protocol.md) (protocole
+v1, exemples commentés, empaquetage par `python pack_plugin.py`).
+
 ## Build
 
-Prérequis : Rust stable (et WebView2 Runtime, préinstallé sur Windows 10/11).
-
-Des alias Cargo (`.cargo/config.toml`) pilotent le crate `src-tauri/` depuis la
-racine du dépôt, sans `cd src-tauri` :
+Prérequis minimal : Rust stable. Il n'y a pas de bundler frontend, aucune étape
+`npm`.
 
 ```bash
-cargo build-app       # build release → dist/kroki_deskapp-<version>.exe (+ twin non versionné)
-cargo run-app         # build + lance l'app en debug (développement)
-cargo lint-app        # clippy
-cargo fmt-app         # rustfmt
-cargo build-appimage  # AppImage Linux (machine/conteneur Linux uniquement)
-cargo build-msi       # installeur MSI Windows (Windows uniquement)
-cargo build-deb       # paquet Debian/Ubuntu (machine/conteneur Linux uniquement)
+cargo run-app            # développement : build debug + lancement
+cargo build-app          # binaire release de l'hôte → dist/
+python build_dist.py     # tous les artefacts de la version → dist/
 ```
 
-Le binaire autonome est publié dans `dist/` — un seul fichier : le frontend,
-les moteurs JS/WASM, `plantuml-mit.jar` et `ditaa-standalone.jar` y sont
-embarqués. Chaque build y dépose l'artefact **postfixé de la version**
-(`kroki_deskapp-1.2.3.exe`) plus un fichier **non versionné**
-(`kroki_deskapp.exe`) pointant sur le même contenu : hardlink si le système de
-fichiers le permet (aucun droit administrateur requis, sur NTFS comme sur
-ext4), copie sinon.
+`build_dist.py` (Python 3.10+, sans dépendance) est la voie de référence pour
+produire une version : plugins, binaire natif, MSI sous Windows, puis AppImage,
+binaire Linux et `.deb` via Docker. Chaque étape se retire par son `--skip-…`
+ou s'isole par son `--…-only`.
 
-### Installeur Windows (MSI)
-
-`cargo build-msi` produit `dist/kroki_deskapp-<version>.msi` (+ twin). Le
-binaire portable reste le livrable principal — copiable sur une clé, sans
-droits — l'installeur s'y **ajoute** pour qui veut une installation en bonne et
-due forme : entrée dans « Applications installées », désinstallation propre,
-mise à jour en place d'une version à l'autre, les **associations de fichiers**
-et une page de choix des **plugins**.
-
-#### Plugins
-
-Le MSI embarque les plugins listés dans la **stratégie d'embarquement** (cf.
-§ « Plugins embarqués » plus bas) ; la seule page de personnalisation laisse
-cocher ceux à installer. Ils s'installent au premier lancement et se mettent à
-jour en même temps que l'application. Avec la stratégie par défaut :
-
-| Propriété | Plugin | Apporte | Coché |
-| --- | --- | --- | --- |
-| `PLUGIN_LATEX_DOC` | `latex-doc` | `.tex` `.latex`, fences ` ```latex ` | oui |
-| `PLUGIN_CSV_TABLES` | `csv-tables` | `.csv` | non |
-| `PLUGIN_BARCHART` | `barchart` | fences ` ```barchart ` | non |
-| `PLUGIN_INI_HIGHLIGHT` | `ini-highlight` | coloration ` ```ini ` | non |
-
-Les trois derniers sont les exemples pédagogiques de la spécification du
-protocole de plugins : embarqués pour être installables sans réseau, pas pour
-être installés par défaut. Un plugin supprimé depuis le dialog Plugins n'est pas
-réinstallé, et une version plus récente installée à la main n'est jamais
-remplacée par une plus ancienne. Décocher un plugin ne désinstalle pas celui qui
-serait déjà en place — la suppression se fait depuis l'application.
-
-#### Associations de fichiers
-
-Elles n'ont pas de page. Seules celles des formats servis par un plugin
-dépendent de la case correspondante.
-
-| Extensions | Effet | Installé si |
-| --- | --- | --- |
-| `.kdws` `.kdext` | double-clic → Kroki Desk | toujours |
-| `.md` `.markdown` `.mdown` `.mkd` `.txt` `.html` `.htm` | « Ouvrir avec » | toujours |
-| extensions d'un plugin (`.tex` `.latex`, `.csv`…) | double-clic → Kroki Desk | plugin coché |
-
-Installer un plugin, c'est choisir Kroki Desk pour ses formats : l'installeur
-les réclame en application par défaut. Windows garde toutefois le dernier mot —
-un format pour lequel vous avez déjà choisi une application la conserve, Kroki
-Desk n'y apparaît qu'en suggestion. Les formats natifs partagés (Markdown,
-texte, HTML) ne sont jamais réclamés : Kroki Desk s'ajoute seulement à « Ouvrir
-avec », sans toucher à vos applications par défaut.
-
-#### Installation silencieuse
-
-Les mêmes choix se passent en propriétés :
-
-```
-msiexec /i kroki_deskapp.msi /qn PLUGIN_CSV_TABLES=1 PLUGIN_LATEX_DOC=""
-```
-
-installe le plugin CSV — et l'association `.csv` avec lui — sans le plugin
-LaTeX ni ses associations.
-
-L'installation est **par machine** (`Program Files`), donc élévation demandée.
-Les documents, réglages et plugins de chaque utilisateur restent dans son profil
-et survivent à une désinstallation.
-
-Le build requiert Windows (WiX v3) et les archives de plugins dans `dist/` —
-`python build_dist.py` enchaîne les deux étapes (le MSI fait partie des
-artefacts produits par défaut) ; `--msi-only` s'y limite.
-
-### Paquet Debian/Ubuntu (.deb)
-
-`cargo build-deb` produit
-`dist/kroki_deskapp-<version>-linux-<arch>-<distro>.deb` (+ twin) : le pendant
-Linux du MSI. À installer avec **apt**, qui résout les dépendances — `dpkg -i`
-ne le fait pas :
-
-```bash
-sudo apt install ./kroki_deskapp-linux-x86_64-debian12.deb
-```
-
-Il pose l'application dans `/usr/bin`, l'inscrit au menu des applications,
-associe les types de fichiers et se désinstalle proprement
-(`sudo apt remove kroki-desk`). Cible : Debian 12+ et Ubuntu 24.04+ — la version
-compilée dans le conteneur exige `libc6 (>= 2.36)`, ce qui exclut Ubuntu 22.04.
-
-#### Plugins
-
-Le paquet embarque les mêmes plugins que le MSI, mais un `.deb` n'a pas
-d'interface pour vous laisser choisir. Ceux que la stratégie d'embarquement
-coche sont donc installés au premier lancement, les autres seulement **déposés
-à côté**. Avec la stratégie par défaut :
-
-| Plugin | Apporte | Emplacement dans le paquet | Installé |
-| --- | --- | --- | --- |
-| `latex-doc` | `.tex` `.latex`, fences ` ```latex ` | `bundled-plugins/` | oui |
-| `csv-tables` | `.csv` | `example-plugins/` | non |
-| `barchart` | fences ` ```barchart ` | `example-plugins/` | non |
-| `ini-highlight` | coloration ` ```ini ` | `example-plugins/` | non |
-
-Les plugins déposés à côté s'installent depuis le dialog Plugins (« Ajouter un
-plugin… »), en pointant `/usr/lib/Kroki Desk/example-plugins/` — sans réseau,
-puisqu'ils sont déjà là. Les règles de mise à jour sont celles du MSI : jamais
-de régression de version, et un plugin supprimé depuis le dialog n'est pas
-réinstallé.
-
-#### Associations de fichiers
-
-Kroki Desk s'ajoute à « Ouvrir avec » pour `.md` `.markdown` `.mdown` `.mkd`
-`.html` `.htm` et pour les formats des plugins installés de type standard
-(`.tex` `.latex`), sans déloger vos applications par défaut. Pour `.kdws`
-`.kdext` et les formats propres à un plugin installé — ceux qui n'ont pas de
-type MIME standard, et reçoivent un type `text/x-kroki-desk-<ext>` — il est le
-seul candidat déclaré, donc le double-clic l'ouvre directement.
-
-Rien n'est imposé : sous Linux, l'application par défaut est un choix
-utilisateur (`~/.config/mimeapps.list`) qu'un paquet n'a pas à écrire.
-
-Deux différences avec le MSI, assumées :
-
-- **`.txt` n'est pas associé.** Linux n'a pas d'association par extension :
-  `.txt` *est* `text/plain`, et le déclarer ferait apparaître Kroki Desk dans le
-  « Ouvrir avec » de tout fichier texte (`.py`, `.conf`, `.log`…), qu'il ne sait
-  pas ouvrir. Un `.txt` reste ouvrable par glisser-déposer ou par le sélecteur
-  de l'application.
-- **Les formats d'un plugin non installé ne sont pas associés** (`.csv` avec la
-  stratégie par défaut) : le plugin qui les lit n'est pas là.
-
-Le build requiert Linux et les archives de plugins dans `dist/` —
-`python build_dist.py` enchaîne les deux étapes depuis Windows comme depuis
-Linux, via Docker (le `.deb` fait partie des artefacts produits par défaut) ;
-`--deb-only` s'y limite.
-
-### Plugins embarqués
-
-Les plugins que le MSI et le `.deb` embarquent sont décidés par un fichier
-texte à la racine du dépôt, une ligne par plugin :
-
-```
-# <id> [on]   — on : coché (MSI) / installé au premier lancement (.deb)
-latex-doc      on
-csv-tables
-```
-
-`bundled-plugins.txt` (ignoré par git) fait foi s'il existe ; sinon
-`bundled-plugins.default.txt`, suivi, donne la sélection par défaut. L'ordre
-des lignes est celui de la page du MSI. Le nom affiché et les extensions à
-associer sont lus dans le `manifest.json` de chaque archive `dist/<id>.kdext`,
-qui doit donc exister (`python build_dist.py --plugins-only`). Le fragment WiX
-et l'overlay `.deb` qui en découlent sont générés à chaque build ;
-`cargo run --manifest-path xtask/Cargo.toml -- bundled` les produit seuls,
-pour relecture.
-
-La variable `KROKI_BUNDLED_PLUGINS` (chemin d'un fichier de stratégie) impose
-une stratégie précise. C'est ce que fait `python build_dist.py --channel
-public` avec `bundled-plugins.default.txt`, même si un `bundled-plugins.txt`
-local existe (`--channel local`, le défaut, garde le choix ci-dessus). En canal
-public, chaque artefact produit est aussi recopié dans `dist/public/<version>/`,
-avec les seuls `.kdext` de la stratégie : c'est le dossier à publier.
-`--channel all` enchaîne les deux canaux en une passe (binaires et AppImage
-une seule fois, MSI et `.deb` deux fois, public d'abord : `dist/` finit sur
-les installeurs du canal local). Le
-script s'arrête si les archives réellement embarquées dans le MSI ou le
-`.deb` diffèrent de cette stratégie.
-
-### Linux
-
-Support en dégradé (WebKitGTK ; pas de détachement d'onglets inter-fenêtres).
-Trois formats livrables :
-
-- **Binaire semi-dynamique** — `cargo build-app` →
-  `dist/kroki_deskapp-<version>-linux-<arch>-<distro>` (+ twin non versionné) ;
-  la machine cible doit avoir `libwebkit2gtk-4.1` installé.
-- **AppImage autonome** — `cargo build-appimage` ; un seul fichier portable,
-  GTK/WebKitGTK embarqués →
-  `dist/kroki_deskapp-<version>-linux-<arch>-<distro>.AppImage` (+ twin non
-  versionné).
-- **Paquet `.deb`** — `cargo build-deb` (cf. ci-dessus) ; même binaire que le
-  premier, mais installé, associé aux types de fichiers et désinstallable.
-
-`<distro>` est le tag de la distro qui compile (lu dans `/etc/os-release` :
-`debian12` pour le conteneur de build, `ubuntu24.04` pour un hôte Ubuntu…) —
-un build natif et un build Docker coexistent ainsi dans `dist/` ; le
-distribuable est le `-debian12` (glibc bookworm, compatibilité large).
-  Installe `tauri-cli` en local (one-shot, `xtask/target/tools/`) s'il n'est
-  pas déjà sur le PATH.
-
-L'outillage (Dockerfile, scripts de build et de test) vit dans `scripts/` :
-
-- `scripts/Dockerfile.linux` — image de build `kroki-linux-build` (Debian
-  bookworm → AppImage compatible avec les distros plus anciennes) ; commandes
-  `docker run` en en-tête du fichier ;
-- `scripts/linux_appimage_build.sh` — enrobe `cargo build-appimage` dans le
-  conteneur (la publication dans `dist/` est faite par le xtask) ;
-- `scripts/linux_deb_build.sh` — idem pour `cargo build-deb` ;
-- `scripts/linux_runtime_run.sh` — test runtime headless (Xvfb) ;
-- `build_dist.py` (racine du dépôt, cross-plateforme) — génère l'intégralité
-  des artefacts de la version en une commande (daemon Docker démarré requis
-  pour les étapes Linux) : `.kdext` des plugins + binaire natif de l'hôte +
-  installeur MSI (Windows) + AppImage + binaire Linux nu + paquet `.deb` →
-  `dist/`, chacun versionné + twin non versionné. **Tout est produit par
-  défaut** ; chaque étape se retire par son `--skip-…` (`--skip-plugins`,
-  `--skip-native`, `--skip-msi`, `--skip-appimage`, `--skip-binary`,
-  `--skip-deb`) ou s'isole par son `--…-only` (`--native-only`,
-  `--plugins-only`, `--msi-only`, `--deb-only`) ; s'y ajoutent
-  `--skip-image-build`, `--compile-only` et `--test`.
+Détail — prérequis par plateforme, options, nommage des artefacts, plugins
+embarqués dans les installeurs, outillage Linux, tests :
+[doc/building.md](doc/building.md).
 
 ## Architecture
 
@@ -411,9 +249,14 @@ L'outillage (Dockerfile, scripts de build et de test) vit dans `scripts/` :
     nomnoml, wavedrom, bytefield-svg). `vendor/dbml.js` est un bundle esbuild de
     `@softwaretechnik/dbml-renderer` réduit à `run(src, "dot")` (viz.js exclu) :
     il produit du DOT, rendu ensuite par le graphviz WASM déjà chargé.
-- `tests/cdp.mjs` — harnais de test pilotant les webviews via CDP
-  (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`) :
-  `report`, `where`, `focus`, `reorder`, `tear-cancel`, `invoke-detach-at x y`.
+- `plugins/` — plugins du dépôt (cf. [Plugins](#plugins)) ; l'hôte côté Rust
+  (`src-tauri/src/plugins.rs`) ne fait que scanner, installer et confiner,
+  le code des plugins tourne dans des workers (`ui/js/plugins.js`).
+- `xtask/`, `scripts/`, `build_dist.py` — build et publication des artefacts
+  (cf. [doc/building.md](doc/building.md)).
+- `tests/` — scripts Node pilotant l'application via CDP, et suites autonomes.
+- `doc/` — [installation](doc/installation.md), [build](doc/building.md),
+  [protocole de plugins](doc/plugin-protocol.md).
 - `samples/` — documents de démonstration (`demo.md`, `moteurs.md`).
 
 ### Notes de sécurité
