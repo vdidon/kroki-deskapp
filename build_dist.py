@@ -39,6 +39,23 @@ Le MSI et le .deb embarquent les .kdext des plugins : leur build échoue si les
 archives manquent de dist/. --skip-plugins les fait donc réutiliser celles d'un
 build précédent, il ne les retire pas de l'installeur.
 
+Canal de distribution (--channel) : seuls le MSI et le .deb dépendent de la
+stratégie d'embarquement des plugins (cf. xtask/src/bundled.rs), donc du canal.
+  - local (défaut) : bundled-plugins.txt s'il existe, sinon
+    bundled-plugins.default.txt — la sélection du poste ;
+  - public : bundled-plugins.default.txt, même si un bundled-plugins.txt existe.
+La stratégie retenue est imposée au xtask (variable KROKI_BUNDLED_PLUGINS,
+transmise aussi au conteneur du .deb). En canal public, chaque artefact produit
+est en outre recopié dans dist/public/<version>/ — exactement ce qu'il y a à
+téléverser : binaires, installeurs, et les seuls .kdext de sa stratégie.
+dist/ à la racine reste écrasé par le dernier build, quel que soit son canal ;
+dist/public/, lui, ne reçoit que les builds publics. --channel all fait les deux
+en une passe : binaires et AppImage une seule fois (ils n'embarquent aucun
+plugin), MSI et .deb construits deux fois, public d'abord — dist/ finit donc
+sur les installeurs du canal local. Après le MSI et
+le .deb, les archives réellement embarquées (src-tauri/bundled-plugins/) sont
+comparées à la stratégie : tout écart arrête le script.
+
 Les builds Docker passent par l'image kroki-linux-build (daemon Docker démarré
 requis, sauf --skip-binary --skip-appimage --skip-deb). Le test runtime headless
 (Xvfb + API Kroki locale) est optionnel (--test).
@@ -55,10 +72,14 @@ Exemples :
     python build_dist.py --msi-only --skip-plugins  # juste le MSI, .kdext de dist/ réutilisés
     python build_dist.py --deb-only                 # juste les .kdext + le .deb (Docker)
     python build_dist.py --compile-only             # vérif compilation Linux seule
+    python build_dist.py --channel public           # artefacts du canal public
+    python build_dist.py --channel all              # canaux public et local en une passe
 """
 
 import argparse
+import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -88,6 +109,12 @@ ONLY_MODES = {
     "deb_only": ("deb", {"plugins", "deb"}),
     "compile_only": (None, set()),
 }
+
+# Stratégies d'embarquement des plugins (cf. xtask/src/bundled.rs).
+STRATEGY_LOCAL = "bundled-plugins.txt"
+STRATEGY_DEFAULT = "bundled-plugins.default.txt"
+STRATEGY_ENV = "KROKI_BUNDLED_PLUGINS"
+CHANNELS = ("local", "public")
 
 USE_COLOR = sys.stdout.isatty()
 
@@ -145,6 +172,73 @@ def pack_plugins() -> None:
     say(f"== {len(plugin_dirs)} plugin(s) publiés dans dist/ (versionné + twin) ==", "32")
 
 
+def channel_strategy(channel: str) -> Path:
+    """Fichier de stratégie d'un canal : le public ignore la sélection du poste."""
+    if channel == "local" and (REPO_ROOT / STRATEGY_LOCAL).is_file():
+        return REPO_ROOT / STRATEGY_LOCAL
+    return REPO_ROOT / STRATEGY_DEFAULT
+
+
+def strategy_ids(strategy: Path) -> list[str]:
+    """Identifiants des plugins d'une stratégie (même lecture que bundled::load)."""
+    ids = []
+    for raw in strategy.read_text(encoding="utf-8").splitlines():
+        words = raw.split("#", 1)[0].split()
+        if words:
+            ids.append(words[0])
+    return ids
+
+
+def newest(pattern: str, exclude_suffixes: tuple[str, ...] = ()) -> Path | None:
+    """Artefact le plus récent de dist/ correspondant au motif."""
+    candidates = sorted(
+        (p for p in (REPO_ROOT / "dist").glob(pattern)
+         if p.is_file() and p.suffix not in exclude_suffixes),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
+def collect(artifact: Path, release_dir: Path | None) -> None:
+    """Recopie un artefact dans dist/public/<version>/ (hardlink, copie en
+    repli) ; no-op hors canal public, dont les artefacts restent dans dist/."""
+    if release_dir is None:
+        return
+    release_dir.mkdir(parents=True, exist_ok=True)
+    target = release_dir / artifact.name
+    target.unlink(missing_ok=True)
+    try:
+        os.link(artifact, target)
+    except OSError:
+        shutil.copy2(artifact, target)
+
+
+def collect_plugins(ids: list[str], release_dir: Path | None) -> None:
+    """Recopie les .kdext versionnés des seuls plugins de la stratégie."""
+    if release_dir is None:
+        return
+    for plugin_id in ids:
+        archive = newest(f"{plugin_id}-[0-9]*.kdext")
+        if archive is None:
+            sys.exit(f"Archive versionnée de « {plugin_id} » introuvable dans dist/ "
+                     "(relancer sans --skip-plugins).")
+        collect(archive, release_dir)
+
+
+def check_staged(ids: list[str], label: str) -> None:
+    """Vérifie que l'installeur a embarqué exactement les plugins du canal.
+
+    bundled::stage vide src-tauri/bundled-plugins/ puis y recopie la stratégie
+    qu'il a lue : son contenu dit donc ce que le build vient d'embarquer, y
+    compris depuis le conteneur du .deb (dépôt monté).
+    """
+    staged = sorted(p.stem for p in (REPO_ROOT / "src-tauri" / "bundled-plugins").glob("*.kdext"))
+    if staged != sorted(ids):
+        sys.exit(f"{label} : plugins embarqués {staged} ≠ stratégie du canal {sorted(ids)} "
+                 "— artefact à ne pas publier.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -174,6 +268,8 @@ def main() -> None:
                         help="ne construire que les plugins et le .deb (Docker requis)")
     parser.add_argument("--compile-only", action="store_true",
                         help="juste un `cargo build` (debug) de vérification dans le conteneur, aucun artefact")
+    parser.add_argument("--channel", choices=(*CHANNELS, "all"), default="local",
+                        help="canal de distribution : stratégie d'embarquement des plugins du MSI/.deb ; public = recopie aussi dans dist/public/<version>/ ; all = public puis local, installeurs construits deux fois (défaut : local)")
     parser.add_argument("--test", action="store_true",
                         help="après le build, test runtime headless sur l'AppImage (ou le binaire nu si --skip-appimage)")
     args = parser.parse_args()
@@ -222,6 +318,30 @@ def main() -> None:
 
     (REPO_ROOT / "dist").mkdir(exist_ok=True)
 
+    # La stratégie du canal est imposée au xtask : sans ça, un poste qui a un
+    # bundled-plugins.txt l'embarquerait aussi dans un build public. `all`
+    # construit le public d'abord, pour que dist/ finisse sur les installeurs
+    # du canal local.
+    version = project_version()
+    channels = []
+    for name in (("public", "local") if args.channel == "all" else (args.channel,)):
+        strategy = channel_strategy(name)
+        channels.append((name, strategy.relative_to(REPO_ROOT).as_posix(), strategy_ids(strategy)))
+        say(f"== Canal {name} : {channels[-1][1]} ({', '.join(channels[-1][2]) or 'aucun plugin'}) ==")
+    public = next((c for c in channels if c[0] == "public"), None)
+    # Les artefacts sans plugin (binaires, AppImage) sont les mêmes pour tous
+    # les canaux : ils ne sont construits qu'une fois, et recopiés si le canal
+    # public en fait partie.
+    release_dir = REPO_ROOT / "dist" / "public" / version if public else None
+
+    def per_channel(label: str):
+        """Itère les canaux en imposant leur stratégie au xtask (cf. STRATEGY_ENV)."""
+        for name, rel, ids in channels:
+            os.environ[STRATEGY_ENV] = rel
+            if len(channels) > 1:
+                say(f"== {label} : canal {name} ==")
+            yield name, rel, ids, (release_dir if name == "public" else None)
+
     # Les plugins d'abord : quelques centaines de ms, sans cargo ni Docker.
     # Même logique que pour le natif ci-dessous, en plus fort — rien de ce qui
     # suit ne doit pouvoir retarder ou empêcher un artefact aussi bon marché.
@@ -229,6 +349,8 @@ def main() -> None:
         skipped("Plugins", "plugins")
     else:
         pack_plugins()
+    if public and not (args.skip_plugins and args.skip_msi and args.skip_deb):
+        collect_plugins(public[2], release_dir)
     if args.plugins_only:
         return
 
@@ -240,6 +362,11 @@ def main() -> None:
     else:
         say("== Build natif (cargo build-app, release LTO : compter ~2 min) ==")
         run(["cargo", "build-app"])
+        native = (newest(f"kroki_deskapp-{version}.exe") if IS_WINDOWS
+                  else newest(f"kroki_deskapp-{version}-linux-*", (".AppImage", ".deb")))
+        if native is None:
+            sys.exit(f"Build terminé mais aucun binaire natif version {version} trouvé dans dist/.")
+        collect(native, release_dir)
         say("== Binaire natif publié dans dist/ (versionné + twin, cf. publish_dist) ==", "32")
     if args.native_only:
         return
@@ -250,9 +377,15 @@ def main() -> None:
     if args.skip_msi:
         skipped("Installeur MSI", "msi", msi_skip_reason)
     else:
-        say("== Build de l'installeur MSI (cargo build-msi, WiX v3) ==")
-        run(["cargo", "build-msi"])
-        say("== MSI publié dans dist/ (versionné + twin) ==", "32")
+        for name, _, ids, channel_dir in per_channel("Installeur MSI"):
+            say("== Build de l'installeur MSI (cargo build-msi, WiX v3) ==")
+            run(["cargo", "build-msi"])
+            check_staged(ids, f"MSI ({name})")
+            msi = newest(f"kroki_deskapp-{version}.msi")
+            if msi is None:
+                sys.exit(f"Build terminé mais aucun MSI version {version} trouvé dans dist/.")
+            collect(msi, channel_dir)
+            say("== MSI publié dans dist/ (versionné + twin) ==", "32")
     if args.msi_only:
         return
 
@@ -272,8 +405,6 @@ def main() -> None:
              "-e", "CARGO_TARGET_DIR=/target", IMAGE_NAME, "cargo", "build"])
         say("== Compilation OK ==", "32")
         return
-
-    version = project_version()
 
     if args.skip_appimage:
         skipped("AppImage", "appimage")
@@ -306,6 +437,7 @@ def main() -> None:
         if not candidates:
             sys.exit(f"Build terminé mais aucun binaire Linux version {version} trouvé dans dist/.")
         linux_binary = candidates[0]
+        collect(linux_binary, release_dir)
         say(f"== Binaire Linux : dist/{linux_binary.name} ==", "32")
         say("   (semi-dynamique : la machine cible doit avoir libwebkit2gtk-4.1 installé ; penser à 'chmod +x' une fois transféré)", "90")
 
@@ -320,6 +452,7 @@ def main() -> None:
         if not candidates:
             sys.exit(f"Build terminé mais aucune AppImage version {version} trouvée dans dist/.")
         appimage = candidates[0]
+        collect(appimage, release_dir)
         say(f"== AppImage produite : {appimage} ==", "32")
 
     # Le .deb en dernier des artefacts Linux : il relance un build release, qui
@@ -329,17 +462,17 @@ def main() -> None:
     if args.skip_deb:
         skipped("Paquet .deb", "deb")
     else:
-        say("== Build du paquet Debian/Ubuntu (cargo build-deb) ==")
-        run(["docker", "run", "--rm", *COMMON_VOLUMES,
-             IMAGE_NAME, "bash", "/app/scripts/linux_deb_build.sh"])
-        candidates = sorted(
-            (REPO_ROOT / "dist").glob(f"kroki_deskapp-{version}-linux-*.deb"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if not candidates:
-            sys.exit(f"Build terminé mais aucun paquet .deb version {version} trouvé dans dist/.")
-        say(f"== Paquet .deb : dist/{candidates[0].name} ==", "32")
+        for name, rel, ids, channel_dir in per_channel("Paquet .deb"):
+            say("== Build du paquet Debian/Ubuntu (cargo build-deb) ==")
+            run(["docker", "run", "--rm", *COMMON_VOLUMES,
+                 "-e", f"{STRATEGY_ENV}={rel}",
+                 IMAGE_NAME, "bash", "/app/scripts/linux_deb_build.sh"])
+            check_staged(ids, f".deb ({name})")
+            deb = newest(f"kroki_deskapp-{version}-linux-*.deb")
+            if deb is None:
+                sys.exit(f"Build terminé mais aucun paquet .deb version {version} trouvé dans dist/.")
+            collect(deb, channel_dir)
+            say(f"== Paquet .deb : dist/{deb.name} ==", "32")
         say("   (installation : sudo apt install ./<paquet>.deb — apt résout les dépendances, pas dpkg -i)", "90")
 
     if args.test:
@@ -351,6 +484,11 @@ def main() -> None:
         run(["docker", "run", "--rm", "-e", f"APP=/app/dist/{test_target}",
              *COMMON_VOLUMES, IMAGE_NAME, "bash", "/app/scripts/linux_runtime_run.sh"])
         say("== Test runtime OK ==", "32")
+
+    if release_dir is not None and release_dir.is_dir():
+        say(f"== Canal public : dist/public/{version}/ ==", "32")
+        for artifact in sorted(release_dir.iterdir()):
+            say(f"   {artifact.name}", "90")
 
 
 if __name__ == "__main__":

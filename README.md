@@ -336,6 +336,18 @@ et l'overlay `.deb` qui en découlent sont générés à chaque build ;
 `cargo run --manifest-path xtask/Cargo.toml -- bundled` les produit seuls,
 pour relecture.
 
+La variable `KROKI_BUNDLED_PLUGINS` (chemin d'un fichier de stratégie) impose
+une stratégie précise. C'est ce que fait `python build_dist.py --channel
+public` avec `bundled-plugins.default.txt`, même si un `bundled-plugins.txt`
+local existe (`--channel local`, le défaut, garde le choix ci-dessus). En canal
+public, chaque artefact produit est aussi recopié dans `dist/public/<version>/`,
+avec les seuls `.kdext` de la stratégie : c'est le dossier à publier.
+`--channel all` enchaîne les deux canaux en une passe (binaires et AppImage
+une seule fois, MSI et `.deb` deux fois, public d'abord : `dist/` finit sur
+les installeurs du canal local). Le
+script s'arrête si les archives réellement embarquées dans le MSI ou le
+`.deb` diffèrent de cette stratégie.
+
 ### Linux
 
 Support en dégradé (WebKitGTK ; pas de détachement d'onglets inter-fenêtres).

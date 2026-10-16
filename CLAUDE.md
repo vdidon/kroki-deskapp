@@ -188,6 +188,19 @@ Ce que l'overlay porte, et pourquoi :
   `dist/` installerait sinon tous les `.kdext` voisins. Le `.deb` passe par la
   **même** stratégie (cf. § suivant). Pour relire ce qui sera généré sans
   bundler : `cargo run --manifest-path xtask/Cargo.toml -- bundled`.
+  **Canaux de distribution** : `KROKI_BUNDLED_PLUGINS` (chemin relatif au
+  dépôt) impose la stratégie et court-circuite le choix ci-dessus — un
+  fichier imposé absent est une erreur, jamais un repli. `build_dist.py
+  --channel public|local|all` la pose (`public` = `bundled-plugins.default.txt`
+  même si `bundled-plugins.txt` existe ; `local`, défaut = choix ci-dessus ;
+  `all` = public puis local en une passe — binaires une fois, MSI et `.deb`
+  deux fois, `dist/` finit sur les installeurs locaux),
+  la transmet au conteneur du `.deb` (`-e`), en `public` seulement recopie
+  chaque artefact produit dans `dist/public/<version>/` (les `.kdext` : ceux
+  de la stratégie seulement ; pas de dossier pour `local`) et compare après le MSI et le `.deb` le contenu de
+  `src-tauri/bundled-plugins/` à la stratégie — écart = arrêt. Seuls MSI et
+  `.deb` diffèrent d'un canal à l'autre ; `dist/` à la racine reste écrasé
+  par le dernier build, quel que soit son canal.
 
 Le MSI est **per-machine** (`Program Files`, UAC à l'installation) : Tauri ne
 propose pas de MSI per-user sans remplacer entièrement `wix.template`.

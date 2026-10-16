@@ -2,8 +2,11 @@
 //!
 //! Source : `bundled-plugins.txt` à la racine du dépôt (gitignoré — la
 //! sélection propre à un poste ou à une distribution), sinon
-//! `bundled-plugins.default.txt` (suivi — le comportement par défaut). Une
-//! ligne par plugin, dans l'ordre d'affichage de la page du MSI :
+//! `bundled-plugins.default.txt` (suivi — le comportement par défaut). La
+//! variable d'environnement `KROKI_BUNDLED_PLUGINS` (chemin relatif à la racine
+//! du dépôt, ou absolu) court-circuite ce choix : c'est par elle que
+//! `build_dist.py --channel` impose la stratégie d'un canal de distribution,
+//! quel que soit le fichier local présent. Une ligne par plugin, dans l'ordre d'affichage de la page du MSI :
 //!
 //! ```text
 //! # commentaire
@@ -33,6 +36,7 @@ use crate::die;
 
 const STRATEGY: &str = "bundled-plugins.txt";
 const STRATEGY_DEFAULT: &str = "bundled-plugins.default.txt";
+const STRATEGY_ENV: &str = "KROKI_BUNDLED_PLUGINS";
 
 /// Extensions dont le type MIME existe déjà dans la base freedesktop : un
 /// plugin qui les lit s'y associe sous ce type. Toute autre extension reçoit un
@@ -92,15 +96,30 @@ impl Plugin {
 
 /// Lit la stratégie et les manifestes des archives de dist/.
 pub fn load(repo: &Path, cmd: &str) -> Vec<Plugin> {
-    let (path, text) = [STRATEGY, STRATEGY_DEFAULT]
-        .iter()
-        .map(|f| repo.join(f))
-        .find_map(|p| fs::read_to_string(&p).ok().map(|t| (p, t)))
-        .unwrap_or_else(|| {
-            die(&format!(
-                "{cmd} : ni {STRATEGY} ni {STRATEGY_DEFAULT} à la racine du dépôt"
-            ))
-        });
+    // Imposée, la stratégie doit exister : retomber sur un autre fichier
+    // embarquerait en silence les plugins d'un autre canal.
+    let forced = std::env::var_os(STRATEGY_ENV).filter(|v| !v.is_empty());
+    let (path, text) = match forced {
+        Some(v) => {
+            let p = repo.join(v);
+            match fs::read_to_string(&p) {
+                Ok(t) => (p, t),
+                Err(e) => die(&format!(
+                    "{cmd} : {STRATEGY_ENV}={} illisible : {e}",
+                    p.display()
+                )),
+            }
+        }
+        None => [STRATEGY, STRATEGY_DEFAULT]
+            .iter()
+            .map(|f| repo.join(f))
+            .find_map(|p| fs::read_to_string(&p).ok().map(|t| (p, t)))
+            .unwrap_or_else(|| {
+                die(&format!(
+                    "{cmd} : ni {STRATEGY} ni {STRATEGY_DEFAULT} à la racine du dépôt"
+                ))
+            }),
+    };
     eprintln!("{cmd} : plugins embarqués selon {}", path.display());
 
     let mut plugins: Vec<Plugin> = Vec::new();
