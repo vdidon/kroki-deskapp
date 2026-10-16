@@ -1,9 +1,9 @@
-# Moteur Plotly interactif
+# Interactive Plotly engine
 
-Plotly est un moteur **« live »** rendu directement dans la vue (pas un SVG figé) :
-survol, zoom, pan fonctionnent. Deux formes de source.
+Plotly is a **"live"** engine rendered directly in the view (not a static SVG):
+hover, zoom and pan all work. Two source forms.
 
-## 1. Spec JSON inline
+## 1. Inline JSON spec
 
 ```plotly
 {
@@ -12,18 +12,18 @@ survol, zoom, pan fonctionnent. Deux formes de source.
     { "type": "box", "name": "FEB", "y": [1.04, 1.06, 1.08, 1.10, 1.12, 1.085],     "marker": { "color": "#d95f02" } },
     { "type": "box", "name": "MAR", "y": [0.78, 0.81, 0.84, 0.87, 0.90],            "marker": { "color": "#7570b3" } }
   ],
-  "layout": { "title": { "text": "Q1 — distribution des ratios r = M/Q (inline)" }, "yaxis": { "title": { "text": "ratio" } } }
+  "layout": { "title": { "text": "Q1 — distribution of ratios r = M/Q (inline)" }, "yaxis": { "title": { "text": "ratio" } } }
 }
 ```
 
-## 2. Fichier externe via `src=`
+## 2. External file via `src=`
 
-Garde le `.md` léger : la spec vit dans un `.json` à côté du document.
+Keeps the `.md` light: the spec lives in a `.json` next to the document.
 
 ```plotly src=figures/demo_scatter.json
 ```
 
-## 3. Erreur gérée proprement
+## 3. Error handled gracefully
 
 ```plotly
 { "data": [ { "type": "box"

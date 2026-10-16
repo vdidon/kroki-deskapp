@@ -1,5 +1,5 @@
 // Teste les nouveaux moteurs (d2, dbml, bpmn) via l'API Kroki locale.
-// Usage : lancer l'app, puis `node tests/test_nouveaux_moteurs.mjs`.
+// Usage : lancer l'app, puis `node tests/test_new_engines.mjs`.
 const BASE = process.env.KROKI_URL || "http://127.0.0.1:8442";
 
 const D2 = `direction: right

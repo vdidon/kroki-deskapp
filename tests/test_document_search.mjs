@@ -1,6 +1,6 @@
 // Test de la recherche dans le document affiché (ui/js/docsearch.js) et des
 // options `Aa` / `ab` / `.*` communes aux deux recherches (ui/js/searchopts.js).
-// Usage : node tests/test_recherche_document.mjs [port]
+// Usage : node tests/test_document_search.mjs [port]
 // Prérequis : app lancée avec WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
 // Autonome : crée son document de test dans un dossier temporaire, l'ouvre via
 // les commandes Tauri, referme son onglet à la fin.

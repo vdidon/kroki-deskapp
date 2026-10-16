@@ -1,5 +1,5 @@
 // Test de la recherche dans tous les documents ouverts (ui/js/globalsearch.js).
-// Usage : node tests/test_recherche_globale.mjs [port]
+// Usage : node tests/test_global_search.mjs [port]
 // Prérequis : app lancée avec WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
 // Autonome : crée ses documents de test dans un dossier temporaire, les ouvre via
 // les commandes Tauri (aucune simulation souris/clavier globale), referme leurs

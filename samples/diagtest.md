@@ -1,7 +1,7 @@
-# Test diagrammes
+# Diagram test
 
 ```mermaid
-graph LR; A[Markdown] -->|kroki| B[SVG]; B --> C[Affichage];
+graph LR; A[Markdown] -->|kroki| B[SVG]; B --> C[Display];
 ```
 
 ```dot

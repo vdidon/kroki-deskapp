@@ -1,9 +1,9 @@
-# Test des moteurs intégrés
+# Built-in engines test
 
 ## mermaid
 
 ```mermaid
-graph LR; A[Markdown] -->|moteur intégré| B[SVG]; B --> C[Affichage];
+graph LR; A[Markdown] -->|built-in engine| B[SVG]; B --> C[Display];
 ```
 
 ## graphviz (WASM)
@@ -16,8 +16,8 @@ digraph G { rankdir=LR; node [shape=box style=filled fillcolor="#dde3ff"]; CLI -
 
 ```plantuml
 @startuml
-Bob -> Alice : rendu local
-Alice --> Bob : sans serveur
+Bob -> Alice : local rendering
+Alice --> Bob : no server
 @enduml
 ```
 
@@ -40,8 +40,8 @@ box "SVG" fit
 ## nomnoml
 
 ```nomnoml
-[Fenêtre]->[Onglet]
-[Onglet]->[Document]
+[Window]->[Tab]
+[Tab]->[Document]
 ```
 
 ## vega-lite
@@ -84,9 +84,9 @@ box "SVG" fit
 ```c4plantuml
 @startuml
 !include <C4/C4_Context>
-Person(user, "Utilisateur")
-System(app, "Kroki Desk", "Visionneuse Markdown")
-Rel(user, app, "ouvre des fichiers")
+Person(user, "User")
+System(app, "Kroki Desk", "Markdown viewer")
+Rel(user, app, "opens files")
 @enduml
 ```
 
@@ -94,11 +94,11 @@ Rel(user, app, "ouvre des fichiers")
 
 ```ditaa
 +--------+   +---------+
-| Client +-->| Serveur |
+| Client +-->| Server  |
 +--------+   +----+----+
                   |
              +----v----+
-             |  Base   |
+             |   DB    |
              | {s}     |
              +---------+
 ```
@@ -106,7 +106,7 @@ Rel(user, app, "ouvre des fichiers")
 ## erd (→ graphviz)
 
 ```erd
-title {label: "Inscription"}
+title {label: "Registration"}
 
 [Person]
 *id
@@ -124,7 +124,7 @@ Person *--1 Location
 
 ## excalidraw
 
-Texte rendu en police système (les polices manuscrites ne sont pas embarquées).
+Text rendered in a system font (handwriting fonts are not embedded).
 
 ```excalidraw
 {"type":"excalidraw","version":2,"source":"kroki-desk","elements":[
@@ -133,7 +133,7 @@ Texte rendu en police système (les polices manuscrites ne sont pas embarquées)
 ],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}
 ```
 
-## Type non intégré (message attendu)
+## Unsupported type (expected message)
 
 ```blockdiag
 blockdiag { A -> B }

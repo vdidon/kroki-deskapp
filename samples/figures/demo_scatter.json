@@ -10,8 +10,8 @@
     }
   ],
   "layout": {
-    "title": { "text": "H2 — ratio JAN observé par année (src= externe)" },
-    "xaxis": { "title": { "text": "année" } },
+    "title": { "text": "H2 — JAN ratio observed per year (external src=)" },
+    "xaxis": { "title": { "text": "year" } },
     "yaxis": { "title": { "text": "r1 = M1/Q" } }
   }
 }

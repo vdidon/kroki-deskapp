@@ -1,35 +1,35 @@
-# Démo Kroki Desk
+# Kroki Desk demo
 
-Document de démonstration : Markdown standard + diagrammes rendus par les
-**moteurs intégrés** de l'application (aucun serveur requis).
+Demo document: standard Markdown + diagrams rendered by the
+**built-in engines** of the application (no server required).
 
-## Sommaire
+## Contents
 
-- [Markdown de base](#markdown-de-base)
+- [Basic Markdown](#basic-markdown)
 - [Mermaid](#mermaid)
 - [PlantUML](#plantuml)
 - [GraphViz](#graphviz)
-- [Autres moteurs](#autres-moteurs)
+- [Other engines](#other-engines)
 
-## Markdown de base
+## Basic Markdown
 
-Du texte avec **gras**, *italique*, `code inline`, ~~barré~~ et un [lien](https://docs.kroki.io/kroki/).
+Some text with **bold**, *italic*, `inline code`, ~~strikethrough~~ and a [link](https://docs.kroki.io/kroki/).
 
-> Une citation pour la forme.
+> A quote for good measure.
 
-| Moteur | Exécution | Types |
+| Engine | Execution | Types |
 |------|-------|--------|
-| mermaid, graphviz (WASM), vega… | webview dédiée | 7 types |
-| svgbob, pikchr | natif Rust | 2 types |
-| plantuml, c4plantuml | Java (si présent) | 2 types |
+| mermaid, graphviz (WASM), vega… | dedicated webview | 7 types |
+| svgbob, pikchr | native Rust | 2 types |
+| plantuml, c4plantuml | Java (if present) | 2 types |
 
-- [x] Rendu markdown
-- [x] Diagrammes sans serveur
-- [ ] Café
+- [x] Markdown rendering
+- [x] Serverless diagrams
+- [ ] Coffee
 
 ```python
 def fib(n: int) -> int:
-    """Fibonacci, sans prétention."""
+    """Fibonacci, unpretentious."""
     return n if n < 2 else fib(n - 1) + fib(n - 2)
 ```
 
@@ -37,40 +37,40 @@ def fib(n: int) -> int:
 
 ```mermaid
 flowchart LR
-    A[Fichier .md] -->|drag & drop| B(Kroki Desk)
-    B --> C{Bloc de code ?}
-    C -->|type de diagramme| D[Moteur intégré]
-    C -->|autre| E[Coloration syntaxique]
+    A[.md file] -->|drag & drop| B(Kroki Desk)
+    B --> C{Code block?}
+    C -->|diagram type| D[Built-in engine]
+    C -->|other| E[Syntax highlighting]
     D --> F[SVG]
     E --> F
 ```
 
 ```mermaid
 sequenceDiagram
-    participant U as Utilisateur
+    participant U as User
     participant A as App
-    participant R as Webview de rendu
-    U->>A: ouvre demo.md
-    A->>R: source mermaid
+    participant R as Rendering webview
+    U->>A: opens demo.md
+    A->>R: mermaid source
     R-->>A: SVG
-    A-->>U: document rendu
+    A-->>U: rendered document
 ```
 
 ## PlantUML
 
-Nécessite Java sur le poste (plantuml-mit.jar est embarqué dans l'application).
+Requires Java on the machine (plantuml-mit.jar is embedded in the application).
 
 ```plantuml
 @startuml
 skinparam shadowing false
-actor Utilisateur
+actor User
 rectangle "Kroki Desk" {
-  usecase "Ouvrir un fichier" as UC1
-  usecase "Détacher un onglet" as UC2
-  usecase "Rendre les diagrammes" as UC3
+  usecase "Open a file" as UC1
+  usecase "Detach a tab" as UC2
+  usecase "Render diagrams" as UC3
 }
-Utilisateur --> UC1
-Utilisateur --> UC2
+User --> UC1
+User --> UC2
 UC1 ..> UC3 : include
 @enduml
 ```
@@ -81,15 +81,15 @@ UC1 ..> UC3 : include
 digraph G {
   rankdir=LR;
   node [shape=box, style="rounded,filled", fillcolor="#ECECFF"];
-  CLI -> "Fenêtre 1" -> "Onglet A";
-  "Fenêtre 1" -> "Onglet B";
-  "Onglet B" -> "Fenêtre 2" [label="détaché", style=dashed];
+  CLI -> "Window 1" -> "Tab A";
+  "Window 1" -> "Tab B";
+  "Tab B" -> "Window 2" [label="detached", style=dashed];
 }
 ```
 
-## Autres moteurs
+## Other engines
 
-### Svgbob (ASCII art, natif)
+### Svgbob (ASCII art, native)
 
 ```svgbob
    .---.     .---.
@@ -102,12 +102,12 @@ digraph G {
              '-----'
 ```
 
-### Pikchr (natif)
+### Pikchr (native)
 
 ```pikchr
 box "Markdown" fit
 arrow
-box "Moteurs" fit
+box "Engines" fit
 arrow
 box "SVG" fit
 ```
@@ -116,12 +116,12 @@ box "SVG" fit
 
 ```nomnoml
 [Kroki Desk|
-  [Fenêtre]->[Onglet]
-  [Onglet]->[Document]
+  [Window]->[Tab]
+  [Tab]->[Document]
 ]
 ```
 
-### WaveDrom (chronogramme)
+### WaveDrom (timing diagram)
 
 ```wavedrom
 { "signal": [
@@ -131,17 +131,17 @@ box "SVG" fit
 ]}
 ```
 
-### d2 (WASM officiel)
+### d2 (official WASM)
 
 ```d2
 direction: right
-md: Fichier .md
+md: .md file
 app: Kroki Desk
 md -> app: drag & drop
-app -> md: rendu
+app -> md: rendering
 ```
 
-### dbml (schéma de base, rendu via graphviz)
+### dbml (database schema, rendered via graphviz)
 
 ```dbml
 Table users {
@@ -155,34 +155,34 @@ Table roles {
 Ref: users.role_id > roles.id
 ```
 
-### Vega-Lite (graphique)
+### Vega-Lite (chart)
 
 ```vegalite
 {
   "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-  "description": "Un petit bar chart.",
+  "description": "A small bar chart.",
   "data": {"values": [
-    {"moteur": "intégré", "score": 9},
-    {"moteur": "docker", "score": 4},
-    {"moteur": "cloud", "score": 2}
+    {"engine": "built-in", "score": 9},
+    {"engine": "docker", "score": 4},
+    {"engine": "cloud", "score": 2}
   ]},
   "mark": "bar",
   "encoding": {
-    "x": {"field": "moteur", "type": "nominal", "axis": {"labelAngle": 0}},
+    "x": {"field": "engine", "type": "nominal", "axis": {"labelAngle": 0}},
     "y": {"field": "score", "type": "quantitative"}
   }
 }
 ```
 
-### Bloc avec erreur volontaire
+### Block with intentional error
 
-L'application doit afficher le diagnostic du moteur sans casser le reste de la page.
+The application must display the engine diagnostic without breaking the rest of the page.
 
 ```mermaid
-graph TD; A --> ;; erreur volontaire
+graph TD; A --> ;; intentional error
 ```
 
-### Type non intégré (message attendu)
+### Unsupported type (expected message)
 
 ```blockdiag
 blockdiag { A -> B }
@@ -190,4 +190,4 @@ blockdiag { A -> B }
 
 ---
 
-Fin de la démo. Modifiez ce fichier dans votre éditeur : la vue se met à jour automatiquement.
+End of the demo. Edit this file in your editor: the view updates automatically.

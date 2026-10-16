@@ -1,30 +1,30 @@
-# Nouveaux moteurs : d2, dbml, bpmn
+# New engines: d2, dbml, bpmn
 
-Trois moteurs ajoutés au rendu intégré (toujours sans serveur ni Docker).
+Three engines added to the built-in rendering (still no server or Docker).
 
-## d2 (WASM officiel)
+## d2 (official WASM)
 
 ```d2
 direction: right
-md: Fichier .md
+md: .md file
 app: Kroki Desk
-eng: Moteur intégré
+eng: Built-in engine
 svg: SVG
 
 md -> app: drag & drop
-app -> eng: bloc de code
-eng -> svg: rendu
+app -> eng: code block
+eng -> svg: rendering
 ```
 
 ```d2
-serveur: {
+server: {
   shape: cylinder
 }
-client -> serveur: requête
-serveur -> client: réponse
+client -> server: request
+server -> client: response
 ```
 
-## dbml (schéma de base de données → DOT → graphviz embarqué)
+## dbml (database schema → DOT → embedded graphviz)
 
 ```dbml
 Table users {
@@ -41,18 +41,18 @@ Table roles {
 Ref: users.role_id > roles.id
 ```
 
-## bpmn (bpmn-js, rendu headless)
+## bpmn (bpmn-js, headless rendering)
 
-Le source BPMN doit inclure les informations de diagramme (`BPMNDiagram`/`DI`),
-comme tout export Camunda / bpmn.io.
+The BPMN source must include the diagram information (`BPMNDiagram`/`DI`),
+like any Camunda / bpmn.io export.
 
 ```bpmn
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Defs_1" targetNamespace="http://bpmn.io/schema/bpmn">
   <bpmn:process id="Process_1" isExecutable="false">
-    <bpmn:startEvent id="Start_1" name="Début"/>
-    <bpmn:task id="Task_1" name="Rendre le diagramme"/>
-    <bpmn:endEvent id="End_1" name="Fin"/>
+    <bpmn:startEvent id="Start_1" name="Start"/>
+    <bpmn:task id="Task_1" name="Render the diagram"/>
+    <bpmn:endEvent id="End_1" name="End"/>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="Task_1"/>
     <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_1" targetRef="End_1"/>
   </bpmn:process>
