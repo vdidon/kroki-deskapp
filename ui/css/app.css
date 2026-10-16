@@ -1,0 +1,1699 @@
+:root {
+  --bg: #ffffff;
+  --bg-tabbar: #eceef1;
+  --tab: #dddfe3;
+  --tab-hover: #d2d4d9;
+  --tab-active: #ffffff;
+  --fg: #1f2328;
+  --fg-muted: #59636e;
+  --border: #d0d7de;
+  --accent: #5856d6;
+  --error: #d1242f;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --word-hl: rgba(255, 165, 0, 0.42); /* surlignage des occurrences du mot sélectionné */
+  --search-hl: rgba(88, 86, 214, 0.28); /* surlignage des résultats de la recherche globale */
+  --find-cur: rgba(255, 166, 0, 0.62); /* occurrence courante de la recherche dans le document */
+  color-scheme: light;
+}
+
+/* Thème : « auto » = AUCUN attribut [data-theme] → la palette sombre suit le système
+   en pur CSS (premier rendu sans flash, suivi automatique des bascules système).
+   Les overrides « clair »/« sombre » (Réglages → Thème) posent [data-theme] et
+   neutralisent la media-query. Les deux blocs sombres ci-dessous DOIVENT rester
+   synchronisés (CSS sans mixin). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0d1117;
+    --bg-tabbar: #010409;
+    --tab: #161b22;
+    --tab-hover: #21262d;
+    --tab-active: #0d1117;
+    --fg: #e6edf3;
+    --fg-muted: #9198a1;
+    --border: #30363d;
+    --accent: #7a79e8;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --word-hl: rgba(255, 200, 70, 0.34);
+    --search-hl: rgba(122, 121, 232, 0.34);
+    --find-cur: rgba(255, 200, 70, 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --bg-tabbar: #010409;
+  --tab: #161b22;
+  --tab-hover: #21262d;
+  --tab-active: #0d1117;
+  --fg: #e6edf3;
+  --fg-muted: #9198a1;
+  --border: #30363d;
+  --accent: #7a79e8;
+  --ok: #3fb950;
+  --warn: #d29922;
+  --word-hl: rgba(255, 200, 70, 0.34);
+  --search-hl: rgba(122, 121, 232, 0.34);
+  --find-cur: rgba(255, 200, 70, 0.5);
+  color-scheme: dark;
+}
+
+/* Surlignage « toutes les occurrences du mot sélectionné » (cf. js/findword.js).
+   Custom Highlight API : peint SOUS la sélection native → le mot sélectionné garde
+   son bleu de sélection. Seules background-color / color / text-decoration sont
+   honorées sur ::highlight() ; on se limite au fond translucide pour préserver la
+   lisibilité du texte par-dessous. */
+::highlight(word-occurrences) {
+  background-color: var(--word-hl);
+}
+
+/* Surlignage des occurrences de la recherche globale (cf. js/globalsearch.js) :
+   même API, nom distinct — coexiste avec le surlignage du mot sélectionné. */
+::highlight(search-occurrences) {
+  background-color: var(--search-hl);
+}
+
+/* Recherche dans le document (Ctrl+F, cf. js/docsearch.js) : toutes les
+   occurrences dans la teinte de la recherche, la courante par-dessus (priority
+   plus élevée côté JS) dans une teinte contrastée. */
+::highlight(find-occurrences) {
+  background-color: var(--search-hl);
+}
+
+::highlight(find-current) {
+  background-color: var(--find-cur);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- Barre d'onglets ---------- */
+
+#tabbar {
+  min-height: 38px;
+  flex: none;
+  background: var(--bg-tabbar);
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 0 4px;
+}
+
+/* Les onglets gardent leur largeur naturelle et débordent sur une 2ᵉ ligne
+   quand la 1ʳᵉ est pleine (la barre grandit) ; au-delà de 2 lignes, tabs.js
+   pose --tab-max pour les compresser uniformément sur exactement 2 lignes.
+   Layout inline (onglets inline-flex) et non flex-wrap : seules les line
+   boxes inline contournent le float des boutons d'action — la 1ʳᵉ ligne
+   s'arrête avant eux, les suivantes occupent toute la largeur. Ni overflow
+   ni autre créateur de BFC ici, sinon le contournement du float est perdu. */
+#tabs {
+  padding-top: 1px;
+  line-height: 0; /* pas de strut : la hauteur de ligne = celle des onglets */
+}
+
+.tab {
+  display: inline-flex;
+  vertical-align: bottom;
+  margin: 4px 1px 0 0; /* ex-gap 4px 1px de #tabs (le padding-top complète à 5px) */
+  line-height: normal;
+  align-items: center;
+  gap: 4px;
+  height: 33px;
+  padding: 0 6px 0 12px;
+  max-width: var(--tab-max, 220px);
+  border-radius: 8px 8px 0 0;
+  background: var(--tab);
+  font-size: 12.5px;
+  cursor: default;
+  position: relative;
+  touch-action: none;
+}
+
+.tab:hover {
+  background: var(--tab-hover);
+}
+
+.tab.active {
+  background: var(--tab-active);
+  box-shadow: 0 -1px 0 var(--border), 1px 0 0 var(--border), -1px 0 0 var(--border);
+}
+
+.tab:not(.dragging) {
+  transition: transform 0.12s ease;
+}
+
+.tab.dragging {
+  z-index: 5;
+  transition: none;
+}
+
+.tab.tearing {
+  opacity: 0.35;
+  outline: 1.5px dashed var(--accent);
+  outline-offset: -1.5px;
+}
+
+body.tab-dragging,
+body.tab-dragging * {
+  cursor: grabbing !important;
+}
+
+.tab-title {
+  flex: 1;
+  min-width: 36px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-close {
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.55;
+  flex: none;
+}
+
+.tab-close:hover {
+  background: rgba(128, 128, 128, 0.3);
+  opacity: 1;
+}
+
+/* Menu contextuel d'onglet (clic droit), positionné par tabs.js. */
+#tab-menu {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#tab-menu[hidden] {
+  display: none;
+}
+
+#tab-menu button {
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+#tab-menu button:hover:not(:disabled) {
+  background: var(--tab-hover);
+}
+
+#tab-menu hr {
+  margin: 4px 6px;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+#tab-menu button:disabled {
+  color: var(--fg-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+#tabbar-actions {
+  float: right; /* la 1ʳᵉ ligne d'onglets le contourne, les suivantes passent dessous */
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 2px 0;
+  flex: none;
+}
+
+#tabbar-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+#tabbar-actions button:hover {
+  background: rgba(128, 128, 128, 0.2);
+  color: var(--fg);
+}
+
+#tabbar-actions button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---------- Contenu ---------- */
+
+#content {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+#views {
+  position: absolute;
+  inset: 0;
+}
+
+/* Voile de chargement (cf. js/loading.js). `pointer-events: none` : pendant un
+   re-render (fichier modifié sur disque) le contenu précédent reste affiché
+   dessous et doit rester défilable. */
+#loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  /* Repli opaque pour les WebKitGTK sans `color-mix` (Linux) : le voile masque
+     alors le contenu au lieu de le laisser transparaître, sans autre effet. */
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+}
+
+#loading-overlay[hidden] {
+  display: none;
+}
+
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 30px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+}
+
+/* L'animation ne porte que sur `transform` : elle tourne sur le compositeur et
+   survit donc au blocage du thread principal par la phase de rendu synchrone.
+   Une animation de `border-color`, `width` ou `background` se figerait. */
+.loading-spinner {
+  width: 26px;
+  height: 26px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+.loading-label {
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Mouvement réduit : la rotation cède la place à une pulsation d'opacité —
+   également compositée, donc toujours visible pendant le blocage. */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: loading-pulse 1.4s ease-in-out infinite;
+    border-top-color: var(--border);
+    background: var(--accent);
+  }
+
+  @keyframes loading-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+}
+
+/* Deux zooms se composent sur #views (cf. setZoom/setPageZoom, main.js), tous
+   deux par la propriété `zoom` : le zoom texte (Ctrl+molette) et le zoom de
+   page (Maj+molette). Le `zoom` CSS seul ne fait qu'un zoom texte : la colonne
+   logique rétrécit d'autant que l'échelle grandit, si bien qu'une figure en
+   `max-width: 100%` garde exactement sa taille à l'écran et que seul le texte
+   grossit (en refluant). Le zoom de page corrige cela en mettant les enfants de
+   la vue en page à la largeur qu'ils auraient à l'échelle 1 : `--page-w` est la
+   largeur de la colonne de lecture *avant* zoom de page, exprimée dans le repère
+   logique courant (100 % de la colonne rétrécie × p, plus le padding horizontal
+   qui a lui aussi été divisé par p). La mise en page est alors identique à
+   toutes les échelles — aucun reflux — et le contenu, p fois plus large que la
+   vue, déborde en défilement horizontal : c'est ce qui permet de parcourir une
+   figure trop dense pour tenir en un écran. `--page-zoom` vaut 1 par défaut
+   (export HTML, tests hors app) : `--page-w` se réduit alors à 100 %. */
+.doc-view {
+  --pad-x: 38px;
+  --page-w: calc(100% * var(--page-zoom, 1) + 2 * var(--pad-x) * (var(--page-zoom, 1) - 1));
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 30px var(--pad-x) 80px;
+  scrollbar-width: thin;
+  outline: none;
+}
+
+/* Colonne de lecture : `min(920px, --page-w)` centrée dans la page à l'échelle
+   1 — l'équivalent exact de `max-width: 920px; margin: 0 auto` tant que
+   --page-zoom vaut 1, mais qui reste centré dans la *page* (et non dans la vue
+   rétrécie) sous zoom de page. Un `max-width` ne suffirait pas : la marge
+   `auto` d'un bloc plus large que son conteneur tombe à zéro. */
+.doc-view > .markdown-body {
+  width: min(920px, var(--page-w));
+  margin: 0 max(0px, calc((var(--page-w) - 920px) / 2));
+}
+
+/* Vue source : pleine largeur de la page à l'échelle 1 (le <pre> ne reflue pas
+   de toute façon, ses longues lignes débordent déjà). */
+.doc-view > .source-view {
+  min-width: var(--page-w);
+}
+
+/* Vue code source : le padding de lecture est taillé pour le preview centré ;
+   sur du code pleine largeur il ne fait qu'éloigner la 1ʳᵉ ligne du haut et la
+   gouttière des numéros du bord gauche (l'écart est amplifié par le zoom de
+   page). On le ramène à une simple respiration. */
+.doc-view:has(> .source-view) {
+  --pad-x: 12px;
+  padding: 8px var(--pad-x) 60px;
+}
+
+/* Vue HTML (page statique dans une iframe sandboxée, cf. renderHtmlDocument) :
+   l'iframe couvre la vue bord à bord (position absolue : elle ignore le padding
+   de lecture, la page exportée porte déjà le sien) et défile en interne. Fond
+   blanc : un HTML tiers sans fond resterait sinon transparent sur le thème
+   sombre de l'app (texte noir illisible). Sous zoom de page, l'iframe garde la
+   largeur de la vue à l'échelle 1 (son contenu ne reflue pas et déborde en
+   défilement horizontal dans la vue) mais la hauteur de la vue : le défilement
+   vertical reste interne à l'iframe, comme sans zoom. Le conteneur est en
+   position absolue : 100 % vise la boîte de padding, sans terme de padding. */
+.doc-view > iframe.html-view {
+  position: absolute;
+  inset: 0;
+  width: calc(100% * var(--page-zoom, 1));
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* Mode « pleine largeur » (bouton Étendre) : le preview abandonne son plafond de
+   lecture pour occuper toute la colonne. Utile au dézoom, où la largeur logique
+   grandit (zoom CSS sur #views) et laisse sinon de larges marges. La vue source est
+   déjà pleine largeur (.source-view), donc non concernée. La largeur est celle
+   de la page à l'échelle 1 (cf. --page-w) : sous zoom de page, la colonne
+   étendue s'agrandit comme le reste. */
+#views.fit-width .doc-view > .markdown-body {
+  width: var(--page-w);
+  margin: 0;
+}
+
+/* Actions de vue : pile de boutons flottants dans le coin haut-droit de la zone de
+   rendu (sommaire au-dessus, bascule code source en dessous). Hors de #views (non
+   zoomée), donc insensible au zoom de page. */
+#view-actions {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#view-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+#view-actions button:hover {
+  opacity: 1;
+  color: var(--fg);
+}
+
+#view-actions button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  opacity: 1;
+}
+
+/* Panneau du sommaire : déroulé à GAUCHE des boutons (ancré à droite), défilable. */
+#toc-panel {
+  position: absolute;
+  top: 10px;
+  right: 54px;
+  z-index: 6;
+  width: min(340px, 60vw);
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  scrollbar-width: thin;
+}
+
+.toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toc-item:hover {
+  background: rgba(128, 128, 128, 0.16);
+}
+
+.toc-item[data-level="1"] {
+  font-weight: 600;
+}
+
+.toc-empty {
+  padding: 8px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+/* ---------- Recherche dans les documents ouverts (cf. js/globalsearch.js) ----------
+   Panneau flottant à la même ancre que le sommaire (exclusifs l'un de l'autre). */
+#search-panel {
+  position: absolute;
+  top: 10px;
+  right: 54px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 70vw);
+  max-height: calc(100% - 20px);
+  padding: 8px;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* Champ de recherche : socle commun aux deux recherches (celle-ci et la barre
+   Ctrl+F). La bordure est portée par l'enveloppe, pas par l'input : les options
+   `Aa` `ab` `.*` sont à l'INTÉRIEUR du champ, collées à droite. */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.search-field {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  padding: 2px 3px 2px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.search-field:focus-within {
+  border-color: var(--accent);
+}
+
+/* Motif invalide (expression régulière) : le champ vire au rouge, comme le
+   message de statut. */
+.search-field:has(input.invalid) {
+  border-color: var(--error);
+}
+
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.search-opts {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+
+.search-opts button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search-opts button:hover {
+  background: rgba(128, 128, 128, 0.18);
+  color: var(--fg);
+}
+
+.search-opts button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* « Mot entier » : le soulignement est l'icône (même convention que VS Code). */
+.opt-word {
+  border-bottom: 1px solid currentColor;
+  line-height: 1;
+}
+
+/* Boutons carrés d'une barre de recherche (fermer, occurrence précédente /
+   suivante) — même gabarit que les options, hors du champ. */
+.search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.search-btn:hover:not(:disabled) {
+  background: rgba(128, 128, 128, 0.18);
+  color: var(--fg);
+}
+
+.search-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+#search-status {
+  flex: none;
+  min-height: 1em;
+  color: var(--fg-muted);
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+#search-status.error {
+  color: var(--error);
+}
+
+#search-results {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.search-group + .search-group {
+  margin-top: 8px;
+}
+
+.search-doc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-count {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.18);
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.search-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  padding: 3px 4px 3px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.search-hit:hover {
+  background: rgba(128, 128, 128, 0.16);
+}
+
+.search-lineno {
+  flex: none;
+  min-width: 2.5em;
+  text-align: right;
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.search-excerpt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-excerpt mark {
+  background: var(--search-hl);
+  color: inherit;
+  border-radius: 2px;
+}
+
+.search-note {
+  padding: 2px 4px 2px 12px;
+  color: var(--fg-muted);
+  font-size: 11.5px;
+  font-style: italic;
+}
+
+/* ---------- Recherche dans le document affiché (cf. js/docsearch.js) ----------
+   Barre compacte à la même ancre que le sommaire et la recherche multi-documents
+   (les trois sont exclusifs) — elle remplace la barre native de la webview. */
+#find-bar {
+  position: absolute;
+  top: 10px;
+  right: 54px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(430px, calc(100% - 70px));
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+
+.find-count {
+  flex: none;
+  min-width: 5.5em;
+  padding: 0 2px;
+  color: var(--fg-muted);
+  font-size: 11.5px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.find-count.error {
+  color: var(--error);
+}
+
+/* Repères des occurrences sur la barre de défilement de la vue (cf.
+   drawRuler, js/docsearch.js) : position et taille posées en JS sur la piste
+   mesurée. Au-dessus de la vue mais sous la barre de recherche, et transparent
+   aux clics — le pouce se saisit au travers. L'occurrence courante reprend la
+   teinte de son surlignage, opaque pour rester lisible sur le pouce. */
+#find-ruler {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.find-tick {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.find-tick.current {
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgb(255, 166, 0);
+  opacity: 1;
+}
+
+/* Vue code source : monospace, une ligne logique = une ligne visuelle (pre, pas de
+   retour à la ligne) pour un alignement fiable avec le preview. Lecture seule. */
+.source-view {
+  /* Pleine largeur, aligné à gauche : le preview est centré (max-width 920px),
+     mais le code source profite de toute la largeur pour les longues lignes. */
+  font-family: "Cascadia Code", "Consolas", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 4;
+  color: var(--fg);
+  counter-reset: srcline;
+  margin: 0; /* le <pre> hérite sinon d'une marge verticale du user-agent */
+}
+
+.source-view .src-line {
+  counter-increment: srcline;
+}
+
+/* Gouttière des numéros : largeur fixe (alignement des lignes de code entre
+   elles) mais dimensionnée sur le nombre de chiffres réel du document —
+   `--src-gutter` est posée par renderSource. Un document de 36 lignes ne réserve
+   donc pas la place de 5 chiffres. */
+.source-view .src-line::before {
+  content: counter(srcline);
+  display: inline-block;
+  width: var(--src-gutter, 3.5em);
+  margin-right: 0.9em;
+  text-align: right;
+  color: var(--fg-muted);
+  opacity: 0.55;
+  user-select: none;
+}
+
+/* Vue debug « markdown intermédiaire » (builds debug uniquement) : liseré
+   d'accent pour la distinguer de la vraie vue source du fichier. */
+.source-view.derived-view {
+  border-left: 3px solid var(--accent);
+  padding-left: 6px;
+}
+
+.markdown-body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+/* ---------- Diagrammes Kroki ---------- */
+
+.kroki-diagram {
+  margin: 16px 0;
+  text-align: center;
+  min-height: 44px;
+}
+
+.kroki-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Fence rendue en markdown par un plugin (`fence:markdown`) : c'est du
+   document, pas une figure — alignement normal, et pas de carte blanche en
+   thème sombre (les diagrammes imbriqués gardent la leur). */
+.kroki-diagram.kroki-markdown {
+  text-align: initial;
+}
+
+/* Plotly ne compense pas le `zoom` CSS d'un ancêtre : sous zoom de page, son
+   hit-testing (hover) se décale car il dessine son plan en pixels logiques mais
+   localise le curseur en pixels visuels. On annule l'échelle héritée sur la figure
+   (effective = 1, coordonnées 1:1) ; main.js redimensionne ensuite le tracé via
+   relayout(width, height) pour qu'il suive quand même le zoom. --plotly-inv-zoom
+   est posée sur #views par applyZoom (défaut 1 = aucun effet) et vaut l'inverse
+   du produit zoom texte × zoom de page : sous zoom de page, la figure est donc
+   re-tracée plus grande (vectorielle, nette) plutôt qu'agrandie. */
+.kroki-diagram[data-kroki-type="plotly"] {
+  zoom: var(--plotly-inv-zoom, 1);
+}
+
+/* La plupart des diagrammes Kroki sont des SVG figés conçus pour un fond clair :
+   en thème sombre on les pose sur une carte blanche. Plotly est EXCLU — c'est nous
+   qui construisons son layout (cf. render.js), donc on le rend nativement sombre et
+   il se fond dans la page. Même logique de double bloc que la palette (auto + override). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .kroki-diagram.ok:not([data-kroki-type="plotly"]):not(.kroki-markdown) {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 14px;
+  }
+}
+
+:root[data-theme="dark"] .kroki-diagram.ok:not([data-kroki-type="plotly"]):not(.kroki-markdown) {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+/* ---------- Vocabulaire de style offert aux plugins (doc/plugin-protocol.md §6.7) ----------
+   .kd-fold : <details> dépliable encadré (définitions, sections repliées). */
+
+.markdown-body details.kd-fold {
+  margin: 0 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 12px;
+}
+
+.markdown-body details.kd-fold > summary {
+  cursor: pointer;
+  margin: 0 -12px;
+  padding: 7px 12px;
+  user-select: none;
+  background: rgba(127, 127, 127, 0.07); /* translucide : lisible en clair comme en sombre */
+  border-radius: 6px;
+}
+
+.markdown-body details.kd-fold[open] > summary {
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  margin-bottom: 12px;
+}
+
+.markdown-body details.kd-fold > summary:hover {
+  background: rgba(127, 127, 127, 0.14);
+}
+
+/* Accordéons imbriqués : léger retrait. */
+.markdown-body details.kd-fold details.kd-fold {
+  margin-left: 12px;
+}
+
+/* .kd-note : encart de documentation en retrait, liseré gauche. */
+
+.markdown-body .kd-note {
+  margin: 0 0 16px;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+.markdown-body .kd-note > ul {
+  margin: 0;
+}
+
+.kroki-loading {
+  color: var(--fg-muted);
+  font-size: 13px;
+  padding: 12px;
+  animation: kroki-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes kroki-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+.kroki-error {
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
+  background: color-mix(in srgb, var(--error) 7%, transparent);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.kroki-error pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+/* ---------- État vide ---------- */
+
+#empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* `safe` : sans lui, un contenu plus haut que la zone serait rogné EN HAUT et
+     le scroll ne pourrait pas l'atteindre (flex centré + overflow). */
+  justify-content: safe center;
+  gap: 12px;
+  color: var(--fg-muted);
+  text-align: center;
+  padding: 24px;
+  overflow: auto;
+}
+
+.empty-title {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.empty-hint {
+  font-size: 14px;
+}
+
+/* Aide-mémoire des raccourcis. `auto-fit` replie les trois colonnes en une
+   seule dans une fenêtre étroite ; #empty-state défile alors au lieu de rogner. */
+.empty-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 16px 34px;
+  max-width: 1040px;
+  margin-top: 6px;
+  text-align: left;
+}
+
+/* Largeur naturelle par groupe (et non trois colonnes égales) : la colonne des
+   touches varie du simple au double d’un groupe à l’autre, et l’égaliser hachait
+   les libellés du plus large en deux lignes. Les groupes se replient au lieu de
+   se comprimer. */
+.empty-shortcuts section {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.empty-shortcuts h3 {
+  margin: 0 0 7px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.empty-shortcuts dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: 5px 10px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.empty-shortcuts dt {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.empty-shortcuts dd {
+  margin: 0;
+  color: var(--fg);
+  opacity: 0.82;
+  line-height: 1.35;
+}
+
+.empty-mouse {
+  font-size: 12px;
+  opacity: 0.75;
+  max-width: 760px;
+  line-height: 1.7;
+}
+
+#empty-state kbd {
+  display: inline-block;
+  margin: 0 1px;
+  min-width: 14px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-tabbar);
+  color: var(--fg);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.linklike {
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ---------- Overlay de dépôt & hint de drag ---------- */
+
+#drop-overlay {
+  position: fixed;
+  inset: 10px;
+  z-index: 50;
+  border: 2.5px dashed var(--accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.drop-label {
+  font-size: 20px;
+  font-weight: 600;
+  background: var(--bg);
+  padding: 10px 22px;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* Toast transitoire (rapports de session .kdws, cf. session.js). */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 70;
+  max-width: min(80vw, 720px);
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+#toast.error {
+  border-color: #d1242f;
+  color: #d1242f;
+}
+
+#drag-hint {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Réglages ---------- */
+
+#settings-dialog,
+#info-dialog,
+#changelog-dialog,
+#plugins-dialog,
+#plugin-trust-dialog {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 22px 24px;
+  width: min(480px, 90vw);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+#settings-dialog::backdrop,
+#info-dialog::backdrop,
+#changelog-dialog::backdrop,
+#plugins-dialog::backdrop,
+#plugin-trust-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+#settings-dialog h2,
+#info-dialog h2,
+#changelog-dialog h2,
+#plugins-dialog h2,
+#plugin-trust-dialog h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+#settings-dialog label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+#settings-dialog input,
+#settings-dialog select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+}
+
+#settings-dialog input:focus,
+#settings-dialog select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.settings-hint {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin: 8px 0 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.settings-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 7px;
+  margin: 0 !important;
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+}
+
+.settings-inline-label {
+  margin: 0 !important;
+  font-weight: 400 !important;
+  font-size: 12.5px !important;
+  color: var(--fg-muted);
+}
+
+#settings-dialog input[type="number"] {
+  width: 90px;
+}
+
+#settings-dialog input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+/* Icônes affichées : une case par bouton des barres d'outils, avec un aperçu
+   cloné du bouton réel (cf. settings.js). Deux colonnes pour que les douze
+   entrées tiennent sans allonger démesurément le dialog. */
+#icons-config {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.icons-group-title {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-bottom: 3px;
+}
+
+.icons-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px 8px;
+}
+
+.icon-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 3px 4px;
+  border-radius: 6px;
+  font-weight: 400 !important;
+  font-size: 12.5px !important;
+  cursor: pointer;
+}
+
+.icon-toggle:hover {
+  background: rgba(128, 128, 128, 0.14);
+}
+
+/* Icône verrouillée (Réglages) : lisible mais non actionnable. */
+.icon-toggle:has(input:disabled) {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.icon-preview {
+  display: flex;
+  align-items: center;
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.icon-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Bouton « Gérer les plugins… » des Réglages (hors ligne d'actions du bas,
+   donc stylé ici — même vocabulaire que les boutons secondaires). */
+.settings-plugins {
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-plugins:hover {
+  filter: brightness(1.08);
+}
+
+/* Sous-titre de section du dialog Informations. */
+.info-subtitle {
+  margin: 16px 0 0;
+  font-size: 13.5px;
+}
+
+.settings-error {
+  font-size: 12.5px;
+  color: var(--error);
+  margin: 10px 0 0;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.settings-actions .spacer {
+  flex: 1;
+}
+
+.settings-actions button {
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ---------- Plugins (dialog de gestion + dialog de confiance) ---------- */
+
+#plugins-list {
+  margin-top: 14px;
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plugin-card {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+
+.plugin-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plugin-name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.plugin-version {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.plugin-publisher {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+
+.plugin-desc {
+  font-size: 12.5px;
+  margin: 8px 0 0;
+}
+
+.plugin-warning {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin: 6px 0 0;
+}
+
+.plugin-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Bouton « Nouveautés » (changelog du plugin) : même gabarit que Supprimer,
+   couleur neutre. */
+.plugin-changelog {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.plugin-delete {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--error);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.plugin-delete.armed {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+}
+
+/* Gros bouton d'ajout, pleine largeur, sous la liste (spec §9.4). */
+.plugins-add {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plugins-add:hover {
+  filter: brightness(1.08);
+}
+
+.trust-row {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.trust-label {
+  flex: 0 0 110px;
+  font-weight: 600;
+}
+
+.settings-actions button:hover {
+  filter: brightness(1.08);
+}
+
+/* ---------- Dialog Nouveautés (changelog) ---------- */
+
+#changelog-dialog {
+  width: min(640px, 92vw);
+}
+
+/* Le corps réutilise .markdown-body (typo GitHub, thème clair/sombre déjà
+   accordé au forçage [data-theme]) mais en plus compact, fond du dialog. */
+#changelog-body {
+  max-height: min(62vh, 540px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  margin-top: 12px;
+  padding-right: 10px;
+  background: transparent;
+  font-size: 13px;
+  /* Scroller focusable : showModal() lui donne le focus (défilement clavier
+     immédiat), sans anneau — même convention que .doc-view. */
+  outline: none;
+}
+
+#changelog-body h2 {
+  font-size: 14.5px;
+  padding-bottom: 5px;
+}
+
+#changelog-body h3 {
+  font-size: 13px;
+}
+
+/* ---------- Fenêtre d'information (runtimes) ---------- */
+
+#info-dialog {
+  width: min(560px, 92vw);
+}
+
+#info-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 12px 0 4px;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+}
+
+.rt-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rt-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.rt-dot.ok,
+.rt-badge.ok {
+  background: var(--ok);
+}
+
+.rt-dot.blocked,
+.rt-badge.blocked {
+  background: var(--warn);
+}
+
+.rt-dot.unsupported,
+.rt-badge.unsupported {
+  background: var(--fg-muted);
+}
+
+#info-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  max-height: min(56vh, 460px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.rt-group {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 9px;
+  padding: 11px 13px;
+}
+
+.rt-group.ok {
+  border-left-color: var(--ok);
+}
+
+.rt-group.blocked {
+  border-left-color: var(--warn);
+}
+
+.rt-group.unsupported {
+  border-left-color: var(--fg-muted);
+}
+
+.rt-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.rt-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.rt-req {
+  font-size: 11.5px;
+  color: var(--fg-muted);
+  margin-top: 1px;
+}
+
+.rt-head > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.rt-badge {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.rt-note {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+.rt-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.rt-chip {
+  font-size: 11.5px;
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fg-muted) 16%, transparent);
+  color: var(--fg);
+}
+
+.rt-group.unsupported .rt-chip {
+  color: var(--fg-muted);
+}
+
+/* ---------- Divers ---------- */
+
+.task-list-item {
+  list-style-type: none;
+}
+
+.task-list-item .task-list-item-checkbox {
+  margin: 0 0.35em 0.25em -1.4em;
+  vertical-align: middle;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--fg-muted) 45%, transparent);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--fg-muted) 70%, transparent);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

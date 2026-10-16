@@ -1,0 +1,30 @@
+# Modèle Handlebars du fichier .desktop du paquet .deb (bundle.linux.deb.desktopTemplate
+# de src-tauri/tauri.deb.conf.json). Il remplace celui du bundler Tauri pour une seule
+# raison, mais elle est décisive : le modèle par défaut écrit `Exec={{exec}}` **sans
+# indicateur d'argument**, si bien que le lanceur n'a aucun endroit où passer le fichier —
+# double-cliquer un document ouvrirait l'application vide. `%F` (liste de chemins locaux,
+# pas `%U` : l'application prend des chemins, pas des URL) est ce qui rend les
+# associations opérantes ; tout le reste est repris du modèle upstream.
+#
+# Variables fournies par le bundler : name, comment (optionnelle), exec, icon,
+# categories, mime_type (optionnelle, = les mimeType de bundle.fileAssociations
+# joints par « ; »). Aucune autre n'est disponible — le texte hors variables est figé.
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name={{name}}
+GenericName=Markdown viewer
+GenericName[fr]=Visionneuse Markdown
+{{#if comment}}
+Comment={{comment}}
+{{/if}}
+Exec={{exec}} %F
+Icon={{icon}}
+Terminal=false
+StartupNotify=true
+StartupWMClass={{exec}}
+Categories={{categories}}
+Keywords=markdown;diagram;diagramme;kroki;mermaid;plantuml;graphviz;latex;
+{{#if mime_type}}
+MimeType={{mime_type}}
+{{/if}}

@@ -1,0 +1,11 @@
+# Fins de ligne. Le dépôt se développe sous Windows mais produit des artefacts
+# Unix : les fichiers ci-dessous sont interprétés tels quels par un système qui
+# ne tolère pas le CR.
+#
+# Le cas critique est src-tauri/linux/postinst.sh et postrm.sh : ils sont copiés
+# dans le control.tar.gz du paquet .deb et exécutés par dpkg. Un `#!/bin/sh\r`
+# fait échouer la configuration du paquet avec un message qui ne dit pas
+# pourquoi. Même chose pour le modèle .desktop, dont chaque valeur traînerait un
+# CR (`Exec=kroki_deskapp %F\r`).
+*.sh text eol=lf
+*.desktop text eol=lf

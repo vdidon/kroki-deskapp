@@ -1,0 +1,62 @@
+[package]
+name = "kroki_deskapp"
+version = "3.24.0"
+description = "Visionneuse Markdown avec rendu de diagrammes Kroki"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+base64 = "0.22.1"
+dunce = "1.0.5"
+flate2 = "1.1.9"
+notify = "8.2.0"
+pikchr = "0.1.4"
+reqwest = "0.13.4"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+svgbob = "0.7.6"
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tiny_http = "0.12.0"
+# Extraction des archives de plugins .kdext. Toutes les méthodes de compression
+# zip usuelles sont acceptées (7-Zip, Compress-Archive…) : Store, Deflate,
+# Deflate64, BZip2, LZMA, Zstandard. Seul PPMd est écarté volontairement (usage
+# marginal) — l'installation le signale proprement. `deflate-flate2-zlib-rs`
+# plutôt que le méta-feature `deflate` : on ne fait que décompresser, inutile
+# d'embarquer zopfli. zip ≥ 8 requis : le lzma-rs des versions 2.x échoue sur
+# les entrées LZMA produites par 7-Zip (remplacé depuis par lzma-rust2).
+zip = { version = "8", default-features = false, features = [
+    "deflate-flate2-zlib-rs",
+    "deflate64",
+    "bzip2",
+    "lzma",
+    "zstd",
+] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Memory",
+    "Win32_System_Ole",
+    "Win32_System_SystemServices",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+# Dépendance directe requise par la macro `#[implement(IDropTarget)]` : son code
+# généré référence le crate `windows_core`. Version alignée sur `windows` 0.62
+# pour éviter le conflit avec le windows-core 0.61 tiré par tauri/wry.
+windows-core = "0.62.2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "s"
+panic = "abort"

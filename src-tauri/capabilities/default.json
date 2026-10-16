@@ -1,0 +1,7 @@
+{
+  "$schema": "gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions de base pour toutes les fenêtres",
+  "windows": ["*"],
+  "permissions": ["core:default"]
+}

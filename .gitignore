@@ -1,0 +1,25 @@
+src-tauri/target/
+xtask/target/
+# Archives de plugins recopiées depuis dist/ par le xtask avant le bundling MSI
+# (les <File> du fragment WiX les lisent via $(sys.SOURCEFILEDIR), donc sous
+# src-tauri/ — cf. bundled::stage du xtask)
+src-tauri/bundled-plugins/
+# Stratégie locale d'embarquement des plugins (défaut suivi :
+# bundled-plugins.default.txt) et ce que le xtask en génère (cf. bundled.rs)
+bundled-plugins.txt
+src-tauri/wix/plugins.generated.wxs
+src-tauri/tauri.deb.generated.json
+src-tauri/linux/kroki-desk.generated.xml
+# Artefacts de build Linux (AppImage copiée par scripts/linux_appimage_build.sh)
+dist/
+*.log
+shot*.png
+cdp_shot*.png
+node_modules/
+
+# RuVector intelligence data
+.ruvector/
+
+.codegraph/
+
+__pycache__/

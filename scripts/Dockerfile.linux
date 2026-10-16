@@ -1,0 +1,64 @@
+# Image de build/test Linux pour Kroki Desk (Tauri 2 + WebKitGTK).
+# Sert à valider la compilation sur cible Linux des fallbacks #[cfg(not(windows))]
+# ET le rendu réel des moteurs WASM/JS sous WebKitGTK (en headless via Xvfb).
+#
+# Usage (depuis la racine du repo) :
+#   docker build -t kroki-linux-build -f scripts/Dockerfile.linux .
+#   # Compilation seule :
+#   docker run --rm -v ${PWD}:/app -v kroki_target:/target -v kroki_cargo:/usr/local/cargo/registry \
+#     -e CARGO_TARGET_DIR=/target kroki-linux-build cargo build
+#   # Build + test runtime des moteurs (l'app tourne en headless, POST sur l'API locale) :
+#   docker run --rm -v ${PWD}:/app -v kroki_target:/target -v kroki_cargo:/usr/local/cargo/registry \
+#     kroki-linux-build bash /app/scripts/linux_runtime_run.sh
+#   # AppImage autonome (bundler Tauri, overlay tauri.appimage.conf.json) → dist/ :
+#   # (le volume kroki_cache persiste ~/.cache/tauri : linuxdeploy/appimagetool ne
+#   #  sont téléchargés qu'une fois — sinon GitHub finit par rate-limiter en 429)
+#   docker run --rm -v ${PWD}:/app -v kroki_target:/target -v kroki_cargo:/usr/local/cargo/registry \
+#     -v kroki_cache:/root/.cache kroki-linux-build bash /app/scripts/linux_appimage_build.sh
+#   # Paquet Debian/Ubuntu (bundler Tauri, overlay tauri.deb.conf.json) → dist/ :
+#   # (aucun outil téléchargé, donc pas de volume de cache à monter)
+#   docker run --rm -v ${PWD}:/app -v kroki_target:/target -v kroki_cargo:/usr/local/cargo/registry \
+#     kroki-linux-build bash /app/scripts/linux_deb_build.sh
+#   # Test runtime de l'AppImage produite (au lieu du binaire debug) :
+#   docker run --rm -e APP="/app/dist/Kroki Desk_<version>_amd64.AppImage" \
+#     -v ${PWD}:/app -v kroki_target:/target -v kroki_cargo:/usr/local/cargo/registry \
+#     kroki-linux-build bash /app/scripts/linux_runtime_run.sh
+#
+# NB (Windows/Git Bash) : lancer ces commandes depuis PowerShell — Git Bash
+# réécrit les chemins /app/... en C:/Program Files/Git/app/... (MSYS pathconv).
+FROM rust:1-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libwebkit2gtk-4.1-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    libssl-dev \
+    pkg-config \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dépendances runtime pour le test headless (couche séparée → cache préservé).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xvfb \
+    xauth \
+    dbus-x11 \
+    libgl1-mesa-dri \
+    libgles2 \
+    nodejs \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Outillage AppImage (cf. linux_appimage_build.sh) : tauri-cli compilé depuis
+# crates.io (long ~10 min — couche placée AVANT les utilitaires apt pour que
+# l'ajout d'un paquet n'invalide pas cette compilation), puis les utilitaires
+# requis par linuxdeploy et ses plugins (téléchargés par le bundler au premier
+# build ; xdg-utils : le plugin GTK appelle xdg-open).
+RUN cargo install tauri-cli --version '^2' --locked
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    file \
+    wget \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/src-tauri

@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "id": "ini-highlight",
+  "version": "1.0.0",
+  "apiVersion": "1",
+  "name": "INI highlight",
+  "description": "Coloration des fences ```ini",
+  "publisher": "acme",
+  "runtime": "worker",
+  "entry": "main.js",
+  "highlights": ["ini"],
+  "capabilities": ["highlight:code"]
+}

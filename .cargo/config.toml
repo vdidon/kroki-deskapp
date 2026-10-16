@@ -1,0 +1,32 @@
+# Alias Cargo pour piloter le crate `src-tauri/` depuis la racine du dépôt, sans
+# `cd src-tauri`. On cible le manifeste via --manifest-path : le crate reste un
+# package standalone (ses [profile.release] et son dossier target/ inchangés).
+#
+#   cargo run-app         → lance l'app en debug (développement)
+#   cargo build-app       → build release + publication dans dist/ (via xtask/)
+#   cargo build-appimage  → AppImage Linux (auto-installe tauri-cli si absent, via xtask/)
+#   cargo build-msi       → installeur MSI Windows (WiX v3, même tauri-cli, via xtask/)
+#   cargo build-deb       → paquet Debian/Ubuntu (Linux uniquement, même tauri-cli, via xtask/)
+#   cargo lint-app        → clippy
+#   cargo fmt-app         → rustfmt
+#
+# Un alias = une seule sous-commande (pas de `clippy && fmt`), d'où lint/fmt séparés.
+# Les arguments supplémentaires sont transmis (ex. `cargo run-app -- --flag`).
+# build-app et build-appimage passent par le crate xtask/ : après le build,
+# l'artefact est publié dans dist/ sous un nom postfixé de la version
+# (ex. kroki_deskapp-1.2.3.exe) doublé d'un fichier non versionné (hardlink,
+# copie en repli — cf. xtask/src/main.rs). build-appimage bootstrappe en plus
+# tauri-cli en local (xtask/target/tools/, one-shot) s'il n'est ni là ni sur le
+# PATH, puis lance `tauri build --config src-tauri/tauri.<cible>.conf.json` —
+# l'overlay active le bundling sans toucher tauri.conf.json (cf. CLAUDE.md
+# §§ « Builds Linux » et « Installeur Windows (MSI) »). build-msi et build-deb
+# exigent les archives de plugins livrées dans dist/ — ils les embarquent
+# (python build_dist.py --plugins-only).
+[alias]
+run-app = "run --manifest-path src-tauri/Cargo.toml"
+build-app = "run --quiet --manifest-path xtask/Cargo.toml -- build"
+build-appimage = "run --quiet --manifest-path xtask/Cargo.toml -- appimage"
+build-msi = "run --quiet --manifest-path xtask/Cargo.toml -- msi"
+build-deb = "run --quiet --manifest-path xtask/Cargo.toml -- deb"
+lint-app = "clippy --manifest-path src-tauri/Cargo.toml"
+fmt-app = "fmt --manifest-path src-tauri/Cargo.toml"

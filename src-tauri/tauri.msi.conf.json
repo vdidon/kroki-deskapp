@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "active": true,
+    "targets": ["msi"],
+    "publisher": "vdidon",
+    "category": "Utility",
+    "shortDescription": "Visionneuse Markdown avec rendu de diagrammes Kroki",
+    "windows": {
+      "webviewInstallMode": { "type": "skip" },
+      "wix": {
+        "language": "fr-FR",
+        "upgradeCode": "03A2A6F1-04C8-5B5A-B86C-338C035EAAC1",
+        "template": "wix/main.wxs",
+        "bannerPath": "wix/banner.bmp",
+        "dialogImagePath": "wix/dialog.bmp",
+        "fragmentPaths": ["wix/installer.wxs", "wix/plugins.generated.wxs"],
+        "componentGroupRefs": [
+          "KrokiDeskAssociations",
+          "KrokiDeskBundledPlugins",
+          "KrokiDeskPluginAssociations"
+        ]
+      }
+    }
+  }
+}

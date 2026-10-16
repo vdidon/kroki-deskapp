@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Paquet shared-mime-info de Kroki Desk, posé par le .deb dans
+  /usr/share/mime/packages/ (bundle.linux.deb.files) et fondu dans la base MIME
+  par update-mime-database (déclenchement dpkg de shared-mime-info, doublé du
+  postinst — cf. linux/postinst.sh).
+
+  Ce fichier ne porte que les formats natifs : le xtask en dérive
+  linux/kroki-desk.generated.xml (gitignoré), complété des types propres aux
+  plugins embarqués (cf. xtask/src/bundled.rs), et c'est celui-là que le
+  paquet installe.
+
+  Il est indispensable : le MimeType= du .desktop ne fait que déclarer les types
+  que l'application sait ouvrir, il ne dit nulle part qu'un fichier `.kdws` EST
+  de ce type. Sans les <glob> ci-dessous, les formats propres à l'application
+  n'existent pas pour le système et le double-clic ne trouve aucun gestionnaire.
+
+  Chaque type est <sub-class-of> de sa forme réelle (zip, json, texte) : c'est ce
+  qui garde les gestionnaires génériques disponibles, et c'est aussi ce qui fait
+  gagner le glob contre la détection par contenu — un `.kdext` est bel et bien un
+  zip, sans cette filiation le sniffing le classerait en application/zip.
+-->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+
+  <mime-type type="application/x-kroki-desk-session">
+    <comment>Kroki Desk session</comment>
+    <comment xml:lang="fr">Session Kroki Desk</comment>
+    <sub-class-of type="application/json"/>
+    <glob pattern="*.kdws"/>
+    <icon name="kroki_deskapp"/>
+  </mime-type>
+
+  <mime-type type="application/x-kroki-desk-plugin">
+    <comment>Kroki Desk plugin archive</comment>
+    <comment xml:lang="fr">Archive de plugin Kroki Desk</comment>
+    <sub-class-of type="application/zip"/>
+    <glob pattern="*.kdext"/>
+    <icon name="kroki_deskapp"/>
+  </mime-type>
+
+  <!--
+    text/markdown existe déjà en amont, mais avec *.md, *.mkd et *.markdown
+    seulement (vérifié dans freedesktop.org.xml.in) : *.mdown, que DOC_EXTENSIONS
+    accepte, n'y est pas. On n'ajoute que le glob manquant — pas de <comment>,
+    pour ne rien redéfinir de la définition standard.
+  -->
+  <mime-type type="text/markdown">
+    <glob pattern="*.mdown"/>
+  </mime-type>
+
+</mime-info>

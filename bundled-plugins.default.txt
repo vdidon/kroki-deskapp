@@ -1,0 +1,17 @@
+# Plugins embarqués dans les installeurs (MSI, .deb) — comportement par défaut.
+#
+# Surchargé en entier par bundled-plugins.txt (gitignoré) s'il existe : y
+# recopier ce fichier pour embarquer une autre sélection.
+#
+# Une ligne par plugin, dans l'ordre de la page de sélection du MSI :
+#   <id> [on]
+#   on   coché par défaut (MSI) / installé au premier lancement (.deb) ;
+#        sans lui, embarqué mais décoché / simplement posé à côté.
+#
+# Nom affiché et extensions viennent du manifest.json de dist/<id>.kdext ; les
+# extensions d'un plugin installé ouvrent Kroki Desk au double-clic. Détail :
+# xtask/src/bundled.rs.
+latex-doc      on
+csv-tables
+barchart
+ini-highlight

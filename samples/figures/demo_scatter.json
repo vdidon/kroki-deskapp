@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "x": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026],
+      "y": [1.07, 1.06, 1.05, 1.08, 1.09, 1.04, 1.10, 1.12, 1.42],
+      "name": "JAN r1",
+      "line": { "color": "#1b9e77" }
+    }
+  ],
+  "layout": {
+    "title": { "text": "H2 — ratio JAN observé par année (src= externe)" },
+    "xaxis": { "title": { "text": "année" } },
+    "yaxis": { "title": { "text": "r1 = M1/Q" } }
+  }
+}

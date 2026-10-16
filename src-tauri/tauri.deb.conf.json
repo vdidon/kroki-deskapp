@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "publisher": "vdidon",
+    "category": "Utility",
+    "shortDescription": "Visionneuse Markdown avec rendu de diagrammes Kroki",
+    "longDescription": "Kroki Desk affiche des documents Markdown et rend les blocs de diagrammes Kroki (mermaid, plantuml, graphviz, d2, bpmn, svgbob…) en SVG sans serveur, sans Docker et sans réseau : tous les moteurs sont embarqués dans l'exécutable.\n\nLes moteurs PlantUML, C4-PlantUML et ditaa s'exécutent sur la JVM et réclament donc un Java installé (default-jre suffit) ; aucun des autres n'en a besoin.",
+    "fileAssociations": [
+      {
+        "ext": ["kdws"],
+        "name": "Kroki Desk session",
+        "mimeType": "application/x-kroki-desk-session"
+      },
+      {
+        "ext": ["kdext"],
+        "name": "Kroki Desk plugin",
+        "mimeType": "application/x-kroki-desk-plugin"
+      },
+      {
+        "ext": ["md", "markdown", "mdown", "mkd"],
+        "name": "Markdown document",
+        "mimeType": "text/markdown"
+      },
+      {
+        "ext": ["html", "htm"],
+        "name": "HTML document",
+        "mimeType": "text/html"
+      }
+    ],
+    "linux": {
+      "deb": {
+        "section": "utils",
+        "depends": ["libc6 (>= 2.36)"],
+        "recommends": ["shared-mime-info", "desktop-file-utils", "xdg-utils"],
+        "desktopTemplate": "linux/kroki-desk.desktop",
+        "postInstallScript": "linux/postinst.sh",
+        "postRemoveScript": "linux/postrm.sh",
+        "files": {
+          "/usr/share/mime/packages/kroki-desk.xml": "linux/kroki-desk.xml"
+        }
+      }
+    }
+  }
+}
