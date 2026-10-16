@@ -82,6 +82,20 @@ Desk only appears as a suggestion. Shared native formats (Markdown,
 text, HTML) are never claimed: Kroki Desk is only added to "Open
 with", without touching your default applications.
 
+### Installer language
+
+The MSI is a single file in English and French: it opens in the language of
+the Windows display language (French for a French Windows, English
+otherwise). To force one:
+
+```
+msiexec /i kroki_deskapp.msi ProductLanguage=1036    # French
+msiexec /i kroki_deskapp.msi ProductLanguage=1033    # English
+```
+
+The installer's language is independent from the application's: Kroki Desk
+picks its own at launch (Settings → Language).
+
 ### Launching by name
 
 The MSI registers the application in *App Paths*: `start "" kroki_deskapp …`

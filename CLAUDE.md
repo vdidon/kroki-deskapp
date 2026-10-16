@@ -146,8 +146,9 @@ What the overlay carries, and why:
   the PATH — it is the documented way for an agent to open a document at a
   reference. Bash and CreateProcess do not read it.
 - **`wix.template` replaced** (`src-tauri/wix/main.wxs`): copy of the tauri-bundler
-  template (tauri-cli 2.11.4) with **a single** deviation, flagged in a
-  comment — the Start menu shortcut no longer has
+  template (tauri-cli 2.11.4) with **two** deviations, flagged in comments:
+  the ProductCode taken from `TAURI_KROKI_DESK_PRODUCT_CODE` (see « A single multilingual
+  MSI » below), and the Start menu shortcut no longer has
   `Icon="ProductIcon"`. That attribute makes the `.lnk` point to
   `%WINDIR%\Installer\{ProductCode}\ProductIcon`, a folder deleted on every major
   update (new ProductCode on every build); the taskbar pin, a **frozen copy**
@@ -167,6 +168,36 @@ What the overlay carries, and why:
   replace the default WixUI logo (red CD). Sizes imposed by WixUI;
   generated from `icons/icon.png` by `uv run scripts/wix_images.py`, to be
   re-run if the icon changes.
+- **A single multilingual MSI** (en-US base + fr-FR, 3.25.0):
+  `wix.language` maps each language to its `.wxl` (`src-tauri/wix/locales/`:
+  our dialog and ProgID texts as `!(loc.Kd…)`, plus Tauri's `LaunchApp`…
+  redefined to be translated — no `Kd…` Id may contain one of Tauri's, the
+  bundler tests them by substring), so `tauri build` produces one MSI per
+  language. `xtask/src/msi_lang.rs` then merges them: `torch -t language`
+  computes the en-US → fr-FR transform, which goes into the base's
+  `_Storages` table under its LCID (`1036`), and the summary's *Template*
+  lists every language (`x64;1033,1036`). The base gets a transform too
+  (`1033`, adding an inert `KrokiDeskInstallerLanguage` property — torch
+  refuses two identical databases), so that every language choice names an
+  existing transform. Windows Installer applies the transform matching the
+  user's **display language** by itself (undocumented but long-standing
+  behavior); `ProductLanguage=1033` / `1036` on the command line forces the
+  choice. `TRANSFORMS=:1033` does **not**: the automatically chosen transform
+  is applied first, those of `TRANSFORMS` on top (verified on a French
+  Windows). Prerequisite,
+  checked by the xtask: the per-language MSIs share their ProductCode. `light`
+  resolves `Product Id="*"` once **per language**, hence two codes; so
+  `build_msi` draws one per build (`stable_guid` of version + time + pid, still
+  new at every build = major upgrade) and passes it as `TAURI_KROKI_DESK_PRODUCT_CODE` (the `TAURI` prefix is
+  mandatory: tauri-bundler clears the environment of the WiX tools except
+  `SYSTEMROOT`/`TMP`/`TEMP` and `TAURI*` variables), which
+  `main.wxs` uses when defined (`*` otherwise) — the template's second
+  deviation from upstream. A transform changing the ProductCode would break
+  the upgrade chain. `msi.dll` is called directly (`windows`
+  crate), not the SDK's `WiSubStg.vbs`. To replay only the merge on the
+  per-language MSIs of the last build (seconds, no cargo nor WiX):
+  `cargo run --manifest-path xtask/Cargo.toml -- msi-merge`. Adding a language = a `.wxl`, a
+  `wix.language` entry and a `msi_lang::OTHERS` entry.
 - **`webviewInstallMode: skip`**: WebView2 is preinstalled since Windows 10
   2004. The other modes download at install time (filtered network) or
   add 127 to 180 MB.

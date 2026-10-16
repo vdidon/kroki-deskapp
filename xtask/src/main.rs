@@ -33,6 +33,8 @@ use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
 
 mod bundled;
+#[cfg(windows)]
+mod msi_lang;
 
 const TAURI_CLI_VERSION: &str = "^2";
 const BIN_NAME: &str = "kroki_deskapp";
@@ -45,12 +47,13 @@ fn main() {
         "build" => build_app(&extra),
         "appimage" => build_appimage(&extra),
         "msi" => build_msi(&extra),
+        "msi-merge" => merge_msi(),
         "deb" => build_deb(&extra),
         "bundled" => gen_bundled(),
         other => {
             eprintln!(
                 "xtask : sous-commande inconnue « {other} » \
-                 (attendu : build | appimage | msi | deb | bundled)"
+                 (attendu : build | appimage | msi | msi-merge | deb | bundled)"
             );
             exit(2);
         }
@@ -187,6 +190,21 @@ fn build_msi(extra: &[String]) {
     bundled::stage(&repo, &plugins, "build-msi");
     bundled::write_wix_fragment(&repo, &plugins, "build-msi");
 
+    // ProductCode neuf à chaque build (mise à jour majeure, comme `Id="*"`),
+    // mais commun aux MSI de chaque langue : `light`, qui résout `*`, tourne
+    // une fois par langue — cf. src-tauri/wix/main.wxs et msi_lang.rs. Préfixe
+    // TAURI obligatoire : tauri-bundler lance WiX avec un environnement vidé,
+    // hors SYSTEMROOT/TMP/TEMP et les variables TAURI* (`clear_env_for_wix`).
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let product_code = bundled::stable_guid(&format!(
+        "kroki-desk/product/{}/{nonce}/{}",
+        read_version(&repo),
+        std::process::id()
+    ));
+
     let cli = ensure_tauri_cli(&repo);
     run_or_die(
         Command::new(&cli)
@@ -198,14 +216,35 @@ fn build_msi(extra: &[String]) {
             ])
             .args(extra)
             .current_dir(&repo)
+            .env("TAURI_KROKI_DESK_PRODUCT_CODE", &product_code)
             // Même neutralisation de sccache que build_app : tauri build lance
             // un cargo build --release, qui bute sinon sur web-sys.
             .env("RUSTC_WRAPPER", ""),
         "build-msi : échec du bundling",
     );
 
+    merge_msi();
+}
+
+/// Fusion des MSI par langue du dernier `tauri build` en un MSI multilingue,
+/// puis publication dans dist/. Fin de `build_msi` ; seule, `cargo run
+/// --manifest-path xtask/Cargo.toml -- msi-merge` rejoue la fusion sans
+/// recompiler ni relancer WiX (mise au point de msi_lang.rs).
+fn merge_msi() {
+    if !cfg!(windows) {
+        die("msi-merge : msi.dll et torch n'existent que sous Windows");
+    }
+    let repo = repo_root();
+    // Un MSI par langue (tauri.msi.conf.json, `wix.language`), fusionnés en un
+    // seul qui suit la langue de l'interface Windows (cf. msi_lang.rs).
     let version = read_version(&repo);
     let bundle_dir = target_dir(&repo).join("release/bundle/msi");
+    #[cfg(windows)]
+    let built = msi_lang::merge(&bundle_dir, &version, |suffix| {
+        find_bundle(&bundle_dir, &version, suffix)
+    });
+    // Inatteignable (sortie en tête hors Windows) : seulement pour compiler.
+    #[cfg(not(windows))]
     let built = find_bundle(&bundle_dir, &version, ".msi");
     publish_dist(
         &repo,

@@ -5,11 +5,14 @@
     "targets": ["msi"],
     "publisher": "vdidon",
     "category": "Utility",
-    "shortDescription": "Visionneuse Markdown avec rendu de diagrammes Kroki",
+    "shortDescription": "Markdown viewer with Kroki diagram rendering",
     "windows": {
       "webviewInstallMode": { "type": "skip" },
       "wix": {
-        "language": "fr-FR",
+        "language": {
+          "en-US": { "localePath": "wix/locales/en-US.wxl" },
+          "fr-FR": { "localePath": "wix/locales/fr-FR.wxl" }
+        },
         "upgradeCode": "03A2A6F1-04C8-5B5A-B86C-338C035EAAC1",
         "template": "wix/main.wxs",
         "bannerPath": "wix/banner.bmp",

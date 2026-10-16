@@ -1,6 +1,8 @@
-<!-- Copie du template WiX de tauri-bundler (tauri-cli 2.11.4) avec UN écart :
-     le raccourci du menu Démarrer n'a plus d'Icon="ProductIcon". Cf. CLAUDE.md,
-     § Installeur Windows. À re-synchroniser lors d'une montée de tauri-cli. -->
+<!-- Copie du template WiX de tauri-bundler (tauri-cli 2.11.4) avec DEUX écarts :
+     le raccourci du menu Démarrer n'a plus d'Icon="ProductIcon", et le ProductCode
+     vient de TAURI_KROKI_DESK_PRODUCT_CODE quand le xtask le fournit (MSI multilingue : un même
+     ProductCode pour les MSI de chaque langue). Cf. CLAUDE.md, § Installeur
+     Windows. À re-synchroniser lors d'une montée de tauri-cli. -->
 <?if $(sys.BUILDARCH)="x86"?>
     <?define Win64 = "no" ?>
     <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
@@ -14,9 +16,19 @@
     <?error Unsupported value of sys.BUILDARCH=$(sys.BUILDARCH)?>
 <?endif?>
 
+<!-- Kroki Desk : `light` résout Id="*" à chaque passage, donc une fois par
+     langue — deux ProductCode, et une transform de langue qui changerait
+     l'identité du produit. Le xtask en tire un par build (TAURI_KROKI_DESK_PRODUCT_CODE),
+     partagé par toutes les langues ; sans lui (tauri build brut), « * ». -->
+<?ifdef env.TAURI_KROKI_DESK_PRODUCT_CODE?>
+    <?define KdProductCode = "$(env.TAURI_KROKI_DESK_PRODUCT_CODE)" ?>
+<?else?>
+    <?define KdProductCode = "*" ?>
+<?endif?>
+
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Product
-            Id="*"
+            Id="$(var.KdProductCode)"
             Name="{{product_name}}"
             UpgradeCode="{{upgrade_code}}"
             Language="!(loc.TauriLanguage)"

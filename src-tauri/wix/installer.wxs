@@ -118,21 +118,21 @@
                        Name="progids" Type="integer" Value="1" KeyPath="yes" />
 
         <RegistryKey Root="HKMU" Key="Software\Classes\KrokiDesk.Session" ForceDeleteOnUninstall="yes">
-          <RegistryValue Type="string" Value="Session Kroki Desk" />
+          <RegistryValue Type="string" Value="!(loc.KdProgIdSession)" />
           <RegistryValue Key="DefaultIcon" Type="string" Value="[INSTALLDIR]kroki_deskapp.exe,0" />
           <RegistryValue Key="shell\open\command" Type="string"
                          Value="&quot;[INSTALLDIR]kroki_deskapp.exe&quot; &quot;%1&quot;" />
         </RegistryKey>
 
         <RegistryKey Root="HKMU" Key="Software\Classes\KrokiDesk.Plugin" ForceDeleteOnUninstall="yes">
-          <RegistryValue Type="string" Value="Plugin Kroki Desk" />
+          <RegistryValue Type="string" Value="!(loc.KdProgIdPlugin)" />
           <RegistryValue Key="DefaultIcon" Type="string" Value="[INSTALLDIR]kroki_deskapp.exe,0" />
           <RegistryValue Key="shell\open\command" Type="string"
                          Value="&quot;[INSTALLDIR]kroki_deskapp.exe&quot; &quot;%1&quot;" />
         </RegistryKey>
 
         <RegistryKey Root="HKMU" Key="Software\Classes\KrokiDesk.Document" ForceDeleteOnUninstall="yes">
-          <RegistryValue Type="string" Value="Document Kroki Desk" />
+          <RegistryValue Type="string" Value="!(loc.KdProgIdDocument)" />
           <RegistryValue Key="DefaultIcon" Type="string" Value="[INSTALLDIR]kroki_deskapp.exe,0" />
           <RegistryValue Key="shell\open\command" Type="string"
                          Value="&quot;[INSTALLDIR]kroki_deskapp.exe&quot; &quot;%1&quot;" />

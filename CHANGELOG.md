@@ -12,6 +12,9 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   operating system — French on a French Windows or Linux desktop, English
   otherwise — and Settings → Language lets you pick one explicitly. The change
   applies at once to every open window, error messages included.
+- **Multilingual installer.** The MSI is a single file that opens in English
+  or French depending on the Windows display language
+  (`msiexec /i … ProductLanguage=1033` forces English).
 - **Plugins told the interface language.** The host sends `locale` with
   `initialize`, `document/transform` and `fence/render`, and notifies
   `locale/changed` (plugin protocol §6.1, §6.6): the bundled LaTeX plugin

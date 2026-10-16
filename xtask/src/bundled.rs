@@ -335,16 +335,16 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
         <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes"
                  NoPrefix="yes" Text="{{\WixUI_Font_Title}}Plugins" />
         <Control Id="Description" Type="Text" X="25" Y="23" Width="330" Height="15" Transparent="yes"
-                 NoPrefix="yes" Text="Choisissez les plugins à installer avec l'application." />
+                 NoPrefix="yes" Text="!(loc.KdPluginDlgDescription)" />
 
         <Control Id="PluginLabel" Type="Text" X="20" Y="58" Width="330" Height="12" NoPrefix="yes"
-                 Text="{{\WixUI_Font_Title}}Installer avec Kroki Desk" />
+                 Text="{{\WixUI_Font_Title}}!(loc.KdPluginDlgHeading)" />
         <Control Id="PluginHint" Type="Text" X="20" Y="72" Width="330" Height="12" NoPrefix="yes"
-                 Text="Un plugin ajoute à l'application des formats qu'elle ne lit pas seule." />
+                 Text="!(loc.KdPluginDlgHint)" />
 
 {checkboxes}
         <Control Id="Note" Type="Text" X="20" Y="{note_y}" Width="330" Height="{note_h}" NoPrefix="yes"
-                 Text="Les plugins cochés s'installent au premier lancement et se mettent à jour avec l'application. Kroki Desk devient l'application par défaut de leurs formats, sauf si vous en avez déjà choisi une." />
+                 Text="!(loc.KdPluginDlgNote)" />
 
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
                  Text="!(loc.WixUIBack)">
@@ -399,7 +399,7 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
 
 /// GUID déterministe (FNV-1a 128 bits sur deux graines, bits de version 5 et
 /// de variante RFC 4122 posés) : stable d'un build à l'autre pour une même clé.
-fn stable_guid(key: &str) -> String {
+pub fn stable_guid(key: &str) -> String {
     let fnv = |seed: u64| {
         key.bytes().fold(seed, |h, b| {
             (h ^ b as u64).wrapping_mul(0x0000_0100_0000_01b3)

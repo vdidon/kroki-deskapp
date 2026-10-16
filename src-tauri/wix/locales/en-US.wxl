@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textes de l'installeur, langue de référence (cf. CLAUDE.md, § « Windows
+     installer (MSI) »). Même jeu d'Id dans chaque langue. Les chaînes de Tauri
+     (TauriLanguage, TauriCodepage) sont ajoutées par le bundler ; les autres
+     (LaunchApp…) sont redéfinies ici pour être traduites. Aucun Id maison ne
+     doit contenir un Id de Tauri : le bundler le teste par sous-chaîne. -->
+<WixLocalization Culture="en-us" Codepage="1252" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="LaunchApp">Launch Kroki Desk</String>
+  <String Id="DowngradeErrorMessage">A newer version of Kroki Desk is already installed.</String>
+  <String Id="PathEnvVarFeature">Add the install location of the Kroki Desk executable to the PATH system environment variable. This allows the Kroki Desk executable to be called from any location.</String>
+  <String Id="InstallAppFeature">Installs Kroki Desk.</String>
+
+  <String Id="KdPluginDlgDescription">Choose the plugins to install with the application.</String>
+  <String Id="KdPluginDlgHeading">Install with Kroki Desk</String>
+  <String Id="KdPluginDlgHint">A plugin adds file formats the application cannot read on its own.</String>
+  <String Id="KdPluginDlgNote">Ticked plugins are installed on first launch and updated with the application. Kroki Desk becomes the default application for their formats, unless you have already chosen another one.</String>
+
+  <String Id="KdProgIdSession">Kroki Desk session</String>
+  <String Id="KdProgIdPlugin">Kroki Desk plugin</String>
+  <String Id="KdProgIdDocument">Kroki Desk document</String>
+</WixLocalization>

@@ -1,7 +1,7 @@
 [package]
 name = "kroki_deskapp"
 version = "3.25.0"
-description = "Visionneuse Markdown avec rendu de diagrammes Kroki"
+description = "Markdown viewer with Kroki diagram rendering"
 edition = "2021"
 
 [build-dependencies]

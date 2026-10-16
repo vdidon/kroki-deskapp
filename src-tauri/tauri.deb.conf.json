@@ -5,7 +5,7 @@
     "targets": ["deb"],
     "publisher": "vdidon",
     "category": "Utility",
-    "shortDescription": "Visionneuse Markdown avec rendu de diagrammes Kroki",
+    "shortDescription": "Markdown viewer with Kroki diagram rendering",
     "longDescription": "Kroki Desk affiche des documents Markdown et rend les blocs de diagrammes Kroki (mermaid, plantuml, graphviz, d2, bpmn, svgbob…) en SVG sans serveur, sans Docker et sans réseau : tous les moteurs sont embarqués dans l'exécutable.\n\nLes moteurs PlantUML, C4-PlantUML et ditaa s'exécutent sur la JVM et réclament donc un Java installé (default-jre suffit) ; aucun des autres n'en a besoin.",
     "fileAssociations": [
       {
