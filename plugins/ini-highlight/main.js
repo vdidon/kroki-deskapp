@@ -1,11 +1,11 @@
-// Plugin d'exemple ini-highlight — §12.3 de doc/plugin-protocol.md : capacité
-// `highlight:code` seule, sans dépendance hljs (grammaire ligne à ligne
-// maison). Deux règles du protocole illustrées ici : le plugin échappe
-// lui-même le code (sa sortie est du HTML, re-sanitizé par l'hôte : spans
-// hljs-* uniquement) et n'émet que des classes `hljs-*` existantes — les
-// couleurs viennent du thème hljs de l'hôte, un plugin n'apporte pas de CSS.
+// ini-highlight example plugin — §12.3 of doc/plugin-protocol.md: the
+// `highlight:code` capability only, with no hljs dependency (home-made
+// line-by-line grammar). Two protocol rules are illustrated here: the plugin
+// escapes the code itself (its output is HTML, re-sanitized by the host:
+// hljs-* spans only) and only emits existing `hljs-*` classes — the colors
+// come from the host's hljs theme, a plugin ships no CSS.
 //
-// Le global `kd` est fourni par le runtime de l'hôte (kd_runtime.js).
+// The global `kd` is provided by the host runtime (kd_runtime.js).
 
 kd.onRequest("initialize", () => ({ ok: true }));
 

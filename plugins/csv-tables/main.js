@@ -1,19 +1,19 @@
-// Plugin d'exemple csv-tables — §12.1 de doc/plugin-protocol.md : capacité
-// `document:markdown` seule. Un fichier .csv (séparateur `;`) devient un
-// document markdown dérivé (titre + table), avec une ancre par ligne de
-// données pour le remap sommaire/vue source.
+// csv-tables example plugin — §12.1 of doc/plugin-protocol.md: the
+// `document:markdown` capability only. A .csv file (separator `;`) becomes a
+// derived markdown document (title + table), with one anchor per data row for
+// the outline/source-view remap.
 //
-// Le global `kd` est fourni par le runtime de l'hôte (kd_runtime.js).
+// The global `kd` is provided by the host runtime (kd_runtime.js).
 
 kd.onRequest("initialize", () => ({ ok: true }));
 
 kd.onRequest("document/transform", ({ text, title }) => {
   const src = String(text ?? "");
-  // Contrat de robustesse §6.2 : contenu inexploitable → markdown dégradé
-  // (bandeau + source en fence), jamais d'`error`.
+  // Robustness contract §6.2: unusable content → degraded markdown
+  // (banner + source in a fence), never an `error`.
   if (!src.trim()) {
     return {
-      markdown: `> ⚠️ Fichier CSV vide.\n\n\`\`\`\n${src}\n\`\`\``,
+      markdown: `> ⚠️ Empty CSV file.\n\n\`\`\`\n${src}\n\`\`\``,
       anchors: [[0, 0]],
     };
   }
@@ -23,12 +23,12 @@ kd.onRequest("document/transform", ({ text, title }) => {
     "",
     `| ${rows[0].join(" | ")} |`,
     `| ${rows[0].map(() => "---").join(" | ")} |`,
-    // ancre par ligne de données : ligne markdown → ligne du .csv source
+    // one anchor per data row: markdown line → line of the source .csv
     ...rows.slice(1).map((r) => `| ${r.join(" | ")} |`),
   ];
   const anchors = [[0, 0], ...rows.slice(1).map((_, i) => [4 + i, 1 + i])];
   return { markdown: md.join("\n"), anchors };
 });
 
-// Un `|` dans une cellule casserait la structure de la table.
+// A `|` in a cell would break the table structure.
 const cell = (s) => s.replace(/\|/g, "\\|");

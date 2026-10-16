@@ -1,8 +1,8 @@
-# Plugin d'exemple barchart
+# barchart example plugin
 
-Implémentation de l'exemple **§12.2** de `doc/plugin-protocol.md` (racine du
-dépôt de l'application) : les capacités `fence:svg` + `read:siblings`. Dans
-n'importe quel document markdown (ou dérivé d'un autre plugin) :
+Implementation of example **§12.2** of `doc/plugin-protocol.md` (root of the
+application repository): the `fence:svg` + `read:siblings` capabilities. In any
+markdown document (or one derived from another plugin):
 
 ````markdown
 ```barchart max=120
@@ -12,8 +12,8 @@ M+1;24
 ```
 ````
 
-ou, données externes — l'image de fallback jumelle (§6.3) joue alors
-automatiquement :
+or, with external data — the twin fallback image (§6.3) then plays
+automatically:
 
 ````markdown
 ![fallback](ventes.png)
@@ -21,25 +21,25 @@ automatiquement :
 ```
 ````
 
-Plugin **pédagogique** : il illustre le point d'extension fence + le service
-`host/readFile`, pas une bibliothèque de graphes.
+An **educational** plugin: it illustrates the fence extension point + the
+`host/readFile` service, not a charting library.
 
-## Contenu
+## Contents
 
-- `manifest.json` — revendique la fence `barchart` (`fence:svg`) et la lecture
-  des `.csv` voisins (`read:siblings`).
-- `main.js` — entry du worker : parse `label;valeur`, échappe les labels,
-  colorie le texte selon le thème effectif fourni par l'hôte.
+- `manifest.json` — claims the `barchart` fence (`fence:svg`) and reading of
+  neighboring `.csv` files (`read:siblings`).
+- `main.js` — worker entry: parses `label;value`, escapes labels, colors the
+  text according to the effective theme provided by the host.
 
-## Empaquetage / installation
+## Packaging / installation
 
 ```bash
 # → dist/barchart-<version>.kdext (+ twin dist/barchart.kdext)
 python pack_plugin.py plugins/barchart
 ```
 
-Installer en déposant le `.kdext` sur une fenêtre de Kroki Desk, ou via le
-bouton « Ajouter un plugin… » (dialog Plugins de la toolbar).
+Install by dropping the `.kdext` onto a Kroki Desk window, or via the "Add a
+plugin…" button (« Ajouter un plugin… », in the toolbar's Plugins dialog).
 
-Boucle de dev sans repack : copier ce dossier dans
-`%APPDATA%\kroki-deskapp\plugins\barchart\` puis relancer l'application.
+Dev loop without repacking: copy this folder into
+`%APPDATA%\kroki-deskapp\plugins\barchart\` then restart the application.

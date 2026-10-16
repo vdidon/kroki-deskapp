@@ -1,30 +1,30 @@
-# Plugin d'exemple ini-highlight
+# ini-highlight example plugin
 
-Implémentation de l'exemple **§12.3** de `doc/plugin-protocol.md` (racine du
-dépôt de l'application) : la capacité `highlight:code` seule. Les fences
-```` ```ini ```` des documents markdown sont colorées (commentaires,
-`[sections]`, `clé = valeur`) via des classes `hljs-*` stylées par le thème
-hljs de l'hôte.
+Implementation of example **§12.3** of `doc/plugin-protocol.md` (root of the
+application repository): the `highlight:code` capability alone. The
+```` ```ini ```` fences of markdown documents are colored (comments,
+`[sections]`, `key = value`) via `hljs-*` classes styled by the host's hljs
+theme.
 
-Plugin **pédagogique** : grammaire ligne à ligne maison, sans hljs vendoré —
-il montre le contrat minimal (`highlight/render` → HTML de spans `hljs-*`
-auto-échappé), pas un support INI exhaustif.
+An **educational** plugin: a home-grown line-by-line grammar, with no vendored
+hljs — it shows the minimal contract (`highlight/render` → self-escaped HTML of
+`hljs-*` spans), not exhaustive INI support.
 
-## Contenu
+## Contents
 
-- `manifest.json` — revendique la coloration `ini` (`highlight:code`).
-- `main.js` — entry du worker : coloration ligne à ligne, échappement HTML
-  côté plugin (l'hôte re-sanitize en ne gardant que les spans `hljs-*`).
+- `manifest.json` — claims `ini` highlighting (`highlight:code`).
+- `main.js` — worker entry: line-by-line highlighting, HTML escaping done
+  plugin-side (the host re-sanitizes, keeping only `hljs-*` spans).
 
-## Empaquetage / installation
+## Packaging / installation
 
 ```bash
 # → dist/ini-highlight-<version>.kdext (+ twin dist/ini-highlight.kdext)
 python pack_plugin.py plugins/ini-highlight
 ```
 
-Installer en déposant le `.kdext` sur une fenêtre de Kroki Desk, ou via le
-bouton « Ajouter un plugin… » (dialog Plugins de la toolbar).
+Install by dropping the `.kdext` onto a Kroki Desk window, or via the "Add a
+plugin…" button (« Ajouter un plugin… », in the toolbar's Plugins dialog).
 
-Boucle de dev sans repack : copier ce dossier dans
-`%APPDATA%\kroki-deskapp\plugins\ini-highlight\` puis relancer l'application.
+Dev loop without repacking: copy this folder into
+`%APPDATA%\kroki-deskapp\plugins\ini-highlight\` then restart the application.

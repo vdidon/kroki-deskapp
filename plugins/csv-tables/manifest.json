@@ -1,10 +1,10 @@
 {
   "manifestVersion": 1,
   "id": "csv-tables",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "apiVersion": "1",
   "name": "CSV as tables",
-  "description": "Affiche les .csv en tables markdown",
+  "description": "Displays .csv files as markdown tables",
   "publisher": "acme",
   "runtime": "worker",
   "entry": "main.js",

@@ -1,16 +1,16 @@
-// Plugin d'exemple barchart — §12.2 de doc/plugin-protocol.md : capacités
-// `fence:svg` + `read:siblings`. Une fence ```barchart (lignes `label;valeur`,
-// option `max=`) est rendue en barres horizontales SVG ; données inline ou
-// externes via `src=fichier.csv` (lu par `host/readFile`, confiné au dossier
-// du document + allowlist `siblingExtensions` — l'image de fallback jumelle
-// de l'hôte, §6.3, joue alors automatiquement).
+// barchart example plugin — §12.2 of doc/plugin-protocol.md: capabilities
+// `fence:svg` + `read:siblings`. A ```barchart fence (`label;value` lines,
+// option `max=`) is rendered as horizontal SVG bars; data inline or external
+// via `src=file.csv` (read by `host/readFile`, confined to the document's
+// folder + `siblingExtensions` allowlist — the host's twin fallback image,
+// §6.3, then plays automatically).
 //
-// Le global `kd` est fourni par le runtime de l'hôte (kd_runtime.js).
+// The global `kd` is provided by the host runtime (kd_runtime.js).
 
 kd.onRequest("initialize", () => ({ ok: true }));
 
 kd.onRequest("fence/render", async ({ source, options, theme }) => {
-  // bloc vide + src= : données lues via l'hôte (confinement read:siblings)
+  // empty block + src=: data read through the host (read:siblings confinement)
   let text = String(source ?? "").trim();
   if (!text && options?.src) text = (await kd.request("host/readFile", { rel: options.src })).text;
   const rows = text
@@ -18,11 +18,11 @@ kd.onRequest("fence/render", async ({ source, options, theme }) => {
     .split(/\r?\n/)
     .map((l) => l.split(";"))
     .filter(([, v]) => Number.isFinite(Number(v)));
-  // Une fence peut lever : l'hôte affiche son bloc d'erreur standard (§6.3).
-  if (!rows.length) throw new Error("aucune ligne « label;valeur » exploitable");
+  // A fence may throw: the host displays its standard error block (§6.3).
+  if (!rows.length) throw new Error("no usable \"label;value\" row");
   const max = Number(options?.max) || Math.max(...rows.map(([, v]) => Number(v)));
-  // Thème effectif fourni par l'hôte — jamais de prefers-color-scheme ici,
-  // sinon le forçage auto/light/dark du réglage serait ignoré.
+  // Effective theme provided by the host — never prefers-color-scheme here,
+  // otherwise the auto/light/dark override in the settings would be ignored.
   const fg = theme === "dark" ? "#e6e6e6" : "#1f1f1f";
   const bars = rows.map(
     ([label, v], i) =>

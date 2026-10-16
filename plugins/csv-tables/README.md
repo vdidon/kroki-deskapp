@@ -1,30 +1,30 @@
-# Plugin d'exemple csv-tables
+# csv-tables example plugin
 
-Implémentation de l'exemple **§12.1** de `doc/plugin-protocol.md` (racine du
-dépôt de l'application) : la capacité `document:markdown` seule. Un fichier
-`.csv` (séparateur `;`, première ligne = en-têtes) s'affiche en table markdown ;
-la vue source montre le CSV brut, le clic sommaire/preview retombe sur la bonne
-ligne du fichier via les ancres.
+Implementation of example **§12.1** of `doc/plugin-protocol.md` (root of the
+application repository): the `document:markdown` capability alone. A `.csv` file
+(`;` separator, first row = headers) is displayed as a markdown table; the
+source view shows the raw CSV, and a click between table of contents and preview
+lands on the right line of the file via the anchors.
 
-Plugin **pédagogique** : il illustre le point d'extension minimal, pas un
-support CSV sérieux (pas de quoting RFC 4180, pas de choix du séparateur).
+An **educational** plugin: it illustrates the minimal extension point, not
+serious CSV support (no RFC 4180 quoting, no choice of separator).
 
-## Contenu
+## Contents
 
-- `manifest.json` — revendique `.csv` avec la seule capacité
-  `document:markdown`.
-- `main.js` — entry du worker : transform CSV → table + ancres, dégradation
-  (bandeau + fence) sur fichier vide.
+- `manifest.json` — claims `.csv` with the `document:markdown` capability
+  only.
+- `main.js` — worker entry: CSV → table + anchors transform, graceful
+  degradation (banner + fence) on an empty file.
 
-## Empaquetage / installation
+## Packaging / installation
 
 ```bash
 # → dist/csv-tables-<version>.kdext (+ twin dist/csv-tables.kdext)
 python pack_plugin.py plugins/csv-tables
 ```
 
-Installer en déposant le `.kdext` sur une fenêtre de Kroki Desk, ou via le
-bouton « Ajouter un plugin… » (dialog Plugins de la toolbar).
+Install by dropping the `.kdext` onto a Kroki Desk window, or via the "Add a
+plugin…" button (« Ajouter un plugin… », in the toolbar's Plugins dialog).
 
-Boucle de dev sans repack : copier ce dossier dans
-`%APPDATA%\kroki-deskapp\plugins\csv-tables\` puis relancer l'application.
+Dev loop without repacking: copy this folder into
+`%APPDATA%\kroki-deskapp\plugins\csv-tables\` then restart the application.
