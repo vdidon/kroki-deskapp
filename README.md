@@ -197,7 +197,7 @@ dialog (⚙), after confirmation.
 Plugins in the repository (`plugins/`):
 
 - [`latex-doc`](plugins/latex-doc/README.md) — standalone LaTeX documents and
-  ` ```latex ` fences (installed by default with the installers);
+  ` ```latex ` fences (installed by default, portable binaries included);
 - [`csv-tables`](plugins/csv-tables/README.md),
   [`barchart`](plugins/barchart/README.md),
   [`ini-highlight`](plugins/ini-highlight/README.md) — teaching examples,

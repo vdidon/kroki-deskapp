@@ -251,10 +251,17 @@ pub fn write_wix_fragment(repo: &Path, plugins: &[Plugin], cmd: &str) {
 fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
     let exe = format!("[INSTALLDIR]{}.exe", crate::BIN_NAME);
     let mut props = String::new();
-    let mut files = String::new();
+    // Dossier créé même si aucun plugin n'est coché : sa présence dit à
+    // `plugins::seed_bundled` qu'un installeur a choisi — sans lui, l'exe
+    // installerait le plugin embarqué (latex-doc) malgré la case décochée.
+    let mut files = format!(
+        "        <Component Id=\"BundledPluginsFolder\" Guid=\"{}\">\n          \
+         <CreateFolder />\n        </Component>\n",
+        stable_guid("kroki-desk/bundled-plugins-folder")
+    );
     let mut assocs = String::new();
     let mut checkboxes = String::new();
-    let mut file_refs = String::new();
+    let mut file_refs = String::from("      <ComponentRef Id=\"BundledPluginsFolder\" />\n");
     let mut assoc_refs = String::new();
 
     for (i, p) in plugins.iter().enumerate() {

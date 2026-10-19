@@ -5,6 +5,17 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.26.0] — 2026-10-19
+
+### Added
+- **The portable binaries open LaTeX documents.** The `latex-doc` plugin is
+  now built into the executable and installed at first launch, as the
+  installers already did: a single downloaded `.exe` or AppImage reads
+  `.tex`/`.latex` files and ` ```latex ` fences. It stays a regular plugin —
+  removed from the Plugins dialog, it does not come back; a newer version
+  installed by hand is kept. An installer on which the plugin was unchecked
+  is still obeyed.
+
 ## [3.25.1] — 2026-10-19
 
 ### Fixed
@@ -887,6 +898,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
+[3.26.0]: #3260--2026-10-19
 [3.25.1]: #3251--2026-10-19
 [3.25.0]: #3250--2026-10-16
 [3.24.0]: #3240--2026-10-16

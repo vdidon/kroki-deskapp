@@ -12,6 +12,7 @@
 //! Tauri (qui suit l'`identifier` du bundle) : `%APPDATA%\kroki-deskapp\plugins`
 //! (Windows) / `$XDG_CONFIG_HOME/kroki-deskapp/plugins` (Linux) — spec §9.1.
 
+use std::io::{Cursor, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock, RwLock};
 use std::time::UNIX_EPOCH;
@@ -549,18 +550,25 @@ pub fn serve(request: &tauri::http::Request<Vec<u8>>) -> tauri::http::Response<V
 // Installation / désinstallation (archives .kdext)
 // --------------------------------------------------------------------------- //
 
-fn archive_manifest(path: &Path) -> Result<Manifest, String> {
+fn open_archive(path: &Path) -> Result<zip::ZipArchive<std::fs::File>, String> {
     let file =
         std::fs::File::open(path).map_err(|e| tr!("pluginpkg.archive_unreadable", error = e))?;
-    let mut zip =
-        zip::ZipArchive::new(file).map_err(|e| tr!("pluginpkg.archive_invalid", error = e))?;
+    zip::ZipArchive::new(file).map_err(|e| tr!("pluginpkg.archive_invalid", error = e))
+}
+
+fn archive_manifest(path: &Path) -> Result<Manifest, String> {
+    zip_manifest(&mut open_archive(path)?)
+}
+
+fn zip_manifest<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Result<Manifest, String> {
     let mut entry = zip.by_name("manifest.json").map_err(|e| match e {
         zip::result::ZipError::FileNotFound => tr!("pluginpkg.manifest_missing"),
         // Ex. méthode de compression non supportée (PPMd) : montrer la cause.
         e => tr!("pluginpkg.manifest_unreadable", error = e),
     })?;
     let mut bytes = Vec::new();
-    std::io::Read::read_to_end(&mut entry, &mut bytes)
+    entry
+        .read_to_end(&mut bytes)
         .map_err(|e| tr!("pluginpkg.manifest_unreadable", error = e))?;
     let m: Manifest =
         serde_json::from_slice(&bytes).map_err(|e| tr!("pluginpkg.manifest_invalid", error = e))?;
@@ -630,18 +638,18 @@ pub fn plugin_manifest_preview(path: String) -> Result<ManifestPreview, String> 
 ///
 /// Ne touche ni au registre ni aux réglages : l'appelant décide. Partagé par la
 /// commande `install_plugin` (dialog de confiance en amont) et par `seed_bundled`
-/// (plugins livrés avec l'installeur).
+/// (plugins livrés avec l'application).
 fn install_archive(src: &Path) -> Result<Manifest, String> {
-    let m = archive_manifest(src)?;
+    install_zip(open_archive(src)?)
+}
+
+fn install_zip<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Result<Manifest, String> {
+    let m = zip_manifest(&mut zip)?;
     let dir = plugins_dir();
     std::fs::create_dir_all(&dir).map_err(|e| tr!("pluginpkg.dir_error", error = e))?;
 
     let tmp = dir.join(format!(".tmp-{}", m.id));
     let _ = std::fs::remove_dir_all(&tmp);
-    let file =
-        std::fs::File::open(src).map_err(|e| tr!("pluginpkg.archive_unreadable", error = e))?;
-    let mut zip =
-        zip::ZipArchive::new(file).map_err(|e| tr!("pluginpkg.archive_invalid", error = e))?;
     zip.extract(&tmp).map_err(|e| {
         let _ = std::fs::remove_dir_all(&tmp);
         tr!("pluginpkg.extract_failed", error = e)
@@ -714,11 +722,20 @@ fn set_removed(app: &AppHandle, id: &str, removed: bool) {
     save_settings(app);
 }
 
+/// Archive du plugin `latex-doc`, empaquetée par `build.rs` depuis
+/// `plugins/latex-doc/` : ce qu'installe `seed_bundled` en l'absence
+/// d'installeur.
+const EMBEDDED_PLUGIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/latex-doc.kdext"));
+
 /// Dossier des plugins livrés avec l'application — l'installeur y dépose les
-/// `.kdext` **cochés à l'installation** (composants conditionnés de
-/// `src-tauri/wix/installer.wxs`). Rien à filtrer ici : le seeding installe ce
-/// qu'il trouve, un plugin décoché est simplement absent du dossier.
-/// Absent des builds portables et du debug : le seeding y est un no-op.
+/// `.kdext` **cochés à l'installation** (composants conditionnés du fragment
+/// WiX généré, ressources de l'overlay `.deb`). Rien à filtrer ici : le seeding
+/// installe ce qu'il trouve, un plugin décoché est simplement absent du dossier.
+///
+/// Les deux installeurs créent ce dossier **même vide** (composant `CreateFolder`
+/// du MSI, `postinst` du `.deb`) : sa présence signifie « un installeur a
+/// choisi », son absence « pas d'installeur » (portable, AppImage, debug) — seul
+/// cas où le plugin embarqué dans le binaire est installé.
 ///
 /// Le sous-dossier est essentiel, et pas seulement par propreté : `resource_dir()`
 /// est le dossier de l'exécutable, or le binaire portable est publié dans `dist/`
@@ -741,9 +758,11 @@ fn installed_version(id: &str) -> Option<String> {
 }
 
 /// Installe et met à jour les plugins livrés avec l'application, **sans dialog
-/// de confiance** : ils proviennent du même installeur que l'exécutable, donc
+/// de confiance** : ils proviennent de l'exécutable ou de son installeur, donc
 /// de la même chaîne de confiance (dérogation au §9.2 de la spec, seule voie
 /// d'installation qui s'en dispense — drop et dialog Plugins le conservent).
+/// Source : le dossier `bundled-plugins/` s'il existe, sinon le plugin embarqué
+/// dans le binaire (cf. `bundled_plugins_dir`).
 ///
 /// À appeler avant `init()` : le premier scan voit alors l'état final, et aucun
 /// worker n'a chargé la version précédente.
@@ -752,12 +771,6 @@ fn installed_version(id: &str) -> Option<String> {
 /// posé à la main est conservé), et un plugin supprimé par l'utilisateur n'est
 /// pas réinstallé (`SettingsData::removed_plugins`).
 pub fn seed_bundled(app: &AppHandle) {
-    let Some(dir) = bundled_plugins_dir(app) else {
-        return;
-    };
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return; // build portable : aucun plugin livré
-    };
     let removed = app
         .state::<SettingsState>()
         .0
@@ -765,35 +778,47 @@ pub fn seed_bundled(app: &AppHandle) {
         .unwrap()
         .removed_plugins
         .clone();
+    let Some(entries) = bundled_plugins_dir(app).and_then(|d| std::fs::read_dir(d).ok()) else {
+        let zip = zip::ZipArchive::new(Cursor::new(EMBEDDED_PLUGIN))
+            .map_err(|e| tr!("pluginpkg.archive_invalid", error = e));
+        seed_archive(zip, "embedded in the binary", &removed);
+        return;
+    };
     let archives = entries
         .flatten()
         .map(|e| e.path())
         .filter(|p| is_plugin_archive(p));
     for path in archives {
-        let m = match archive_manifest(&path) {
-            Ok(m) => m,
-            Err(e) => {
-                eprintln!(
-                    "[plugins] bundled archive ignored ({}): {e}",
-                    path.display()
-                );
-                continue;
-            }
-        };
-        if removed.contains(&m.id) {
-            continue;
+        seed_archive(open_archive(&path), &path.display().to_string(), &removed);
+    }
+}
+
+fn seed_archive<R: Read + Seek>(
+    zip: Result<zip::ZipArchive<R>, String>,
+    origin: &str,
+    removed: &[String],
+) {
+    let manifest = zip.and_then(|mut zip| zip_manifest(&mut zip).map(|m| (zip, m)));
+    let (zip, m) = match manifest {
+        Ok(found) => found,
+        Err(e) => {
+            eprintln!("[plugins] bundled archive ignored ({origin}): {e}");
+            return;
         }
-        // Installé en version égale ou supérieure : ne rien faire.
-        if installed_version(&m.id).is_some_and(|cur| !version_less(&cur, &m.version)) {
-            continue;
-        }
-        match install_archive(&path) {
-            Ok(_) => eprintln!(
-                "[plugins] {} {} installed (bundled with the app)",
-                m.id, m.version
-            ),
-            Err(e) => eprintln!("[plugins] cannot install {}: {e}", m.id),
-        }
+    };
+    if removed.contains(&m.id) {
+        return;
+    }
+    // Installé en version égale ou supérieure : ne rien faire.
+    if installed_version(&m.id).is_some_and(|cur| !version_less(&cur, &m.version)) {
+        return;
+    }
+    match install_zip(zip) {
+        Ok(_) => eprintln!(
+            "[plugins] {} {} installed (bundled with the app, {origin})",
+            m.id, m.version
+        ),
+        Err(e) => eprintln!("[plugins] cannot install {}: {e}", m.id),
     }
 }
 

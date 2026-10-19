@@ -13,9 +13,15 @@
 # faire échouer l'installation. Le `|| true` couvre le même cas de figure pour un
 # outil présent mais en échec : un cache non régénéré ne justifie pas de laisser
 # le paquet à demi configuré.
+#
+# Il crée aussi le dossier des plugins livrés, qui n'existe que si l'un d'eux est
+# coché dans la stratégie d'embarquement : sa seule présence, même vide, dit à
+# l'application qu'un installeur a choisi (plugins::seed_bundled) — sans lui,
+# elle installerait au premier lancement le plugin embarqué dans le binaire.
 set -e
 
 if [ "$1" = "configure" ]; then
+    mkdir -p "/usr/lib/Kroki Desk/bundled-plugins"
     if command -v update-mime-database >/dev/null 2>&1; then
         update-mime-database /usr/share/mime || true
     fi

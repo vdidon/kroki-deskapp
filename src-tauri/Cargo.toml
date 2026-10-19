@@ -1,11 +1,15 @@
 [package]
 name = "kroki_deskapp"
-version = "3.25.1"
+version = "3.26.0"
 description = "Markdown viewer with Kroki diagram rendering"
 edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+# Empaquetage du plugin embarqué latex-doc en .kdext (build.rs) : écriture
+# Deflate seulement.
+serde_json = "1.0.150"
+zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [dependencies]
 base64 = "0.22.1"

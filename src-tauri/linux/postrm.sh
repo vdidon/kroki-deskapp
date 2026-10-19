@@ -10,9 +10,14 @@
 # profil de chaque utilisateur (~/.config/kroki-deskapp), hors de portée d'un
 # paquet installé par machine — les y laisser est ce qui permet de réinstaller
 # sans rien reperdre.
+#
+# Seul nettoyage dans /usr/lib : le dossier bundled-plugins créé par le postinst,
+# que dpkg ignore quand aucun fichier du paquet n'y vit — puis son parent, que
+# dpkg a laissé faute de pouvoir le vider. rmdir ne retire que du vide.
 set -e
 
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    rmdir "/usr/lib/Kroki Desk/bundled-plugins" "/usr/lib/Kroki Desk" 2>/dev/null || true
     if command -v update-mime-database >/dev/null 2>&1; then
         update-mime-database /usr/share/mime || true
     fi

@@ -101,7 +101,10 @@ What the overlay carries, and why:
     `plugins::seed_bundled` installs what it finds in
     `resource_dir()/bundled-plugins/`. Corollary: unchecking a plugin
     **already installed** does not uninstall it — seeding adds and updates,
-    it never removes.
+    it never removes. The folder itself is an unconditional `CreateFolder`
+    component (`BundledPluginsFolder`): it must exist even with nothing
+    checked, otherwise the exe would install its embedded `latex-doc` (see
+    « Plugin system » → shipped plugins).
   - **The associations have no page**: all are laid down, only the
     *level* varies — and it is chosen for what it does, not out of
     displayed caution. `Software\Classes\<.ext>\(Default)` only takes hold on a
@@ -888,15 +891,25 @@ touching the host or writing a plugin. Operational summary:
   memory. Since the plugins folder is per-user and both installers are
   per-machine,
   the installation cannot be done by the installer: it happens at the
-  first launch of each user session. Portable build = folder
-  absent = no-op. Unchecking a plugin **does not uninstall** one already present:
+  first launch of each user session. **Folder absent = no installer**
+  (portable, AppImage, debug): seeding then falls back on the **embedded
+  `latex-doc`** — `src-tauri/build.rs` packs `plugins/latex-doc/` into
+  `OUT_DIR` on every build path (same `packInclude` selection as
+  `pack_plugin.py`, mandatory there — the build fails without it), and
+  `plugins.rs` includes it with `include_bytes!`, same three rules. Hence both
+  installers create the folder **even empty** (MSI `CreateFolder`, `.deb`
+  `postinst`): an installer that retained nothing must not get it anyway.
+  A `latex-doc` change thus reaches the binary at the next build
+  (`rerun-if-changed` on the folder) — still no app bump for it alone.
+  Unchecking a plugin **does not uninstall** one already present:
   seeding adds and updates, never removes — the choice is made at
   install time, removal from the Plugins dialog. The list lives
   in **one** place only, the bundling strategy: the WiX fragment and the `.deb` overlay
   are generated from it. **Test without
   installer**: drop the `.kdext` into
   `src-tauri/target/debug/bundled-plugins/` —
-  `resource_dir()` is the executable's folder, debug included.
+  `resource_dir()` is the executable's folder, debug included (the folder's
+  presence then also disables the embedded `latex-doc`).
 - **Install queue**: the paths that add a `.kdext` (Windows drop,
   double-click, command line, native picker) **queue** the archive on the
   Rust side (`plugins::request_install`) and emit `plugin-install-request` only

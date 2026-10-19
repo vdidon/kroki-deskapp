@@ -29,8 +29,11 @@ JS/WASM engines and the PlantUML/ditaa jars are embedded.
 - **Bare Linux binary**: lighter, but the machine must provide
   `libwebkit2gtk-4.1`.
 
-No plugin is preinstalled: add them from the Plugins dialog
-(see [plugins](../README.md#plugins)).
+The LaTeX plugin (`latex-doc`, `.tex` `.latex` documents and ` ```latex `
+fences) is embedded in the binary and installed at each user's first launch,
+under the same rules as the installers' bundled plugins (updated with the
+binary, never reinstalled once removed). The others are added from the
+Plugins dialog (see [plugins](../README.md#plugins)).
 
 ## Windows installer (MSI)
 

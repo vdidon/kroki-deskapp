@@ -498,9 +498,9 @@ startup, **before** the discovery of § 9.3, the host installs and updates them
 **without a trust dialog** (`plugins::seed_bundled`).
 
 The host does not know this selection and does not need to: it installs what
-it finds in the folder. An unticked plugin is simply absent — which makes the
-mechanism identical for a portable build (folder absent = no-op) and for a
-partial installation.
+it finds in the folder. An unticked plugin is simply absent. Both installers
+create the folder **even when nothing is ticked**: its presence means "an
+installer chose", which the host must respect even if the choice was nothing.
 
 This is the only exception to § 9.2, and it rests on a single argument: these
 archives come from the **same installer as the executable**. Asking the user
@@ -524,8 +524,12 @@ Since the plugins folder is per-user (§ 9.1) while the installer is
 per-machine, the installation cannot be done by the installer itself: it takes
 place at the first launch that follows, for each user session.
 
-Portable builds (executable alone) embed no archive: the folder is absent, the
-step is a no-op and the behavior is the one from before.
+Without an installer (portable executable, AppImage, development build), the
+folder is absent and the host falls back on the one archive compiled into the
+executable — the LaTeX document plugin, packed from the repository by the
+build. The same rules apply to it, and the same argument: it comes from the
+binary itself. It is what makes a single downloaded executable open `.tex`
+files.
 
 ## 10. Reservations (named in v1, not implemented)
 
