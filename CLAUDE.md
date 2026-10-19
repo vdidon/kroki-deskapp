@@ -807,6 +807,12 @@ source, options); a re-render therefore naturally retries errors.
   *stem*, it is its static fallback (portable outside the app / if Plotly fails); once
   the interactive render has succeeded, `hidePairedFallbackImage` hides the image to avoid
   displaying the figure twice. On failure, the PNG stays visible.
+  **The vendored bundle is patched** (3.25.1, `scripts/patch_plotly.py`, marker comment at
+  the top of the file): Plotly turns every 3D text label into triangles (vectorize-text),
+  and clean-pslg converted every point to `bn.js` rationals and back even with no edge
+  crossing, while the 8192×1024 canvas was repainted per label — 4 labelled `scatter3d`
+  figures went 9.3 → 3.6 s, meshes byte-identical. **Re-run the script after updating
+  `plotly.min.js`**: it is idempotent and fails if a pattern is no longer found exactly once.
 - `ui/renderer/` — page of the hidden render webview and its vendored engines.
 - Vendors (`ui/vendor/`, `ui/renderer/vendor/`) are pre-built bundles
   committed to the repo. `vendor/dbml.js` is an esbuild bundle of `@softwaretechnik/dbml-renderer`

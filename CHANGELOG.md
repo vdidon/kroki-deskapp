@@ -5,6 +5,15 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.25.1] — 2026-10-19
+
+### Fixed
+- **3D Plotly figures with text labels open about 2.5× faster.** Every label
+  of a `scatter3d` figure (and every axis title and tick) is turned into
+  triangles before display; Plotly spent most of that time converting each
+  point to exact fractions and back, and repainting an 8192×1024 canvas, even
+  when there was nothing to correct. The figures are drawn exactly as before.
+
 ## [3.25.0] — 2026-10-16
 
 ### Added
@@ -878,6 +887,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
+[3.25.1]: #3251--2026-10-19
 [3.25.0]: #3250--2026-10-16
 [3.24.0]: #3240--2026-10-16
 [3.23.1]: #3231--2026-10-14
