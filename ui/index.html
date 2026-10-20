@@ -217,6 +217,14 @@
         <input id="server-port" type="number" min="1024" max="65535" />
       </div>
       <p class="settings-hint" id="server-hint"></p>
+      <div class="settings-row">
+        <label class="settings-checkbox"><input type="checkbox" id="update-check" /> <span data-i18n="settings.updates.label">Check for updates at startup</span></label>
+      </div>
+      <p class="settings-hint" data-i18n="settings.updates.hint">
+        At most once a day, asks GitHub for the latest published version.
+        Nothing is installed automatically: a notification offers the download
+        matching this installation, opened in the browser.
+      </p>
       <label data-i18n="settings.plugins.label">Plugins</label>
       <button type="button" id="settings-plugins" class="secondary settings-plugins" data-i18n="settings.plugins.manage">Manage plugins…</button>
       <p class="settings-hint" data-i18n-html="settings.plugins.hint">
@@ -273,6 +281,12 @@
   <dialog id="info-dialog">
     <h2 data-i18n="info.title">Information</h2>
     <p class="settings-hint" id="info-version"></p>
+    <div class="settings-actions info-update">
+      <button type="button" id="info-update-check" class="secondary" data-i18n="update.check">Check for updates</button>
+      <button type="button" id="info-update-download" class="primary" data-i18n="update.download" hidden>Download</button>
+      <button type="button" id="info-update-release" class="secondary" data-i18n="update.release_notes" hidden>Release notes</button>
+      <span id="info-update-status"></span>
+    </div>
     <h3 class="info-subtitle" data-i18n="info.engines.title">Runtimes &amp; engines</h3>
     <p class="settings-hint" data-i18n="info.engines.hint">
       All engines are embedded in the executable. Some require a system

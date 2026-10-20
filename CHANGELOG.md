@@ -5,6 +5,18 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.28.0] — 2026-10-20
+
+### Added
+- **Update check.** At startup, at most once a day, Kroki Desk asks GitHub
+  for the latest release and, when a newer version is out, shows a
+  notification offering two links, opened in the browser: the download
+  matching this installation (MSI, portable executable, `.deb`, AppImage or
+  bare Linux binary) and the release notes. Nothing is installed
+  automatically. The check can be turned off in the Settings
+  (*Check for updates at startup*) and run on demand from the Information
+  dialog.
+
 ## [3.27.0] — 2026-10-19
 
 ### Added
@@ -912,6 +924,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
+[3.28.0]: #3280--2026-10-20
 [3.27.0]: #3270--2026-10-19
 [3.26.0]: #3260--2026-10-19
 [3.25.1]: #3251--2026-10-19

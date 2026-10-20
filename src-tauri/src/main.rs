@@ -15,6 +15,7 @@ mod plugins;
 mod server;
 mod session;
 mod state;
+mod updates;
 mod watcher;
 
 use std::path::PathBuf;
@@ -150,6 +151,7 @@ fn main() {
             plugins::open_plugins_dir,
             plugins::plugin_changelog,
             plugins::plugin_read_sibling,
+            updates::check_update,
         ])
         // Sert les fichiers des plugins au worker sandboxé (lecture seule,
         // confinée au dossier du plugin) : `http://plugin.localhost/<id>/…`

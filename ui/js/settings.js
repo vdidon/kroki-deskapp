@@ -1,5 +1,5 @@
-// Réglages : thème, langue, icônes des barres d'outils, serveur externe optionnel et
-// API Kroki locale, persistés côté Rust.
+// Réglages : thème, langue, icônes des barres d'outils, serveur externe optionnel,
+// API Kroki locale et vérification des mises à jour, persistés côté Rust.
 
 import { invoke } from "./app.js";
 import { applyTheme } from "./theme.js";
@@ -16,6 +16,7 @@ const serverEnabled = document.getElementById("server-enabled");
 const serverPort = document.getElementById("server-port");
 const supportedHint = document.getElementById("supported-hint");
 const serverHint = document.getElementById("server-hint");
+const updateCheck = document.getElementById("update-check");
 const errorEl = document.getElementById("settings-error");
 
 let onSaved = null;
@@ -129,6 +130,7 @@ export async function openSettings() {
   urlInput.value = s.external_url;
   serverEnabled.checked = s.server_enabled;
   serverPort.value = s.server_port;
+  updateCheck.checked = s.update_check;
   supportedInfo = s;
   updateSupportedHint();
   updateServerHint();
@@ -168,6 +170,7 @@ export function initSettings(savedCallback) {
     urlInput.value = "";
     serverEnabled.checked = true;
     serverPort.value = 8442;
+    updateCheck.checked = true;
     updateServerHint();
   });
   document.getElementById("settings-cancel").addEventListener("click", () => {
@@ -183,6 +186,7 @@ export function initSettings(savedCallback) {
         theme: themeSelect.value,
         language: languageSelect.value,
         icons: iconWork,
+        updateCheck: updateCheck.checked,
       });
       // Langue : recharger le catalogue AVANT `onSaved`, dont le re-rendu doit
       // déjà produire les messages dans la nouvelle langue. Aussi quand la

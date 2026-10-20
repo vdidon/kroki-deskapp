@@ -577,7 +577,7 @@ fn zip_manifest<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Result<Manifest
 }
 
 /// Comparaison de versions `x.y.z` (composantes numériques, lexicographique).
-fn version_less(a: &str, b: &str) -> bool {
+pub(crate) fn version_less(a: &str, b: &str) -> bool {
     let parse = |v: &str| -> Vec<u64> {
         v.split(['.', '-', '+'])
             .map(|c| c.parse().unwrap_or(0))
@@ -741,7 +741,7 @@ const EMBEDDED_PLUGIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/latex-d
 /// est le dossier de l'exécutable, or le binaire portable est publié dans `dist/`
 /// — à côté de toutes les archives produites par `build_dist.py`. Sans
 /// ce niveau, le lancer depuis là installerait n'importe quel `.kdext` voisin.
-fn bundled_plugins_dir(app: &AppHandle) -> Option<PathBuf> {
+pub(crate) fn bundled_plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     app.path()
         .resource_dir()
         .ok()

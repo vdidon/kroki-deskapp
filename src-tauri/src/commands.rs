@@ -354,6 +354,7 @@ pub fn set_settings(
     theme: String,
     language: String,
     icons: BTreeMap<String, bool>,
+    update_check: bool,
 ) -> Result<(), String> {
     let url = external_url.trim().trim_end_matches('/').to_string();
     if !url.is_empty() && !url.starts_with("http://") && !url.starts_with("https://") {
@@ -377,9 +378,10 @@ pub fn set_settings(
     let locale = i18n::set_language(&language);
     {
         let mut s = settings.0.lock().unwrap();
-        // Non exposé au dialog Réglages : préservé tel quel (alimenté par
-        // plugins::install_plugin / uninstall_plugin).
+        // Non exposés au dialog Réglages : préservés tels quels (alimentés par
+        // plugins::install_plugin / uninstall_plugin et updates::check_update).
         let removed_plugins = std::mem::take(&mut s.removed_plugins);
+        let update_checked_at = s.update_checked_at;
         *s = SettingsData {
             external_url: url,
             server_enabled,
@@ -388,6 +390,8 @@ pub fn set_settings(
             language,
             icons: icons.clone(),
             removed_plugins,
+            update_check,
+            update_checked_at,
         };
     }
     save_settings(&app);

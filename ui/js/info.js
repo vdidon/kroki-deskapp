@@ -1,5 +1,6 @@
 // Dialog « Informations » : version de l'app, état des runtimes/moteurs sur
-// le poste courant, accès au changelog (« Nouveautés »). Les données des
+// le poste courant, accès au changelog (« Nouveautés ») et vérification des
+// mises à jour à la demande (updates.js). Les données des
 // moteurs viennent du backend (`get_runtimes`) ; chaque groupe porte un
 // statut : ok (app + système), blocked (app, prérequis système manquant),
 // unsupported (pas pris en charge par l'application).
@@ -7,10 +8,46 @@
 import { invoke } from "./app.js";
 import { openChangelog } from "./changelog.js";
 import { t } from "./i18n.js";
+import { checkForUpdate, openDownload, openRelease } from "./updates.js";
 
 const dialog = document.getElementById("info-dialog");
 const groupsEl = document.getElementById("info-groups");
 const versionEl = document.getElementById("info-version");
+const updateBtn = document.getElementById("info-update-check");
+const downloadBtn = document.getElementById("info-update-download");
+const releaseBtn = document.getElementById("info-update-release");
+const updateStatus = document.getElementById("info-update-status");
+let updateInfo = null; // dernier résultat, cible des boutons « Télécharger » / « Notes de version »
+
+function setUpdateStatus(text, error = false) {
+  updateStatus.textContent = text;
+  updateStatus.classList.toggle("error", error);
+}
+
+function showUpdateLinks(show) {
+  downloadBtn.hidden = !show;
+  releaseBtn.hidden = !show;
+}
+
+async function checkUpdate() {
+  updateBtn.disabled = true;
+  showUpdateLinks(false);
+  setUpdateStatus(t("update.checking"));
+  try {
+    updateInfo = await checkForUpdate();
+    showUpdateLinks(updateInfo.newer);
+    downloadBtn.title = updateInfo.download_file ?? "";
+    setUpdateStatus(
+      updateInfo.newer
+        ? t("update.available", { version: updateInfo.latest })
+        : t("update.up_to_date", { version: updateInfo.current }),
+    );
+  } catch (err) {
+    setUpdateStatus(String(err), true);
+  } finally {
+    updateBtn.disabled = false;
+  }
+}
 
 // Libellé d'un statut, traduit à l'affichage (le dialog est rendu à chaque ouverture).
 function statusLabel(status) {
@@ -72,6 +109,9 @@ function renderGroup(g) {
 }
 
 export async function openInfo() {
+  // Résultat d'une ouverture précédente : périmé (et dans l'ancienne langue).
+  showUpdateLinks(false);
+  setUpdateStatus("");
   try {
     versionEl.textContent = `Kroki Desk v${await window.__TAURI__.app.getVersion()}`;
   } catch {
@@ -99,4 +139,7 @@ export function initInfo() {
   // Le changelog s'empile au-dessus du dialog (modales imbriquées, comme le
   // dialog de confiance au-dessus du dialog Plugins).
   document.getElementById("info-changelog").addEventListener("click", openChangelog);
+  updateBtn.addEventListener("click", checkUpdate);
+  downloadBtn.addEventListener("click", () => openDownload(updateInfo));
+  releaseBtn.addEventListener("click", () => openRelease(updateInfo));
 }

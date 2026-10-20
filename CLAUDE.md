@@ -582,6 +582,25 @@ source, options); a re-render therefore naturally retries errors.
 - `server.rs` — local Kroki HTTP API (`tiny_http`), 127.0.0.1 only.
 - `kroki.rs` — external server client + cache.
 - `watcher.rs` — auto-reload on disk change (`notify`).
+- `updates.rs` — update check (3.28.0), **notification only**: `check_update`
+  reads the latest GitHub release (`releases/latest` of the `repository` field
+  of `Cargo.toml`, single source) and compares its tag to the version. Nothing
+  is downloaded by the app: two links opened in the browser, the release page
+  and the asset matching the installation (`updates::Format`: the
+  `bundled-plugins` folder, created by both installers, means MSI on Windows /
+  `.deb` on Linux; otherwise portable `.exe`, `$APPIMAGE` → AppImage, bare
+  binary), picked from the API's `assets` by name suffix — a renamed artifact
+  in `publish_dist` must stay matched there — with the release page as
+  fallback; only `…/releases/download/` URLs of the repo are accepted. The
+  Tauri updater was ruled out: no portable exe nor `.deb`, and the MSI is
+  rewritten by `msi_lang` after `tauri build`, which would invalidate its
+  signature. Automatic check at each window's boot (`ui/js/updates.js`),
+  but the backend lets through only the first of the process, at most once a
+  day (`SettingsData::update_checked_at`, stamped **before** the request so a
+  filtered network is not hit at every launch), only if
+  `SettingsData::update_check`, and silently on failure; on-demand check from
+  the Info dialog, errors shown. The only network request the app makes on its
+  own — keep it that way (README « Security notes »).
 - `state.rs` — `AppState`, `SettingsState`, etc. (settings persisted in
   `%APPDATA%\kroki-deskapp\settings.json`, next to `plugins\` and, like it,
   outside the Tauri identity folder — `plugins::app_dir`).

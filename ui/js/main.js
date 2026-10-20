@@ -16,6 +16,7 @@ import { initFileDrop } from "./filedrop.js";
 import { initSession } from "./session.js";
 import { initSettings, openSettings } from "./settings.js";
 import { initInfo, openInfo } from "./info.js";
+import { initUpdates } from "./updates.js";
 import { initChangelog } from "./changelog.js";
 import { exportActiveView } from "./export.js";
 import { applyTheme, initTheme } from "./theme.js";
@@ -816,6 +817,7 @@ async function boot() {
   await initPluginsUi();
   await initFileDrop();
   await initSession();
+  initUpdates(); // non attendue : requête réseau, jusqu'à 10 s
 
   document.getElementById("btn-open").addEventListener("click", () => invoke("open_file_dialog"));
   // Délégation : le lien est dans un texte traduit par innerHTML (`welcome.open_hint`),

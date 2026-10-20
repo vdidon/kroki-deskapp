@@ -184,7 +184,15 @@ open tab).
   not disable its keyboard shortcut. The **"intermediate markdown"** button
   (« markdown intermédiaire ») — the raw output of a document plugin
   (`.tex`…), useful when developing a plugin — is enabled here; it is off by
-  default.
+  default;
+- **Check for updates at startup** (« Rechercher les mises à jour au
+  démarrage », on by default): at most once a day, asks the GitHub API for the
+  latest release and, if it is newer, shows a notification with two links,
+  opened in the browser: **Download** — the file matching this installation
+  (`.msi` if installed by the MSI, `.exe` for the portable binary, `.deb`,
+  `.AppImage` or bare binary on Linux; the release page if none matches) —
+  and **Release notes**. Nothing is installed automatically. The Information
+  dialog (« Informations ») offers the same check on demand.
 
 ## Plugins
 
@@ -283,6 +291,12 @@ untrusted content, injected scripts not executed); the only real `eval` is
 internal to d2, confined to the rendering webview — the same trust already
 granted to the mermaid/PlantUML/graphviz engines. The local API only listens
 on 127.0.0.1.
+
+Rendering never touches the network. The only request the application makes
+on its own is the update check (`GET
+https://api.github.com/repos/vdidon/kroki-deskapp/releases/latest`, at most
+once a day, no data sent beyond the version in the User-Agent); it fails
+silently and is turned off in the Settings.
 
 ## License
 

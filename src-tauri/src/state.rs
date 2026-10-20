@@ -94,6 +94,12 @@ pub struct SettingsData {
     /// annulé au lancement suivant. Réinstaller le plugin à la main l'en
     /// retire — l'utilisateur reprend alors les mises à jour automatiques.
     pub removed_plugins: Vec<String>,
+    /// Vérifier au démarrage, au plus une fois par jour, si une version plus
+    /// récente est publiée sur GitHub (`updates.rs`, notification seule).
+    pub update_check: bool,
+    /// Horodatage (secondes Unix) de la dernière vérification automatique.
+    /// Non exposé au dialog Réglages.
+    pub update_checked_at: u64,
 }
 
 impl Default for SettingsData {
@@ -106,6 +112,8 @@ impl Default for SettingsData {
             language: "auto".to_string(),
             icons: BTreeMap::new(),
             removed_plugins: Vec::new(),
+            update_check: true,
+            update_checked_at: 0,
         }
     }
 }

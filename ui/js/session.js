@@ -9,15 +9,44 @@ import { t } from "./i18n.js";
 const toastEl = document.getElementById("toast");
 let toastTimer = null;
 
-/** Toast transitoire en bas de fenêtre. Les erreurs restent plus longtemps. */
-export function showToast(message, error = false) {
-  toastEl.textContent = message;
+/** Toast transitoire en bas de fenêtre. Les erreurs restent plus longtemps.
+ *  `actions` (`[{ label, run, title?, secondary? }]`) ajoute des boutons : le
+ *  toast devient cliquable et reste le temps de le lire. */
+export function showToast(message, error = false, actions = []) {
+  toastEl.replaceChildren(message);
+  for (const action of actions) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = action.label;
+    if (action.title) btn.title = action.title;
+    btn.classList.toggle("secondary", !!action.secondary);
+    btn.addEventListener("click", () => {
+      toastEl.hidden = true;
+      action.run();
+    });
+    toastEl.append(btn);
+  }
+  // Un toast cliquable reste 15 s : la croix permet de l'écarter tout de suite.
+  if (actions.length) {
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "toast-close";
+    close.textContent = "×";
+    close.title = t("common.close");
+    close.setAttribute("aria-label", t("common.close"));
+    close.addEventListener("click", () => {
+      clearTimeout(toastTimer);
+      toastEl.hidden = true;
+    });
+    toastEl.append(close);
+  }
   toastEl.classList.toggle("error", !!error);
+  toastEl.classList.toggle("actionable", actions.length > 0);
   toastEl.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     toastEl.hidden = true;
-  }, error ? 8000 : 3500);
+  }, actions.length ? 15000 : error ? 8000 : 3500);
 }
 
 export async function initSession() {
