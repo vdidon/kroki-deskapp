@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textes de l'installeur en portugais du Brésil : mêmes Id que en-US.wxl. -->
+<WixLocalization Culture="pt-br" Codepage="1252" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="LaunchApp">Iniciar o Kroki Desk</String>
+  <String Id="DowngradeErrorMessage">Uma versão mais recente do Kroki Desk já está instalada.</String>
+  <String Id="PathEnvVarFeature">Adiciona a pasta de instalação do Kroki Desk à variável de ambiente PATH do sistema, para que o executável possa ser chamado de qualquer local.</String>
+  <String Id="InstallAppFeature">Instala o Kroki Desk.</String>
+
+  <String Id="KdPluginDlgDescription">Escolha os plugins a instalar com o aplicativo.</String>
+  <String Id="KdPluginDlgHeading">Instalar com o Kroki Desk</String>
+  <String Id="KdPluginDlgHint">Um plugin adiciona formatos que o aplicativo não lê sozinho.</String>
+  <String Id="KdPluginDlgNote">Os plugins marcados são instalados na primeira execução e atualizados com o aplicativo. O Kroki Desk passa a ser o aplicativo padrão dos formatos deles, a menos que você já tenha escolhido outro.</String>
+
+  <String Id="KdProgIdSession">Sessão do Kroki Desk</String>
+  <String Id="KdProgIdPlugin">Plugin do Kroki Desk</String>
+  <String Id="KdProgIdDocument">Documento do Kroki Desk</String>
+</WixLocalization>

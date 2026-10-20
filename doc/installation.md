@@ -87,13 +87,22 @@ with", without touching your default applications.
 
 ### Installer language
 
-The MSI is a single file in English and French: it opens in the language of
-the Windows display language (French for a French Windows, English
-otherwise). To force one:
+The MSI is a single file in nine languages — English, German, Spanish,
+French, Italian, Japanese, Korean, Brazilian Portuguese and Simplified
+Chinese: it opens in the Windows display language, English otherwise. Windows
+matches the exact language variant, so a Windows in another variant (Mexican
+Spanish, European Portuguese…) may get English. To force one:
 
 ```
-msiexec /i kroki_deskapp.msi ProductLanguage=1036    # French
 msiexec /i kroki_deskapp.msi ProductLanguage=1033    # English
+msiexec /i kroki_deskapp.msi ProductLanguage=1031    # German
+msiexec /i kroki_deskapp.msi ProductLanguage=3082    # Spanish
+msiexec /i kroki_deskapp.msi ProductLanguage=1036    # French
+msiexec /i kroki_deskapp.msi ProductLanguage=1040    # Italian
+msiexec /i kroki_deskapp.msi ProductLanguage=1041    # Japanese
+msiexec /i kroki_deskapp.msi ProductLanguage=1042    # Korean
+msiexec /i kroki_deskapp.msi ProductLanguage=1046    # Brazilian Portuguese
+msiexec /i kroki_deskapp.msi ProductLanguage=2052    # Simplified Chinese
 ```
 
 The installer's language is independent from the application's: Kroki Desk

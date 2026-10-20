@@ -171,7 +171,8 @@ What the overlay carries, and why:
   replace the default WixUI logo (red CD). Sizes imposed by WixUI;
   generated from `icons/icon.png` by `uv run scripts/wix_images.py`, to be
   re-run if the icon changes.
-- **A single multilingual MSI** (en-US base + fr-FR, 3.25.0):
+- **A single multilingual MSI** (en-US base + de-DE, es-ES, fr-FR, it-IT,
+  ja-JP, ko-KR, pt-BR, zh-CN; 3.25.0, nine languages since 3.27.0):
   `wix.language` maps each language to its `.wxl` (`src-tauri/wix/locales/`:
   our dialog and ProgID texts as `!(loc.Kd…)`, plus Tauri's `LaunchApp`…
   redefined to be translated — no `Kd…` Id may contain one of Tauri's, the
@@ -182,7 +183,12 @@ What the overlay carries, and why:
   lists every language (`x64;1033,1036`). The base gets a transform too
   (`1033`, adding an inert `KrokiDeskInstallerLanguage` property — torch
   refuses two identical databases), so that every language choice names an
-  existing transform. Windows Installer applies the transform matching the
+  existing transform. The CJK languages change the database codepage (932,
+  936, 949 vs 1252): applying their transform strictly fails on
+  `ChangeCodepage`, but `torch -t language` writes the suppression of that
+  error into the transform itself, which is what Windows Installer obeys —
+  every `.wxl` text must exist in its codepage, otherwise `light` fails.
+  Windows Installer applies the transform matching the
   user's **display language** by itself (undocumented but long-standing
   behavior); `ProductLanguage=1033` / `1036` on the command line forces the
   choice. `TRANSFORMS=:1033` does **not**: the automatically chosen transform
@@ -600,8 +606,13 @@ source, options); a re-render therefore naturally retries errors.
   `icons.js` (registry of toolbar icons, see below),
   `loading.js` (loading overlay, see below),
   `main.js`, `app.js` (helpers + `invoke` re-export).
-- **Interface language** (3.25.0): English (reference and fallback) and
-  French. **Single source** for front and back: `src-tauri/i18n/<lang>.json`,
+- **Interface language** (3.25.0): English (reference and fallback),
+  French, and since 3.27.0 German, Spanish, Italian, Japanese, Korean,
+  Brazilian Portuguese (`pt`, also served to Portugal) and Simplified Chinese
+  (`zh`; a Traditional Chinese system — `zh-TW`/`HK`/`MO`/`Hant` — gets English,
+  `i18n::language_code`). Plural rules exist twice: `Intl.PluralRules` on the
+  front, the hand-written `plural_category` (`i18n.rs`) on the Rust side — a
+  language with `few`/`many` forms (Russian, Polish…) needs a branch there. **Single source** for front and back: `src-tauri/i18n/<lang>.json`,
   flat `key → text` objects with `{param}` placeholders, a text depending on a
   number being a CLDR plural object (`{"one": …, "other": …}`, picked by
   `count`). The Rust side embeds them (`include_str!`, `i18n.rs`) and reads

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textes de l'installeur en chinois simplifié : mêmes Id que en-US.wxl. -->
+<WixLocalization Culture="zh-cn" Codepage="936" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="LaunchApp">启动 Kroki Desk</String>
+  <String Id="DowngradeErrorMessage">已安装更新版本的 Kroki Desk。</String>
+  <String Id="PathEnvVarFeature">将 Kroki Desk 的安装文件夹添加到系统环境变量 PATH 中，以便从任意位置启动该可执行文件。</String>
+  <String Id="InstallAppFeature">安装 Kroki Desk。</String>
+
+  <String Id="KdPluginDlgDescription">选择要随应用程序一起安装的插件。</String>
+  <String Id="KdPluginDlgHeading">随 Kroki Desk 一起安装</String>
+  <String Id="KdPluginDlgHint">插件可为应用程序添加其本身无法读取的文件格式。</String>
+  <String Id="KdPluginDlgNote">选中的插件将在首次启动时安装，并随应用程序一起更新。Kroki Desk 将成为这些格式的默认应用程序，除非你已选择了其他应用程序。</String>
+
+  <String Id="KdProgIdSession">Kroki Desk 会话</String>
+  <String Id="KdProgIdPlugin">Kroki Desk 插件</String>
+  <String Id="KdProgIdDocument">Kroki Desk 文档</String>
+</WixLocalization>

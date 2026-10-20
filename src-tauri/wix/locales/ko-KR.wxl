@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textes de l'installeur en coreen (Codepage 949 : pas d'accents ici) - memes Id que en-US.wxl. -->
+<WixLocalization Culture="ko-kr" Codepage="949" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="LaunchApp">Kroki Desk 시작</String>
+  <String Id="DowngradeErrorMessage">최신 버전의 Kroki Desk가 이미 설치되어 있습니다.</String>
+  <String Id="PathEnvVarFeature">Kroki Desk 실행 파일의 설치 위치를 PATH 시스템 환경 변수에 추가합니다. 이렇게 하면 어느 위치에서나 Kroki Desk 실행 파일을 호출할 수 있습니다.</String>
+  <String Id="InstallAppFeature">Kroki Desk를 설치합니다.</String>
+
+  <String Id="KdPluginDlgDescription">애플리케이션과 함께 설치할 플러그인을 선택하십시오.</String>
+  <String Id="KdPluginDlgHeading">Kroki Desk와 함께 설치</String>
+  <String Id="KdPluginDlgHint">플러그인은 애플리케이션이 자체적으로 읽을 수 없는 파일 형식을 추가합니다.</String>
+  <String Id="KdPluginDlgNote">선택한 플러그인은 처음 실행할 때 설치되며 애플리케이션과 함께 업데이트됩니다. 다른 애플리케이션을 이미 선택하지 않은 경우 Kroki Desk가 해당 형식의 기본 애플리케이션이 됩니다.</String>
+
+  <String Id="KdProgIdSession">Kroki Desk 세션</String>
+  <String Id="KdProgIdPlugin">Kroki Desk 플러그인</String>
+  <String Id="KdProgIdDocument">Kroki Desk 문서</String>
+</WixLocalization>

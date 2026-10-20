@@ -59,11 +59,44 @@ pub const BASE: Lang = Lang {
 };
 
 /// Langues embarquées en transforms — miroir des clés de `wix.language` dans
-/// tauri.msi.conf.json, hors base.
-pub const OTHERS: &[Lang] = &[Lang {
-    tag: "fr-FR",
-    lcid: 1036,
-}];
+/// tauri.msi.conf.json, hors base. Les langues CJK changent le codepage de la
+/// base (932, 936, 949) : `torch -t language` marque leur transform comme
+/// supprimant l'erreur `ChangeCodepage`, ce qui suffit à Windows Installer
+/// (prototype validé le 2026-10-19 — textes relus identiques au MSI natif).
+pub const OTHERS: &[Lang] = &[
+    Lang {
+        tag: "de-DE",
+        lcid: 1031,
+    },
+    Lang {
+        tag: "es-ES",
+        lcid: 3082,
+    },
+    Lang {
+        tag: "fr-FR",
+        lcid: 1036,
+    },
+    Lang {
+        tag: "it-IT",
+        lcid: 1040,
+    },
+    Lang {
+        tag: "ja-JP",
+        lcid: 1041,
+    },
+    Lang {
+        tag: "ko-KR",
+        lcid: 1042,
+    },
+    Lang {
+        tag: "pt-BR",
+        lcid: 1046,
+    },
+    Lang {
+        tag: "zh-CN",
+        lcid: 2052,
+    },
+];
 
 const PID_TEMPLATE: u32 = 7;
 const VT_LPSTR: u32 = 30;

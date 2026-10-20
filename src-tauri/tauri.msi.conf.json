@@ -11,7 +11,14 @@
       "wix": {
         "language": {
           "en-US": { "localePath": "wix/locales/en-US.wxl" },
-          "fr-FR": { "localePath": "wix/locales/fr-FR.wxl" }
+          "de-DE": { "localePath": "wix/locales/de-DE.wxl" },
+          "es-ES": { "localePath": "wix/locales/es-ES.wxl" },
+          "fr-FR": { "localePath": "wix/locales/fr-FR.wxl" },
+          "it-IT": { "localePath": "wix/locales/it-IT.wxl" },
+          "ja-JP": { "localePath": "wix/locales/ja-JP.wxl" },
+          "ko-KR": { "localePath": "wix/locales/ko-KR.wxl" },
+          "pt-BR": { "localePath": "wix/locales/pt-BR.wxl" },
+          "zh-CN": { "localePath": "wix/locales/zh-CN.wxl" }
         },
         "upgradeCode": "03A2A6F1-04C8-5B5A-B86C-338C035EAAC1",
         "template": "wix/main.wxs",

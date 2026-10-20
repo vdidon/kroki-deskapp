@@ -5,6 +5,20 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.27.0] — 2026-10-19
+
+### Added
+- **Seven more interface languages: German, Spanish, Italian, Japanese,
+  Korean, Brazilian Portuguese and Simplified Chinese**, alongside English
+  and French. *Automatic* (Settings → Language) picks the one of the
+  operating system; a Portuguese system gets the Brazilian translation, a
+  Traditional Chinese one stays in English. The Windows installer speaks the
+  same nine languages, still as a single MSI.
+
+### Fixed
+- The tooltip of the intermediate Markdown button no longer says "debug
+  build": the button has been available in release builds since 3.12.0.
+
 ## [3.26.0] — 2026-10-19
 
 ### Added
@@ -898,6 +912,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
+[3.27.0]: #3270--2026-10-19
 [3.26.0]: #3260--2026-10-19
 [3.25.1]: #3251--2026-10-19
 [3.25.0]: #3250--2026-10-16

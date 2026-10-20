@@ -19,10 +19,19 @@ use std::sync::LazyLock;
 
 use serde_json::{Map, Value};
 
-/// Langues livrées, la référence en tête : `(code, catalogue)`.
-const CATALOGS: [(&str, &str); 2] = [
+/// Langues livrées, la référence en tête : `(code, catalogue)`. Le code est la
+/// langue primaire : `pt` (portugais du Brésil) sert aussi le Portugal, `zh`
+/// est le chinois simplifié (cf. [`language_code`] pour le traditionnel).
+const CATALOGS: [(&str, &str); 9] = [
     ("en", include_str!("../i18n/en.json")),
+    ("de", include_str!("../i18n/de.json")),
+    ("es", include_str!("../i18n/es.json")),
     ("fr", include_str!("../i18n/fr.json")),
+    ("it", include_str!("../i18n/it.json")),
+    ("ja", include_str!("../i18n/ja.json")),
+    ("ko", include_str!("../i18n/ko.json")),
+    ("pt", include_str!("../i18n/pt.json")),
+    ("zh", include_str!("../i18n/zh.json")),
 ];
 
 /// Catalogues parsés, dans l'ordre de [`CATALOGS`]. Un JSON invalide est une
@@ -60,7 +69,9 @@ pub fn in_reference_language<R>(f: impl FnOnce() -> R) -> R {
 
 /// Index effectif : surcharge du thread, sinon langue de l'interface.
 fn active() -> usize {
-    OVERRIDE.with(|o| o.get()).unwrap_or_else(|| CURRENT.load(Ordering::Relaxed))
+    OVERRIDE
+        .with(|o| o.get())
+        .unwrap_or_else(|| CURRENT.load(Ordering::Relaxed))
 }
 
 /// Résout le réglage `language` (`"auto"`, `"en"`, `"fr"`…) en code de langue
@@ -79,12 +90,21 @@ pub fn resolve(setting: &str) -> &'static str {
 /// Windows : langue d'affichage de l'utilisateur ; Linux : `LC_ALL` /
 /// `LC_MESSAGES` / `LANG`.
 fn system_language() -> String {
-    sys_locale::get_locale()
-        .unwrap_or_default()
-        .split(['-', '_', '.'])
-        .next()
-        .unwrap_or("")
-        .to_ascii_lowercase()
+    language_code(&sys_locale::get_locale().unwrap_or_default())
+}
+
+/// Code primaire d'une locale (`fr-FR`, `fr_FR.UTF-8` → `fr`). Exception : le
+/// chinois traditionnel (`zh-TW`, `zh-HK`, `zh-MO`, `zh-Hant-…`) devient
+/// `zh-hant`, non livré — l'anglais plutôt que le simplifié du catalogue `zh`,
+/// comme le fait Windows lui-même.
+fn language_code(locale: &str) -> String {
+    let lower = locale.to_ascii_lowercase();
+    let mut parts = lower.split(['-', '_', '.']);
+    let primary = parts.next().unwrap_or("").to_string();
+    if primary == "zh" && parts.any(|p| matches!(p, "hant" | "tw" | "hk" | "mo")) {
+        return "zh-hant".to_string();
+    }
+    primary
 }
 
 fn index_of(code: &str) -> Option<usize> {
@@ -115,7 +135,10 @@ pub fn language_list() -> Vec<Value> {
         .iter()
         .zip(PARSED.iter())
         .map(|((code, _), map)| {
-            let name = map.get("language.name").and_then(Value::as_str).unwrap_or(code);
+            let name = map
+                .get("language.name")
+                .and_then(Value::as_str)
+                .unwrap_or(code);
             serde_json::json!({ "code": code, "name": name })
         })
         .collect()
@@ -134,12 +157,17 @@ pub fn messages() -> Map<String, Value> {
     out
 }
 
-/// Forme plurielle CLDR de `n` pour une langue livrée.
+/// Forme plurielle CLDR de `n` pour une langue livrée — le frontend, lui, a
+/// `Intl.PluralRules`. Une langue ajoutée dont les règles ne sont dans aucune
+/// branche (`few`, `many` : russe, polonais…) doit en recevoir une.
 fn plural_category(lang: &str, n: f64) -> &'static str {
     match lang {
-        // fr : 0 et 1 au singulier (« 0 onglet », « 1 onglet »).
-        "fr" if (0.0..2.0).contains(&n.abs()) => "one",
-        "fr" => "other",
+        // fr, pt : 0 et 1 au singulier (« 0 onglet », « 1 onglet »).
+        "fr" | "pt" if (0.0..2.0).contains(&n.abs()) => "one",
+        "fr" | "pt" => "other",
+        // Pas de pluriel grammatical : `other` seul.
+        "ja" | "ko" | "zh" => "other",
+        // en, de, es, it : singulier pour 1 seulement.
         _ if n == 1.0 => "one",
         _ => "other",
     }
@@ -229,7 +257,10 @@ mod tests {
 
     #[test]
     fn substitution_et_repli() {
-        assert_eq!(substitute("port ≥ {min}", &[("min", "1024".into())]), "port ≥ 1024");
+        assert_eq!(
+            substitute("port ≥ {min}", &[("min", "1024".into())]),
+            "port ≥ 1024"
+        );
         assert_eq!(substitute("{x} {y}", &[("x", "a".into())]), "a {y}");
         assert_eq!(text("clé.inconnue", &[]), "clé.inconnue");
     }
@@ -251,6 +282,20 @@ mod tests {
         assert_eq!(plural_category("fr", 2.0), "other");
         assert_eq!(plural_category("en", 0.0), "other");
         assert_eq!(plural_category("en", 1.0), "one");
+        assert_eq!(plural_category("pt", 0.0), "one");
+        assert_eq!(plural_category("de", 0.0), "other");
+        assert_eq!(plural_category("ja", 1.0), "other");
+    }
+
+    #[test]
+    fn code_de_langue() {
+        assert_eq!(language_code("fr-FR"), "fr");
+        assert_eq!(language_code("pt_PT.UTF-8"), "pt");
+        assert_eq!(language_code("zh-CN"), "zh");
+        assert_eq!(language_code("zh-Hans-SG"), "zh");
+        assert_eq!(language_code("zh-TW"), "zh-hant");
+        assert_eq!(language_code("zh-Hant-HK"), "zh-hant");
+        assert_eq!(language_code(""), "");
     }
 
     #[test]
