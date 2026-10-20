@@ -427,8 +427,8 @@ on 127.0.0.1.
 Rendering never touches the network. The only request the application makes
 on its own is the update check (`GET
 https://api.github.com/repos/vdidon/kroki-deskapp/releases/latest`, at most
-once a day, no data sent beyond the version in the User-Agent); it fails
-silently and is turned off in the Settings.
+once a day, no data sent beyond the version in the User-Agent); it fails silently
+and can be turned off in the Settings.
 
 ## License
 

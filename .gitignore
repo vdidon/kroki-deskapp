@@ -27,3 +27,5 @@ __pycache__/
 # README media: raw captures and the document rewritten by gifs.mjs
 scripts/readme_media/raw/
 scripts/readme_media/live.md
+
+_workspace/
