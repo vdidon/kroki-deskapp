@@ -2,6 +2,7 @@
 name = "kroki_deskapp"
 version = "3.27.0"
 description = "Markdown viewer with Kroki diagram rendering"
+license = "MIT"
 edition = "2021"
 
 [build-dependencies]

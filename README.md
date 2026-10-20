@@ -283,3 +283,9 @@ untrusted content, injected scripts not executed); the only real `eval` is
 internal to d2, confined to the rendering webview — the same trust already
 granted to the mermaid/PlantUML/graphviz engines. The local API only listens
 on 127.0.0.1.
+
+## License
+
+[MIT](LICENSE). The bundled third-party engines and vendored libraries keep
+their own licenses (e.g. PlantUML under MIT, ditaa under LGPL v3 — see
+« Architecture »).
