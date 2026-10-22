@@ -188,6 +188,7 @@ class PluginHost {
 
   /** @returns {Promise<void>} */
   async start() {
+    const t0 = performance.now();
     const runtime = await runtimeSource();
     const entryUrl = pluginFileUrl(this.info, this.info.entry);
     const blob = new Blob([runtime, `\nkd.__load(${JSON.stringify(entryUrl)});`], {
@@ -220,6 +221,11 @@ class PluginHost {
       theme: effectiveTheme(),
       locale: getLocale(),
     });
+    pushLog(
+      this.info.id,
+      "info",
+      `worker started (v${this.info.version}) in ${Math.round(performance.now() - t0)} ms`,
+    );
   }
 
   /** @param {KdWireMessage | null | undefined} m message du worker, non validé */
@@ -615,17 +621,29 @@ onLocaleChange((locale) => {
  * @returns {Promise<{ markdown: string, anchors: Anchor[], warnings: string[] }>}
  */
 export async function pluginTransformDocument(info, { text, path, dir, title }) {
+  const t0 = performance.now();
   const r = await call(
     info,
     "document/transform",
     { text, path, dir, title, theme: effectiveTheme(), locale: getLocale() },
     dir,
   );
-  return {
+  const doc = {
     markdown: String(r?.markdown ?? ""),
     anchors: sanitizeAnchors(r?.anchors),
     warnings: Array.isArray(r?.warnings) ? r.warnings.map(String) : [],
   };
+  // Temps du plugin seul (hors rendu markdown de l'hôte, cf. loading.js) :
+  // départage une lenteur plugin / hôte. Démarrage du worker compris au 1er appel.
+  const name = String(path).split(/[\\/]/).pop();
+  const warns = doc.warnings.length ? `, ${doc.warnings.length} warning(s)` : "";
+  pushLog(
+    info.id,
+    "info",
+    `document/transform ${name}: ${Math.round(performance.now() - t0)} ms, ` +
+      `${Math.round(text.length / 1024)}k → ${Math.round(doc.markdown.length / 1024)}k chars${warns}`,
+  );
+  return doc;
 }
 
 /**

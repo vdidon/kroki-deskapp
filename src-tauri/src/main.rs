@@ -172,7 +172,30 @@ fn main() {
             commands::load_settings(&handle);
             // Langue avant tout message : seeding, scan et fenêtres en émettent.
             let language = handle.state::<state::SettingsState>().0.lock().unwrap().language.clone();
-            i18n::set_language(&language);
+            let code = i18n::set_language(&language);
+            // Contexte d'un rapport de bug ; Java et TeX sont tracés quand ils
+            // sont sondés (à la demande : pas de JVM lancée au démarrage).
+            let external = handle
+                .state::<state::SettingsState>()
+                .0
+                .lock()
+                .unwrap()
+                .external_url
+                .clone();
+            journal::info(
+                "app",
+                format!(
+                    "Kroki Desk {} ({} {}), interface language {code} (setting: {language}), rendering: {}",
+                    env!("CARGO_PKG_VERSION"),
+                    std::env::consts::OS,
+                    std::env::consts::ARCH,
+                    if external.is_empty() {
+                        "built-in engines".to_string()
+                    } else {
+                        format!("external Kroki server {}", journal::redact_url(&external))
+                    }
+                ),
+            );
             // Plugins livrés avec l'installeur : installés/mis à jour avant le
             // scan, pour que le registre parte de l'état final. Lit
             // `removed_plugins` des réglages — donc après `load_settings`.

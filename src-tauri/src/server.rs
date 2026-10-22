@@ -23,14 +23,19 @@ pub fn apply_settings(app: &AppHandle, enabled: bool, port: u16) {
         (Some((p, _)), true) if *p == port => return, // déjà dans le bon état
         _ => {}
     }
-    if let Some((_, server)) = cur.take() {
+    if let Some((old, server)) = cur.take() {
         server.unblock();
+        crate::journal::info("server", format!("local Kroki API stopped (port {old})"));
     }
     if !enabled {
         return;
     }
     match Server::http(("127.0.0.1", port)) {
         Ok(server) => {
+            crate::journal::info(
+                "server",
+                format!("local Kroki API listening on http://127.0.0.1:{port}"),
+            );
             let server = Arc::new(server);
             *cur = Some((port, server.clone()));
             let app = app.clone();

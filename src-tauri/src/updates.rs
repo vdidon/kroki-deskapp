@@ -142,7 +142,29 @@ pub async fn check_update(app: AppHandle, automatic: bool) -> Result<Option<Upda
     Ok(fetch(&app).await.ok().filter(|info| info.newer))
 }
 
+/// `fetch_release` tracé dans le journal (seule requête réseau de l'app).
 async fn fetch(app: &AppHandle) -> Result<UpdateInfo, String> {
+    let result = fetch_release(app).await;
+    match &result {
+        Ok(info) => crate::journal::info(
+            "updates",
+            format!(
+                "latest release {}, running {}{}",
+                info.latest,
+                info.current,
+                if info.newer {
+                    " (update available)"
+                } else {
+                    ""
+                }
+            ),
+        ),
+        Err(e) => crate::journal::warn("updates", format!("update check failed: {e}")),
+    }
+    result
+}
+
+async fn fetch_release(app: &AppHandle) -> Result<UpdateInfo, String> {
     let api = format!(
         "{}/releases/latest",
         REPOSITORY.replacen("https://github.com/", "https://api.github.com/repos/", 1)

@@ -77,7 +77,7 @@ pub async fn render_diagram(
         return Ok(svg.clone());
     }
 
-    let svg = if external.is_empty() {
+    let result = if external.is_empty() {
         let app2 = app.clone();
         let (d, s) = (dtype.clone(), source.clone());
         let json_opts: serde_json::Map<String, serde_json::Value> = opts
@@ -88,13 +88,29 @@ pub async fn render_diagram(
             engine::render_local(&app2, &d, &s, &json_opts)
         })
         .await
-        .map_err(|e| tr!("engine.render_interrupted", error = e))??
+        .map_err(|e| tr!("engine.render_interrupted", error = e))
+        .and_then(|r| r)
     } else {
-        kroki::render(&kroki, &external, &dtype, &source, opts).await?
+        kroki::render(&kroki, &external, &dtype, &source, opts).await
     };
 
-    kroki.cache.lock().unwrap().insert(key, svg.clone());
-    Ok(svg)
+    match result {
+        Ok(svg) => {
+            kroki.cache.lock().unwrap().insert(key, svg.clone());
+            Ok(svg)
+        }
+        Err(e) => {
+            // Affichée dans le document ; journalisée pour le diagnostic (le
+            // cache ne garde que les succès : chaque nouvel essai est tracé).
+            let via = if external.is_empty() {
+                "built-in".to_string()
+            } else {
+                crate::journal::redact_url(&external)
+            };
+            crate::journal::warn("render", format!("{dtype} ({via}): {e}"));
+            Err(e)
+        }
+    }
 }
 
 /// Appelée par la webview de rendu quand ses moteurs sont chargés.

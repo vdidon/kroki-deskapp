@@ -642,7 +642,11 @@ source, options); a re-render therefore naturally retries errors.
   run-app`); messages stay English like any log output. Windows add their
   plugins' entries via `plugin_log` (`host/log`, failures and breakdowns seen
   by the host, rate-limited in `plugins.js`); each entry is broadcast as
-  `journal-entry`. Shown by the « Journal » dialog (`ui/js/journal.js`), opened
+  `journal-entry`. Besides failures it records context (launch line, Java/TeX
+  probes — logged where they are probed, never probed just to log —, local
+  API, diagram render errors in `render_diagram`, update checks, plugin worker
+  start-up and per-document `document/transform` timing); log a URL through
+  `journal::redact_url`. Shown by the « Journal » dialog (`ui/js/journal.js`), opened
   from the Info dialog (everything) or a plugin card (filtered).
 - `state.rs` — `AppState`, `SettingsState`, etc. (settings persisted in
   `%APPDATA%\kroki-deskapp\settings.json`, next to `plugins\` and, like it,

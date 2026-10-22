@@ -77,6 +77,19 @@ pub fn attach(app: &AppHandle) {
     let _ = APP.set(app.clone());
 }
 
+/// URL sans identifiants (`https://user:pass@host` → `https://host/`) : le
+/// journal est fait pour être copié dans un rapport de bug.
+pub fn redact_url(url: &str) -> String {
+    match reqwest::Url::parse(url) {
+        Ok(mut u) => {
+            let _ = u.set_username("");
+            let _ = u.set_password(None);
+            u.to_string()
+        }
+        Err(_) => "(invalid URL)".to_string(),
+    }
+}
+
 fn truncate(message: &str) -> String {
     match message.char_indices().nth(MAX_MESSAGE) {
         Some((cut, _)) => format!("{}…", &message[..cut]),
@@ -160,6 +173,11 @@ mod tests {
         assert_eq!(cut.chars().count(), MAX_MESSAGE + 1);
         assert!(cut.ends_with('…'));
         assert_eq!(truncate("court"), "court");
+        assert_eq!(
+            redact_url("https://u:p@kroki.example:8000/x"),
+            "https://kroki.example:8000/x"
+        );
+        assert_eq!(redact_url("pas une url"), "(invalid URL)");
     }
 
     #[test]

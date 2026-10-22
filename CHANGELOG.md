@@ -5,6 +5,29 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.29.0] — 2026-10-22
+
+### Added
+- **Log** (« Journal ») dialog: the diagnostic messages of the application
+  and its plugins since launch, with a source filter and a Copy button for
+  bug reports. Open it from the Information dialog (everything), or from a
+  plugin's card in the Plugins dialog (« Journal (n) », shown when that
+  plugin has entries). Kept in memory only.
+- The log records what used to vanish silently in the windowed build: a
+  bundled plugin that could not be installed, file watching that failed to
+  start, the local API port already in use, the render engines' window that
+  could not be created.
+- Plugin messages (`host/log`) are now visible — they were collected but
+  never shown — together with the failures Kroki Desk observes for each
+  plugin: timeouts, crashes, returned errors, switch to "broken".
+- The log also gives the context of a session, for diagnosis and bug
+  reports: version, system and rendering mode at launch; Java and TeX found
+  or not (with their version) when first needed; local API start and stop;
+  each diagram that failed to render; each update check; and, per plugin,
+  its start-up time and the time it took to convert each document — which
+  tells a slow plugin from a slow display. Server credentials are never
+  logged.
+
 ## [3.28.1] — 2026-10-22
 
 ### Fixed
@@ -946,6 +969,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
+[3.29.0]: #3290--2026-10-22
 [3.28.1]: #3281--2026-10-22
 [3.28.0]: #3280--2026-10-20
 [3.27.0]: #3270--2026-10-19

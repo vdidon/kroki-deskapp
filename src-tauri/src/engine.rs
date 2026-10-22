@@ -355,14 +355,36 @@ fn find_java(app: &AppHandle) -> Option<PathBuf> {
         .into_iter()
         .chain([PathBuf::from("java")])
         .collect();
-    let found = candidates.into_iter().find(|p| {
-        let mut cmd = std::process::Command::new(p);
+    let found = candidates.into_iter().find_map(|p| {
+        let mut cmd = std::process::Command::new(&p);
         cmd.arg("-version");
         no_window(&mut cmd);
-        cmd.output().map(|o| o.status.success()).unwrap_or(false)
+        let out = cmd.output().ok().filter(|o| o.status.success())?;
+        // `java -version` écrit sur stderr ; 1re ligne = distribution et version.
+        let version = first_line(&out.stderr);
+        Some((p, version))
     });
+    match &found {
+        Some((p, version)) => {
+            crate::journal::info("engine", format!("Java found: {} ({version})", p.display()))
+        }
+        None => crate::journal::info(
+            "engine",
+            "Java not found (JAVA_HOME, PATH): PlantUML/C4/ditaa need an external Kroki server",
+        ),
+    }
+    let found = found.map(|(p, _)| p);
     *cache = Some(found.clone());
     found
+}
+
+fn first_line(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string()
 }
 
 /// Java est-il utilisable sur ce poste ? (sondé une fois, mis en cache)
@@ -545,6 +567,8 @@ const TEX_TIMEOUT: Duration = Duration::from_secs(60);
 struct TexTools {
     /// MiKTeX : option propre pour couper l'installation automatique de paquets.
     miktex: bool,
+    /// 1re ligne de `latex --version` (journal).
+    version: String,
 }
 
 /// `latex` et `dvisvgm` sont-ils sur le PATH ? (sondé une fois, mis en cache)
@@ -555,6 +579,16 @@ fn find_tex(app: &AppHandle) -> Option<TexTools> {
         return known.clone();
     }
     let found = probe_tex();
+    crate::journal::info(
+        "engine",
+        match &found {
+            Some(t) => format!("TeX found: {}", t.version),
+            None => {
+                "TeX not found (latex and dvisvgm on PATH): tikz needs an external Kroki server"
+                    .to_string()
+            }
+        },
+    );
     *cache = Some(found.clone());
     found
 }
@@ -572,6 +606,7 @@ fn probe_tex() -> Option<TexTools> {
     match (probe("latex"), probe("dvisvgm")) {
         (Some(version), Some(_)) => Some(TexTools {
             miktex: version.contains("MiKTeX"),
+            version: first_line(version.as_bytes()),
         }),
         _ => None,
     }
