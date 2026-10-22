@@ -635,6 +635,15 @@ source, options); a re-render therefore naturally retries errors.
   `SettingsData::update_check`, and silently on failure; on-demand check from
   the Info dialog, errors shown. The only network request the app makes on its
   own — keep it that way (README « Security notes »).
+- `journal.rs` — application log (3.29.0): last 500 diagnostic entries, in
+  memory only, one log for the whole process. The release binary has no
+  console, so **write diagnostics through `journal::info/warn/error(source,
+  msg)`, never a bare `eprintln!`** (it still goes to stderr for `cargo
+  run-app`); messages stay English like any log output. Windows add their
+  plugins' entries via `plugin_log` (`host/log`, failures and breakdowns seen
+  by the host, rate-limited in `plugins.js`); each entry is broadcast as
+  `journal-entry`. Shown by the « Journal » dialog (`ui/js/journal.js`), opened
+  from the Info dialog (everything) or a plugin card (filtered).
 - `state.rs` — `AppState`, `SettingsState`, etc. (settings persisted in
   `%APPDATA%\kroki-deskapp\settings.json`, next to `plugins\` and, like it,
   outside the Tauri identity folder — `plugins::app_dir`).
@@ -645,7 +654,8 @@ source, options); a re-render therefore naturally retries errors.
   `render_diagram`), `tabs.js`, `teardrag.js` (tab detaching), `filedrop.js`,
   `settings.js` (settings + access to the Plugins dialog), `theme.js` (auto/light/dark
   override), `info.js` (« Informations » dialog: version, runtimes,
-  access to What's new), `changelog.js` (« Nouveautés » dialog, dedicated markdown-it
+  access to What's new and the log), `journal.js` (« Journal » dialog, see
+  `journal.rs`), `changelog.js` (« Nouveautés » dialog, dedicated markdown-it
   without Kroki fence + DOMPurify), `export.js` (export of the active tab's
   rendering as standalone HTML: inlined CSS, local images as data-URI via the
   `export_html` command), `findword.js` (highlighting of occurrences of the selected

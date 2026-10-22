@@ -261,7 +261,7 @@ fn build_renderer(app: &AppHandle) {
     .inner_size(1200.0, 900.0)
     .build();
     if let Err(e) = built {
-        eprintln!("[engine] cannot create the render webview: {e}");
+        crate::journal::error("engine", format!("cannot create the render webview: {e}"));
         // Échec : relâcher le verrou pour autoriser une nouvelle tentative.
         app.state::<EngineState>()
             .creating

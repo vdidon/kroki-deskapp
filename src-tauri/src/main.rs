@@ -9,6 +9,7 @@ mod commands;
 #[cfg(windows)]
 mod drop_target;
 mod engine;
+mod journal;
 mod kroki;
 mod manager;
 mod plugins;
@@ -41,7 +42,10 @@ fn detach_if_requested() {
     let exe = match std::env::current_exe() {
         Ok(exe) => exe,
         Err(e) => {
-            eprintln!("[cli] --detach: executable not found ({e}), running in the foreground");
+            journal::warn(
+                "cli",
+                format!("--detach: executable not found ({e}), running in the foreground"),
+            );
             return;
         }
     };
@@ -80,9 +84,10 @@ fn detach_if_requested() {
 
     match spawned {
         Ok(_) => std::process::exit(0),
-        Err(e) => {
-            eprintln!("[cli] --detach: relaunch failed ({e}), running in the foreground")
-        }
+        Err(e) => journal::warn(
+            "cli",
+            format!("--detach: relaunch failed ({e}), running in the foreground"),
+        ),
     }
 }
 
@@ -152,6 +157,8 @@ fn main() {
             plugins::plugin_changelog,
             plugins::plugin_read_sibling,
             updates::check_update,
+            journal::get_journal,
+            journal::plugin_log,
         ])
         // Sert les fichiers des plugins au worker sandboxé (lecture seule,
         // confinée au dossier du plugin) : `http://plugin.localhost/<id>/…`
@@ -159,6 +166,9 @@ fn main() {
         .register_uri_scheme_protocol("plugin", |_ctx, request| plugins::serve(&request))
         .setup(|app| {
             let handle = app.handle().clone();
+            // Avant tout le reste : les entrées du démarrage partent aussi vers
+            // les fenêtres (celles d'avant restent lisibles par `get_journal`).
+            journal::attach(&handle);
             commands::load_settings(&handle);
             // Langue avant tout message : seeding, scan et fenêtres en émettent.
             let language = handle.state::<state::SettingsState>().0.lock().unwrap().language.clone();

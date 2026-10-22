@@ -43,13 +43,6 @@ import { t, getLocale, onLocaleChange } from "./i18n.js";
  * @property {ReturnType<typeof setTimeout>} timer
  */
 
-/**
- * Entrée du journal `host/log` d'un plugin.
- * @typedef {object} PluginLogEntry
- * @property {unknown} level non validé : `params.level` tel qu'envoyé (défaut `info`)
- * @property {string} message
- */
-
 /// Capacités servables par cet hôte (négociation `initialize`, §6.1). Doit
 /// rester en phase avec `HOST_CAPABILITIES` (src-tauri/src/plugins.rs).
 /** @type {KdCapability[]} */
@@ -86,8 +79,12 @@ const byHighlight = new Map(); // langage de coloration -> PluginInfo
 const hosts = new Map(); // id -> PluginHost (workers vivants)
 /** @type {Map<string, string>} */
 const broken = new Map(); // id -> raison (§7.1 : 3 échecs consécutifs)
-/** @type {Map<string, PluginLogEntry[]>} */
-const logs = new Map(); // id -> [{level, message}] (host/log, dialog d'info)
+// Débit du journal par plugin : au-delà de LOG_BURST entrées par seconde, les
+// suivantes sont comptées puis résumées en une seule (un plugin qui journalise
+// dans une boucle ne doit pas noyer l'IPC ni évincer le reste du journal).
+const LOG_BURST = 20;
+/** @type {Map<string, { start: number, count: number, dropped: number }>} */
+const logRate = new Map();
 
 /** @type {Promise<string> | null} */
 let runtimeSrcPromise = null; // texte de kd_runtime.js (chargé une fois)
@@ -126,15 +123,39 @@ function runtimeSource() {
 }
 
 /**
+ * Entrée du journal de l'application pour ce plugin (journal.rs) : son
+ * `host/log`, ou un échec vu par l'hôte. Le backend valide `level`, tronque le
+ * message et diffuse l'entrée à toutes les fenêtres.
  * @param {string} id
- * @param {unknown} level
+ * @param {unknown} level non validé (`host/log`)
  * @param {unknown} message
  */
 function pushLog(id, level, message) {
-  const buf = logs.get(id) || [];
-  buf.push({ level, message: String(message) });
-  if (buf.length > 200) buf.shift();
-  logs.set(id, buf);
+  const now = Date.now();
+  let rate = logRate.get(id);
+  if (!rate || now - rate.start >= 1000) {
+    const dropped = rate?.dropped ?? 0;
+    rate = { start: now, count: 0, dropped: 0 };
+    logRate.set(id, rate);
+    if (dropped) {
+      rate.count++;
+      invoke("plugin_log", {
+        pluginId: id,
+        level: "warn",
+        message: t("journal.dropped", { count: dropped }),
+      }).catch(() => {});
+    }
+  }
+  if (rate.count >= LOG_BURST) {
+    rate.dropped++;
+    return;
+  }
+  rate.count++;
+  invoke("plugin_log", {
+    pluginId: id,
+    level: String(level),
+    message: String(message),
+  }).catch(() => {});
 }
 
 // --------------------------------------------------------------------------- //
@@ -388,16 +409,16 @@ async function call(info, method, params, dir) {
     // du protocole : rendu dégradé, mais ni kill ni compteur de panne. Un
     // timeout/crash tue le worker (redémarrage paresseux, §7.1).
     // `err` : PluginCallError, ou toute valeur levée en amont (start, invoke).
-    if (!(/** @type {Partial<PluginCallError> | null} */ (err)?.remote)) {
+    const reason = String(/** @type {Partial<Error> | null} */ (err)?.message || err);
+    if (/** @type {Partial<PluginCallError> | null} */ (err)?.remote) {
+      pushLog(info.id, "warn", `${method}: ${reason}`);
+    } else {
       host.failures += 1;
       host.abort(err instanceof Error ? err : new Error(String(err)));
+      pushLog(info.id, "error", `${method}: ${reason}`);
       if (host.failures >= 3) {
-        broken.set(info.id, String(/** @type {Partial<Error> | null} */ (err)?.message || err));
-        pushLog(
-          info.id,
-          "error",
-          `plugin en panne : ${/** @type {Partial<Error> | null} */ (err)?.message || err}`,
-        );
+        broken.set(info.id, reason);
+        pushLog(info.id, "error", t("runtime_ui.broken", { id: info.id, reason }));
       }
     }
     throw err;
@@ -567,15 +588,6 @@ export function isSessionFilePath(path) {
  */
 export function pluginRuntimeState(id) {
   return broken.has(id) ? { broken: true, reason: broken.get(id) } : { broken: false };
-}
-
-/**
- * Journal `host/log` d'un plugin (dialog d'info runtimes).
- * @param {string} id
- * @returns {PluginLogEntry[]}
- */
-export function pluginLogs(id) {
-  return logs.get(id) || [];
 }
 
 /** Notifie le thème effectif aux workers vivants (`theme/changed`, §6.6). */

@@ -1,6 +1,6 @@
 // Contrat front ↔ back : arguments et retours des commandes Tauri, payloads des
 // événements. Recopié à la main des signatures Rust (`commands.rs`, `plugins.rs`,
-// `updates.rs`) et des structs serde ; `tests/test_ipc_types.mjs` vérifie que
+// `updates.rs`, `journal.rs`) et des structs serde ; `tests/test_ipc_types.mjs` vérifie que
 // commandes et noms d'arguments restent alignés sur le Rust.
 //
 // Conventions de sérialisation à respecter en modifiant ce fichier :
@@ -126,6 +126,18 @@ export interface UpdateInfo {
   download_file: string | null;
 }
 
+/** `journal::JournalEntry` — retour de `get_journal`, payload de `journal-entry`. */
+export interface JournalEntry {
+  seq: number;
+  /** Millisecondes depuis l'époque Unix. */
+  time: number;
+  level: "debug" | "info" | "warn" | "error";
+  /** Module Rust (`server`, `watcher`…) ou id du plugin si `plugin`. */
+  source: string;
+  plugin: boolean;
+  message: string;
+}
+
 /** Catalogue de langue complété par l'anglais (`get_i18n`). */
 export interface I18nPayload {
   locale: string;
@@ -197,6 +209,9 @@ export interface Commands {
   plugin_read_sibling: { args: { pluginId: string; baseDir: string; rel: string }; ret: string };
   // updates.rs
   check_update: { args: { automatic: boolean }; ret: UpdateInfo | null };
+  // journal.rs
+  get_journal: { args: NoArgs; ret: JournalEntry[] };
+  plugin_log: { args: { pluginId: string; level: string; message: string }; ret: void };
 }
 
 /** Diffusion entre fenêtres : `from` = label de la fenêtre émettrice. */
@@ -216,6 +231,7 @@ export interface Events {
   "plugins-changed": PluginInfo[];
   "plugin-install-request": null;
   "session-report": { message: string; error: boolean };
+  "journal-entry": JournalEntry;
   "render-job": {
     id: number;
     dtype: string;

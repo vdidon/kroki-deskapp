@@ -12,6 +12,7 @@
 import { invoke, listen, escapeHtml } from "./app.js";
 import { allPlugins, pluginRuntimeState } from "./plugins.js";
 import { openPluginChangelog } from "./changelog.js";
+import { onJournalChange, openJournal, pluginEntryCount } from "./journal.js";
 import { isNativeFence } from "./render.js";
 import { onLocaleChange, t } from "./i18n.js";
 
@@ -79,6 +80,24 @@ function nativeClaimWarnings(p) {
     }
   }
   return out;
+}
+
+// Bouton « Journal » de chaque carte affichée (id -> bouton).
+/** @type {Map<string, HTMLButtonElement>} */
+const journalButtons = new Map();
+
+/**
+ * @param {string} id
+ * @param {HTMLButtonElement} button
+ */
+function updateJournalButton(id, button) {
+  const count = pluginEntryCount(id);
+  button.hidden = count === 0;
+  button.textContent = t("journal.plugin_button", { count });
+}
+
+function updateJournalButtons() {
+  for (const [id, button] of journalButtons) updateJournalButton(id, button);
 }
 
 /**
@@ -156,6 +175,15 @@ function renderCard(p) {
     news.addEventListener("click", () => openPluginChangelog(p));
     actions.append(news);
   }
+  // Journal du plugin (journal.js), affiché seulement s'il a des entrées ;
+  // tenu à jour par `updateJournalButtons` tant que le dialog est ouvert.
+  const journal = document.createElement("button");
+  journal.type = "button";
+  journal.className = "plugin-journal";
+  journal.addEventListener("click", () => openJournal(p.id));
+  journalButtons.set(p.id, journal);
+  updateJournalButton(p.id, journal);
+  actions.append(journal);
   const del = document.createElement("button");
   del.type = "button";
   del.className = "plugin-delete";
@@ -197,6 +225,7 @@ function alertError(container, err) {
 
 function renderList() {
   const plugins = allPlugins();
+  journalButtons.clear();
   listEl.replaceChildren();
   if (!plugins.length) {
     const empty = document.createElement("p");
@@ -362,5 +391,8 @@ export async function initPluginsUi() {
   // Liste rafraîchie si le registre change pendant que le dialog est ouvert.
   await listen("plugins-changed", () => {
     if (dialog.open) renderList();
+  });
+  onJournalChange(() => {
+    if (dialog.open) updateJournalButtons();
   });
 }

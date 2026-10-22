@@ -1,7 +1,7 @@
 // @ts-check
 // Dialog « Informations » : version de l'app, état des runtimes/moteurs sur
 // le poste courant, accès au changelog (« Nouveautés ») et vérification des
-// mises à jour à la demande (updates.js). Les données des
+// mises à jour à la demande (updates.js), accès au journal (journal.js). Les données des
 // moteurs viennent du backend (`get_runtimes`) ; chaque groupe porte un
 // statut : ok (app + système), blocked (app, prérequis système manquant),
 // unsupported (pas pris en charge par l'application).
@@ -9,6 +9,7 @@
 import { invoke } from "./app.js";
 import { openChangelog } from "./changelog.js";
 import { t } from "./i18n.js";
+import { openJournal } from "./journal.js";
 import { checkForUpdate, openDownload, openRelease } from "./updates.js";
 
 /** @typedef {import("../../types/ipc").UpdateInfo} UpdateInfo */
@@ -158,6 +159,9 @@ export function initInfo() {
   // Le changelog s'empile au-dessus du dialog (modales imbriquées, comme le
   // dialog de confiance au-dessus du dialog Plugins).
   /** @type {HTMLElement} */ (document.getElementById("info-changelog")).addEventListener("click", openChangelog);
+  // Journal complet (application + plugins) ; filtré par plugin depuis le
+  // dialog Plugins.
+  /** @type {HTMLElement} */ (document.getElementById("info-journal")).addEventListener("click", () => openJournal());
   updateBtn.addEventListener("click", checkUpdate);
   // Boutons masqués tant qu'aucune vérification n'a abouti : `updateInfo` est
   // alors renseigné (cf. checkUpdate).

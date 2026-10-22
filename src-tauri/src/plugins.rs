@@ -249,7 +249,7 @@ fn norm_ext(e: &str) -> String {
     e.trim().trim_start_matches('.').to_ascii_lowercase()
 }
 
-fn valid_id(id: &str) -> bool {
+pub(crate) fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id
@@ -698,6 +698,7 @@ pub fn uninstall_plugin(app: AppHandle, id: String) -> Result<(), String> {
     // Mémorise le refus, sinon un plugin livré avec l'installeur reviendrait au
     // démarrage suivant (cf. `seed_bundled`).
     set_removed(&app, &id, true);
+    crate::journal::forget_plugin(&id);
     rescan(&app);
     Ok(())
 }
@@ -802,7 +803,10 @@ fn seed_archive<R: Read + Seek>(
     let (zip, m) = match manifest {
         Ok(found) => found,
         Err(e) => {
-            eprintln!("[plugins] bundled archive ignored ({origin}): {e}");
+            crate::journal::warn(
+                "plugins",
+                format!("bundled archive ignored ({origin}): {e}"),
+            );
             return;
         }
     };
@@ -814,11 +818,14 @@ fn seed_archive<R: Read + Seek>(
         return;
     }
     match install_zip(zip) {
-        Ok(_) => eprintln!(
-            "[plugins] {} {} installed (bundled with the app, {origin})",
-            m.id, m.version
+        Ok(_) => crate::journal::info(
+            "plugins",
+            format!(
+                "{} {} installed (bundled with the app, {origin})",
+                m.id, m.version
+            ),
         ),
-        Err(e) => eprintln!("[plugins] cannot install {}: {e}", m.id),
+        Err(e) => crate::journal::error("plugins", format!("cannot install {}: {e}", m.id)),
     }
 }
 

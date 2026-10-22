@@ -47,7 +47,7 @@ pub fn apply_settings(app: &AppHandle, enabled: bool, port: u16) {
                 }
             });
         }
-        Err(e) => eprintln!("[server] port {port} unavailable: {e}"),
+        Err(e) => crate::journal::error("server", format!("port {port} unavailable: {e}")),
     }
 }
 

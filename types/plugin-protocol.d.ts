@@ -231,7 +231,7 @@ export type HostLogLevel = "debug" | "info" | "warn" | "error";
 
 /** Notifications plugin → hôte. */
 export interface PluginToHostNotifications {
-  /** Journal du plugin (200 dernières entrées, `pluginLogs`). */
+  /** Journal de l'application (« Journal », §6.5) : `level` inconnu → `info`. */
   "host/log": { level: HostLogLevel; message: string };
 }
 

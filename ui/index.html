@@ -301,8 +301,24 @@
     <div id="info-groups"></div>
     <div class="settings-actions">
       <button type="button" id="info-changelog" class="secondary" title="Application changelog" data-i18n="changelog.title" data-i18n-title="info.changelog_title">What's new</button>
+      <button type="button" id="info-journal" class="secondary" title="Diagnostic messages of the application and its plugins" data-i18n="journal.button" data-i18n-title="journal.button_title">Log</button>
       <span class="spacer"></span>
       <button type="button" id="info-close" class="primary" data-i18n="common.close">Close</button>
+    </div>
+  </dialog>
+  <dialog id="journal-dialog">
+    <h2 data-i18n="journal.title">Log</h2>
+    <p class="settings-hint" data-i18n="journal.hint">
+      Diagnostic messages of the application and its plugins since launch,
+      oldest first. Kept in memory only, never written to disk.
+    </p>
+    <select id="journal-filter" aria-label="Source" data-i18n-aria-label="journal.filter.label"></select>
+    <div id="journal-list" tabindex="-1"></div>
+    <p id="journal-empty" class="settings-hint" data-i18n="journal.empty" hidden>No entries.</p>
+    <div class="settings-actions">
+      <button type="button" id="journal-copy" class="secondary" data-i18n="journal.copy">Copy</button>
+      <span class="spacer"></span>
+      <button type="button" id="journal-close" class="primary" data-i18n="common.close">Close</button>
     </div>
   </dialog>
 </body>

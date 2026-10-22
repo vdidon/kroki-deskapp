@@ -322,7 +322,7 @@ nothing special to do for multi-line constructs.
 | Method | Capability | Contract |
 | --- | --- | --- |
 | `host/readFile` | `read:siblings` | `params: { rel, dir? }` → `result: { text }`. Path **relative** to the `dir` of the document being processed, `read_data_file` confinement + `siblingExtensions` allowlist. `dir` SHOULD echo the `dir` received with the request being served; when omitted, the host uses the folder of the only document being processed and answers `denied` if requests for several folders are in flight. `error.code = "denied"` (outside confinement/allowlist) or `"not-found"` (only for a file missing inside the folder). Valid only while a host request is being processed. |
-| `host/log` | — (always) | Notification `{ level: "debug"|"info"|"warn"|"error", message }`. Log visible in the runtimes info dialog. |
+| `host/log` | — (always) | Notification `{ level: "debug"|"info"|"warn"|"error", message }` (any other `level` is recorded as `info`; `message` truncated to 2,000 characters; beyond 20 entries per second, the next ones are dropped and counted). Goes to the application log (« Journal »), alongside the failures the host observes for the plugin (§ 7.1); viewable from the Plugins dialog (§ 9.4) and from the Info dialog. In memory only, last 500 entries for the whole application. |
 
 ### 6.6 Host → plugin notifications
 
@@ -468,6 +468,12 @@ and What's new (« Nouveautés ») dialogs). Contents:
 - **"What's new" (« Nouveautés ») button** on every card whose plugin embeds a
   `CHANGELOG.md` (§ 3.1): opens the host's changelog dialog on the plugin's
   changelog, rendered sanitized, without running the plugin.
+- **"Log (n)" (« Journal (n) ») button** on every card whose plugin has
+  entries in the application log: its `host/log` messages and the failures
+  the host observed (timeouts, worker crashes, errors returned by the plugin,
+  switch to broken § 7.1). Opens the log dialog filtered on that plugin; the
+  Info dialog opens the same dialog unfiltered (application + all plugins).
+  Uninstalling a plugin clears its entries.
 - **"Delete" (« Supprimer ») button** on every card: explicit confirmation,
   then deletion of the `plugins/<id>/` folder (including the `.bak`), worker
   stopped, affected open tabs re-rendered (they fall back to the degraded
@@ -482,9 +488,7 @@ and What's new (« Nouveautés ») dialogs). Contents:
   flow once the archive path is obtained.
 
 Deliberately out of v1: enabling/disabling without uninstalling, automatic
-update from a remote source, sorting/search. The `host/log` journal remains
-viewable in the runtimes info dialog (`info.js`), not here — management and
-diagnostics are two distinct uses. Only the plugins shipped with the
+update from a remote source, sorting/search. Only the plugins shipped with the
 application update themselves, and only when the application itself is updated
 (§ 9.5).
 
