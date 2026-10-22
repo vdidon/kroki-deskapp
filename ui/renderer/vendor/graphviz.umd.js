@@ -1,1 +1,0 @@
-Couldn't find the requested file /dist/graphviz.umd.js in @hpcc-js/wasm-graphviz.
