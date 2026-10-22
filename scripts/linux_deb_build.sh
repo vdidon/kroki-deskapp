@@ -19,4 +19,4 @@ export CARGO_TARGET_DIR=/target
 cd /app
 cargo build-deb
 
-echo "== Paquet .deb disponible dans dist/ (versionné + fichier non versionné) =="
+echo "== .deb package available in dist/ (versioned + unversioned twin) =="

@@ -1,79 +1,80 @@
 #!/usr/bin/env python3
-"""Génère l'intégralité des artefacts de distribution de la version dans
-dist/, en une seule commande, depuis Windows ou Linux.
+"""Builds every distribution artifact of the current version into dist/, in a
+single command, from Windows or Linux.
 
-Tout est produit par défaut ; chaque étape se retire par son --skip-*, ou
-s'isole par son --*-only. Chaque artefact est publié postfixé de la version
-(source de vérité : src-tauri/Cargo.toml) et doublé d'un fichier non versionné
-pointant sur le même contenu (hardlink, copie en repli — cf. publish_dist dans
-xtask/src/main.rs) :
-  - les .kdext de tous les plugins de plugins/ (tout dossier contenant un
-    manifest.json, jonctions comprises), via pack_plugin.py : <id>-<version>.kdext ;
-  - le binaire natif de l'hôte (cargo build-app) : kroki_deskapp-<version>.exe
-    sur Windows, kroki_deskapp-<version>-linux-<arch>-<distro> sur Linux ;
-  - l'installeur MSI Windows (cargo build-msi, WiX v3, overlay
-    src-tauri/tauri.msi.conf.json) : kroki_deskapp-<version>.msi — Windows
-    uniquement, sauté d'office ailleurs ;
-  - le binaire Linux "nu" (semi-dynamique, glibc bookworm, nécessite
-    libwebkit2gtk-4.1 sur la machine cible) :
-    kroki_deskapp-<version>-linux-x86_64-debian12 — via l'image Docker ;
-  - l'AppImage autonome (GTK/WebKitGTK embarqués, bundlée par tauri-cli) :
-    kroki_deskapp-<version>-linux-x86_64-debian12.AppImage — via l'image Docker ;
-  - le paquet Debian/Ubuntu, pendant Linux du MSI (cargo build-deb, overlay
-    src-tauri/tauri.deb.conf.json) :
-    kroki_deskapp-<version>-linux-x86_64-debian12.deb — via l'image Docker, y
-    compris sur un hôte Linux : le paquet distribuable est celui compilé sur
-    bookworm, dont le plancher glibc est le plus bas.
+Everything is produced by default; each step is removed by its --skip-*, or
+isolated by its --*-only. Each artifact is published suffixed with the version
+(source of truth: src-tauri/Cargo.toml) and paired with an unversioned file
+pointing at the same content (hardlink, copy as a fallback — see publish_dist
+in xtask/src/main.rs):
+  - the .kdext of every plugin in plugins/ (any folder holding a
+    manifest.json, junctions included), via pack_plugin.py: <id>-<version>.kdext;
+  - the host's native binary (cargo build-app): kroki_deskapp-<version>.exe
+    on Windows, kroki_deskapp-<version>-linux-<arch>-<distro> on Linux;
+  - the Windows MSI installer (cargo build-msi, WiX v3, overlay
+    src-tauri/tauri.msi.conf.json): kroki_deskapp-<version>.msi — Windows
+    only, skipped outright elsewhere;
+  - the bare Linux binary (semi-dynamic, bookworm glibc, requires
+    libwebkit2gtk-4.1 on the target machine):
+    kroki_deskapp-<version>-linux-x86_64-debian12 — via the Docker image;
+  - the standalone AppImage (GTK/WebKitGTK embedded, bundled by tauri-cli):
+    kroki_deskapp-<version>-linux-x86_64-debian12.AppImage — via the Docker image;
+  - the Debian/Ubuntu package, Linux counterpart of the MSI (cargo build-deb,
+    overlay src-tauri/tauri.deb.conf.json):
+    kroki_deskapp-<version>-linux-x86_64-debian12.deb — via the Docker image,
+    even on a Linux host: the distributable package is the one built on
+    bookworm, whose glibc floor is the lowest.
 
-Tout artefact Linux est suffixé de la distro qui l'a compilé (tag lu dans
-/etc/os-release par le xtask : debian12 pour le conteneur, ubuntu24.04 pour un
-hôte Ubuntu…) — un build natif et un build Docker ne s'écrasent donc jamais
-dans dist/ ; le distribuable est le -debian12 (compatibilité glibc large).
+Every Linux artifact is suffixed with the distro that built it (tag read from
+/etc/os-release by the xtask: debian12 for the container, ubuntu24.04 for an
+Ubuntu host…) — a native build and a Docker build therefore never overwrite
+each other in dist/; the distributable is the -debian12 (broad glibc
+compatibility).
 
-L'ordre est celui du coût croissant, pour qu'une étape lente ou en panne ne
-puisse ni retarder ni empêcher un artefact bon marché : les plugins (quelques
-centaines de ms, ni cargo ni Docker), puis le binaire natif, puis le MSI, puis
-seulement les étapes Docker.
+Steps run in order of increasing cost, so that a slow or broken step can
+neither delay nor prevent a cheap artifact: the plugins (a few hundred ms,
+neither cargo nor Docker), then the native binary, then the MSI, and only then
+the Docker steps.
 
-Le MSI et le .deb embarquent les .kdext des plugins : leur build échoue si les
-archives manquent de dist/. --skip-plugins les fait donc réutiliser celles d'un
-build précédent, il ne les retire pas de l'installeur.
+The MSI and the .deb embed the plugins' .kdext: their build fails if the
+archives are missing from dist/. --skip-plugins therefore makes them reuse
+those of a previous build, it does not remove them from the installer.
 
-Canal de distribution (--channel) : seuls le MSI et le .deb dépendent de la
-stratégie d'embarquement des plugins (cf. xtask/src/bundled.rs), donc du canal.
-  - local (défaut) : bundled-plugins.txt s'il existe, sinon
-    bundled-plugins.default.txt — la sélection du poste ;
-  - public : bundled-plugins.default.txt, même si un bundled-plugins.txt existe.
-La stratégie retenue est imposée au xtask (variable KROKI_BUNDLED_PLUGINS,
-transmise aussi au conteneur du .deb). En canal public, chaque artefact produit
-est en outre recopié dans dist/public/<version>/ — exactement ce qu'il y a à
-téléverser : binaires, installeurs, et les seuls .kdext de sa stratégie.
-dist/ à la racine reste écrasé par le dernier build, quel que soit son canal ;
-dist/public/, lui, ne reçoit que les builds publics. --channel all fait les deux
-en une passe : binaires et AppImage une seule fois (ils n'embarquent aucun
-plugin), MSI et .deb construits deux fois, public d'abord — dist/ finit donc
-sur les installeurs du canal local. Après le MSI et
-le .deb, les archives réellement embarquées (src-tauri/bundled-plugins/) sont
-comparées à la stratégie : tout écart arrête le script.
+Distribution channel (--channel): only the MSI and the .deb depend on the
+plugin bundling strategy (see xtask/src/bundled.rs), hence on the channel.
+  - local (default): bundled-plugins.txt if it exists, otherwise
+    bundled-plugins.default.txt — the workstation's selection;
+  - public: bundled-plugins.default.txt, even if a bundled-plugins.txt exists.
+The chosen strategy is imposed on the xtask (KROKI_BUNDLED_PLUGINS variable,
+also passed to the .deb container). On the public channel, each produced
+artifact is also copied into dist/public/<version>/ — exactly what is to be
+uploaded: binaries, installers, and only the .kdext of its strategy.
+dist/ at the root is overwritten by the last build, whatever its channel;
+dist/public/ only receives public builds. --channel all does both in one
+pass: binaries and AppImage once (they embed no plugin), MSI and .deb built
+twice, public first — dist/ therefore ends up on the local channel's
+installers. After the MSI and the .deb, the archives actually embedded
+(src-tauri/bundled-plugins/) are compared with the strategy: any mismatch
+stops the script.
 
-Les builds Docker passent par l'image kroki-linux-build (daemon Docker démarré
-requis, sauf --skip-binary --skip-appimage --skip-deb). Le test runtime headless
-(Xvfb + API Kroki locale) est optionnel (--test).
+Docker builds go through the kroki-linux-build image (running Docker daemon
+required, unless --skip-binary --skip-appimage --skip-deb). The headless
+runtime test (Xvfb + local Kroki API) is optional (--test).
 
-Exemples :
-    python build_dist.py                            # tous les artefacts
-    python build_dist.py --test                     # idem + test headless
-    python build_dist.py --skip-msi --skip-deb      # sans les installeurs
+Examples:
+    python build_dist.py                            # all artifacts
+    python build_dist.py --test                     # same + headless test
+    python build_dist.py --skip-msi --skip-deb      # without the installers
     python build_dist.py --skip-native --skip-appimage --skip-msi --skip-deb
-                                                    # juste le binaire Linux nu
-    python build_dist.py --native-only              # juste le binaire natif (aucun Docker)
-    python build_dist.py --plugins-only             # juste les .kdext (ni cargo ni Docker)
-    python build_dist.py --msi-only                 # juste les .kdext + le MSI (aucun Docker)
-    python build_dist.py --msi-only --skip-plugins  # juste le MSI, .kdext de dist/ réutilisés
-    python build_dist.py --deb-only                 # juste les .kdext + le .deb (Docker)
-    python build_dist.py --compile-only             # vérif compilation Linux seule
-    python build_dist.py --channel public           # artefacts du canal public
-    python build_dist.py --channel all              # canaux public et local en une passe
+                                                    # just the bare Linux binary
+    python build_dist.py --native-only              # just the native binary (no Docker)
+    python build_dist.py --plugins-only             # just the .kdext (neither cargo nor Docker)
+    python build_dist.py --msi-only                 # just the .kdext + the MSI (no Docker)
+    python build_dist.py --msi-only --skip-plugins  # just the MSI, .kdext from dist/ reused
+    python build_dist.py --deb-only                 # just the .kdext + the .deb (Docker)
+    python build_dist.py --compile-only             # Linux compile check only
+    python build_dist.py --channel public           # public channel artifacts
+    python build_dist.py --channel all              # public and local channels in one pass
 """
 
 import argparse
@@ -131,7 +132,7 @@ def flag(name: str) -> str:
 def run(cmd: list[str], **kwargs) -> None:
     result = subprocess.run(cmd, cwd=REPO_ROOT, **kwargs)
     if result.returncode != 0:
-        sys.exit(f"Commande en échec (exit {result.returncode}) : {' '.join(cmd)}")
+        sys.exit(f"Command failed (exit {result.returncode}): {' '.join(cmd)}")
 
 
 def assert_docker_running() -> None:
@@ -140,14 +141,14 @@ def assert_docker_running() -> None:
         capture_output=True,
     )
     if probe.returncode != 0:
-        sys.exit("Le daemon Docker ne répond pas (arrêté ?). Démarre-le puis relance ce script.")
+        sys.exit("The Docker daemon is not responding (stopped?). Start it, then rerun this script.")
 
 
 def project_version() -> str:
     content = (REPO_ROOT / "src-tauri" / "Cargo.toml").read_text(encoding="utf-8")
     m = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
     if not m:
-        sys.exit("Impossible de lire la version dans src-tauri/Cargo.toml")
+        sys.exit("Cannot read the version from src-tauri/Cargo.toml")
     return m.group(1)
 
 
@@ -164,12 +165,12 @@ def pack_plugins() -> None:
         d for d in plugins_root.iterdir() if (d / "manifest.json").is_file()
     ) if plugins_root.is_dir() else []
     if not plugin_dirs:
-        sys.exit("Aucun plugin empaquetable : pas de dossier avec manifest.json dans plugins/.")
+        sys.exit("No plugin to pack: no folder with a manifest.json in plugins/.")
 
-    say(f"== Empaquetage des plugins ({len(plugin_dirs)}) ==")
+    say(f"== Packing plugins ({len(plugin_dirs)}) ==")
     for plugin_dir in plugin_dirs:
         run([sys.executable, str(REPO_ROOT / "pack_plugin.py"), str(plugin_dir)])
-    say(f"== {len(plugin_dirs)} plugin(s) publiés dans dist/ (versionné + twin) ==", "32")
+    say(f"== {len(plugin_dirs)} plugin(s) published to dist/ (versioned + twin) ==", "32")
 
 
 def channel_strategy(channel: str) -> Path:
@@ -221,8 +222,8 @@ def collect_plugins(ids: list[str], release_dir: Path | None) -> None:
     for plugin_id in ids:
         archive = newest(f"{plugin_id}-[0-9]*.kdext")
         if archive is None:
-            sys.exit(f"Archive versionnée de « {plugin_id} » introuvable dans dist/ "
-                     "(relancer sans --skip-plugins).")
+            sys.exit(f"Versioned archive of \"{plugin_id}\" not found in dist/ "
+                     "(rerun without --skip-plugins).")
         collect(archive, release_dir)
 
 
@@ -235,8 +236,8 @@ def check_staged(ids: list[str], label: str) -> None:
     """
     staged = sorted(p.stem for p in (REPO_ROOT / "src-tauri" / "bundled-plugins").glob("*.kdext"))
     if staged != sorted(ids):
-        sys.exit(f"{label} : plugins embarqués {staged} ≠ stratégie du canal {sorted(ids)} "
-                 "— artefact à ne pas publier.")
+        sys.exit(f"{label}: embedded plugins {staged} ≠ channel strategy {sorted(ids)} "
+                 "— do not publish this artifact.")
 
 
 def main() -> None:
@@ -245,33 +246,33 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--skip-image-build", action="store_true",
-                        help="ne pas reconstruire l'image Docker (rapide de toute façon grâce au cache de layers)")
+                        help="do not rebuild the Docker image (fast anyway thanks to the layer cache)")
     parser.add_argument("--skip-plugins", action="store_true",
-                        help="ne pas (ré)empaqueter les .kdext des plugins ; le MSI et le .deb réutilisent alors ceux déjà dans dist/")
+                        help="do not (re)pack the plugins' .kdext; the MSI and the .deb then reuse those already in dist/")
     parser.add_argument("--skip-native", action="store_true",
-                        help="ne pas builder le binaire natif de l'hôte")
+                        help="do not build the host's native binary")
     parser.add_argument("--skip-msi", action="store_true",
-                        help="ne pas construire l'installeur MSI (sans effet hors Windows, où il est sauté d'office)")
+                        help="do not build the MSI installer (no effect outside Windows, where it is always skipped)")
     parser.add_argument("--skip-appimage", action="store_true",
-                        help="ne pas construire l'AppImage")
+                        help="do not build the AppImage")
     parser.add_argument("--skip-binary", action="store_true",
-                        help="ne pas extraire le binaire Linux nu dans dist/")
+                        help="do not extract the bare Linux binary into dist/")
     parser.add_argument("--skip-deb", action="store_true",
-                        help="ne pas construire le paquet Debian/Ubuntu .deb")
+                        help="do not build the Debian/Ubuntu .deb package")
     parser.add_argument("--native-only", action="store_true",
-                        help="ne builder que le binaire natif de l'hôte (aucun Docker requis)")
+                        help="build only the host's native binary (no Docker required)")
     parser.add_argument("--plugins-only", action="store_true",
-                        help="n'empaqueter que les plugins (aucun cargo, aucun Docker)")
+                        help="pack only the plugins (no cargo, no Docker)")
     parser.add_argument("--msi-only", action="store_true",
-                        help="ne construire que les plugins et le MSI (aucun Docker)")
+                        help="build only the plugins and the MSI (no Docker)")
     parser.add_argument("--deb-only", action="store_true",
-                        help="ne construire que les plugins et le .deb (Docker requis)")
+                        help="build only the plugins and the .deb (Docker required)")
     parser.add_argument("--compile-only", action="store_true",
-                        help="juste un `cargo build` (debug) de vérification dans le conteneur, aucun artefact")
+                        help="just a check `cargo build` (debug) in the container, no artifact")
     parser.add_argument("--channel", choices=(*CHANNELS, "all"), default="local",
-                        help="canal de distribution : stratégie d'embarquement des plugins du MSI/.deb ; public = recopie aussi dans dist/public/<version>/ ; all = public puis local, installeurs construits deux fois (défaut : local)")
+                        help="distribution channel: plugin bundling strategy of the MSI/.deb; public = also copies into dist/public/<version>/; all = public then local, installers built twice (default: local)")
     parser.add_argument("--test", action="store_true",
-                        help="après le build, test runtime headless sur l'AppImage (ou le binaire nu si --skip-appimage)")
+                        help="after the build, headless runtime test on the AppImage (or the bare binary if --skip-appimage)")
     args = parser.parse_args()
 
     # Mémorisé avant que les --*-only ne forcent les autres skips, pour que les
@@ -280,16 +281,16 @@ def main() -> None:
 
     selected = [name for name in ONLY_MODES if getattr(args, name)]
     if len(selected) > 1:
-        parser.error("les options --*-only s'excluent : " + ", ".join(flag(n) for n in selected))
+        parser.error("the --*-only options are mutually exclusive: " + ", ".join(flag(n) for n in selected))
 
     only_flag = None
     if selected:
         only_flag = flag(selected[0])
         isolated, kept = ONLY_MODES[selected[0]]
         if args.test:
-            parser.error(f"{only_flag} est incompatible avec --test")
+            parser.error(f"{only_flag} is incompatible with --test")
         if isolated in explicit_skips:
-            parser.error(f"{only_flag} est incompatible avec {flag('skip_' + isolated)}")
+            parser.error(f"{only_flag} is incompatible with {flag('skip_' + isolated)}")
         for step in STEPS:
             if step not in kept:
                 setattr(args, f"skip_{step}", True)
@@ -299,14 +300,14 @@ def main() -> None:
     msi_skip_reason = None
     if not IS_WINDOWS and not args.skip_msi:
         if args.msi_only:
-            parser.error("--msi-only : l'installeur MSI ne se construit que sous Windows (WiX v3 n'y tourne que là)")
+            parser.error("--msi-only: the MSI installer can only be built on Windows (WiX v3 only runs there)")
         args.skip_msi = True
-        msi_skip_reason = "WiX v3 ne tourne que sous Windows"
+        msi_skip_reason = "WiX v3 only runs on Windows"
 
     def skipped(label: str, step: str, reason: str | None = None) -> None:
         if reason is None:
             reason = flag(f"skip_{step}") if step in explicit_skips else (only_flag or flag(f"skip_{step}"))
-        say(f"== {label} : sauté ({reason}) ==", "33")
+        say(f"== {label}: skipped ({reason}) ==", "33")
 
     needs_docker = (
         args.compile_only
@@ -327,7 +328,7 @@ def main() -> None:
     for name in (("public", "local") if args.channel == "all" else (args.channel,)):
         strategy = channel_strategy(name)
         channels.append((name, strategy.relative_to(REPO_ROOT).as_posix(), strategy_ids(strategy)))
-        say(f"== Canal {name} : {channels[-1][1]} ({', '.join(channels[-1][2]) or 'aucun plugin'}) ==")
+        say(f"== Channel {name}: {channels[-1][1]} ({', '.join(channels[-1][2]) or 'no plugin'}) ==")
     public = next((c for c in channels if c[0] == "public"), None)
     # Les artefacts sans plugin (binaires, AppImage) sont les mêmes pour tous
     # les canaux : ils ne sont construits qu'une fois, et recopiés si le canal
@@ -339,7 +340,7 @@ def main() -> None:
         for name, rel, ids in channels:
             os.environ[STRATEGY_ENV] = rel
             if len(channels) > 1:
-                say(f"== {label} : canal {name} ==")
+                say(f"== {label}: {name} channel ==")
             yield name, rel, ids, (release_dir if name == "public" else None)
 
     # Les plugins d'abord : quelques centaines de ms, sans cargo ni Docker.
@@ -358,16 +359,16 @@ def main() -> None:
     # qu'on attend le plus souvent. Une étape Docker lente ou en panne (daemon
     # arrêté, image à retélécharger) ne doit ni le retarder ni l'empêcher.
     if args.skip_native:
-        skipped("Binaire natif", "native")
+        skipped("Native binary", "native")
     else:
-        say("== Build natif (cargo build-app, release LTO : compter ~2 min) ==")
+        say("== Native build (cargo build-app, LTO release: allow ~2 min) ==")
         run(["cargo", "build-app"])
         native = (newest(f"kroki_deskapp-{version}.exe") if IS_WINDOWS
                   else newest(f"kroki_deskapp-{version}-linux-*", (".AppImage", ".deb")))
         if native is None:
-            sys.exit(f"Build terminé mais aucun binaire natif version {version} trouvé dans dist/.")
+            sys.exit(f"Build finished but no native binary for version {version} found in dist/.")
         collect(native, release_dir)
-        say("== Binaire natif publié dans dist/ (versionné + twin, cf. publish_dist) ==", "32")
+        say("== Native binary published to dist/ (versioned + twin, see publish_dist) ==", "32")
     if args.native_only:
         return
 
@@ -375,50 +376,50 @@ def main() -> None:
     # no-op. Avant Docker, comme le natif — c'est un artefact Windows, rien de
     # ce qui suit ne doit pouvoir l'empêcher.
     if args.skip_msi:
-        skipped("Installeur MSI", "msi", msi_skip_reason)
+        skipped("MSI installer", "msi", msi_skip_reason)
     else:
-        for name, _, ids, channel_dir in per_channel("Installeur MSI"):
-            say("== Build de l'installeur MSI (cargo build-msi, WiX v3) ==")
+        for name, _, ids, channel_dir in per_channel("MSI installer"):
+            say("== Building the MSI installer (cargo build-msi, WiX v3) ==")
             run(["cargo", "build-msi"])
             check_staged(ids, f"MSI ({name})")
             msi = newest(f"kroki_deskapp-{version}.msi")
             if msi is None:
-                sys.exit(f"Build terminé mais aucun MSI version {version} trouvé dans dist/.")
+                sys.exit(f"Build finished but no MSI for version {version} found in dist/.")
             collect(msi, channel_dir)
-            say("== MSI publié dans dist/ (versionné + twin) ==", "32")
+            say("== MSI published to dist/ (versioned + twin) ==", "32")
     if args.msi_only:
         return
 
     if needs_docker:
-        say("== Vérification du daemon Docker ==")
+        say("== Checking the Docker daemon ==")
         assert_docker_running()
 
         if not args.skip_image_build:
-            say(f"== Construction de l'image {IMAGE_NAME} ==")
+            say(f"== Building the {IMAGE_NAME} image ==")
             run(["docker", "build", "-t", IMAGE_NAME, "-f", "scripts/Dockerfile.linux", "."])
         else:
-            say("== Image Docker : build sauté (--skip-image-build) ==", "33")
+            say("== Docker image: build skipped (--skip-image-build) ==", "33")
 
     if args.compile_only:
-        say("== Compilation seule (cargo build) ==")
+        say("== Compile only (cargo build) ==")
         run(["docker", "run", "--rm", *COMMON_VOLUMES,
              "-e", "CARGO_TARGET_DIR=/target", IMAGE_NAME, "cargo", "build"])
-        say("== Compilation OK ==", "32")
+        say("== Compile OK ==", "32")
         return
 
     if args.skip_appimage:
         skipped("AppImage", "appimage")
     else:
-        say("== Build de l'AppImage ==")
+        say("== Building the AppImage ==")
         run(["docker", "run", "--rm", *COMMON_VOLUMES,
              "-v", "kroki_cache:/root/.cache",
              IMAGE_NAME, "bash", "/app/scripts/linux_appimage_build.sh"])
 
     linux_binary = None
     if args.skip_binary:
-        skipped("Binaire Linux nu", "binary")
+        skipped("Bare Linux binary", "binary")
     else:
-        say("== Extraction du binaire Linux nu (parallèle de kroki_deskapp.exe) ==")
+        say("== Extracting the bare Linux binary (counterpart of kroki_deskapp.exe) ==")
         # cargo build-app (xtask) rebuilde si besoin (no-op si le build AppImage
         # vient de compiler le release) et publie le binaire + le twin non
         # versionné, suffixés du tag distro (debian12 dans le conteneur).
@@ -435,11 +436,11 @@ def main() -> None:
             reverse=True,
         )
         if not candidates:
-            sys.exit(f"Build terminé mais aucun binaire Linux version {version} trouvé dans dist/.")
+            sys.exit(f"Build finished but no Linux binary for version {version} found in dist/.")
         linux_binary = candidates[0]
         collect(linux_binary, release_dir)
-        say(f"== Binaire Linux : dist/{linux_binary.name} ==", "32")
-        say("   (semi-dynamique : la machine cible doit avoir libwebkit2gtk-4.1 installé ; penser à 'chmod +x' une fois transféré)", "90")
+        say(f"== Linux binary: dist/{linux_binary.name} ==", "32")
+        say("   (semi-dynamic: the target machine must have libwebkit2gtk-4.1 installed; remember to 'chmod +x' it once transferred)", "90")
 
     appimage = None
     if not args.skip_appimage:
@@ -450,43 +451,43 @@ def main() -> None:
             reverse=True,
         )
         if not candidates:
-            sys.exit(f"Build terminé mais aucune AppImage version {version} trouvée dans dist/.")
+            sys.exit(f"Build finished but no AppImage for version {version} found in dist/.")
         appimage = candidates[0]
         collect(appimage, release_dir)
-        say(f"== AppImage produite : {appimage} ==", "32")
+        say(f"== AppImage built: {appimage} ==", "32")
 
     # Le .deb en dernier des artefacts Linux : il relance un build release, qui
     # est alors un no-op si l'AppImage ou le binaire nu vient de compiler, et sa
     # publication ne doit pas s'intercaler dans les recherches d'artefacts
     # ci-dessus (le nom du paquet a le même préfixe que celui du binaire nu).
     if args.skip_deb:
-        skipped("Paquet .deb", "deb")
+        skipped(".deb package", "deb")
     else:
-        for name, rel, ids, channel_dir in per_channel("Paquet .deb"):
-            say("== Build du paquet Debian/Ubuntu (cargo build-deb) ==")
+        for name, rel, ids, channel_dir in per_channel(".deb package"):
+            say("== Building the Debian/Ubuntu package (cargo build-deb) ==")
             run(["docker", "run", "--rm", *COMMON_VOLUMES,
                  "-e", f"{STRATEGY_ENV}={rel}",
                  IMAGE_NAME, "bash", "/app/scripts/linux_deb_build.sh"])
             check_staged(ids, f".deb ({name})")
             deb = newest(f"kroki_deskapp-{version}-linux-*.deb")
             if deb is None:
-                sys.exit(f"Build terminé mais aucun paquet .deb version {version} trouvé dans dist/.")
+                sys.exit(f"Build finished but no .deb package for version {version} found in dist/.")
             collect(deb, channel_dir)
-            say(f"== Paquet .deb : dist/{deb.name} ==", "32")
-        say("   (installation : sudo apt install ./<paquet>.deb — apt résout les dépendances, pas dpkg -i)", "90")
+            say(f"== .deb package: dist/{deb.name} ==", "32")
+        say("   (install: sudo apt install ./<package>.deb — apt resolves dependencies, dpkg -i does not)", "90")
 
     if args.test:
         target = appimage or linux_binary
         if target is None:
-            sys.exit("--test requiert l'AppImage ou le binaire Linux nu (retirer --skip-appimage ou --skip-binary).")
+            sys.exit("--test requires the AppImage or the bare Linux binary (remove --skip-appimage or --skip-binary).")
         test_target = target.name
-        say(f"== Test runtime headless sur {test_target} ==")
+        say(f"== Headless runtime test on {test_target} ==")
         run(["docker", "run", "--rm", "-e", f"APP=/app/dist/{test_target}",
              *COMMON_VOLUMES, IMAGE_NAME, "bash", "/app/scripts/linux_runtime_run.sh"])
-        say("== Test runtime OK ==", "32")
+        say("== Runtime test OK ==", "32")
 
     if release_dir is not None and release_dir.is_dir():
-        say(f"== Canal public : dist/public/{version}/ ==", "32")
+        say(f"== Public channel: dist/public/{version}/ ==", "32")
         for artifact in sorted(release_dir.iterdir()):
             say(f"   {artifact.name}", "90")
 

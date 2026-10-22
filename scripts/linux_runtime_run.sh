@@ -13,12 +13,12 @@ export APPIMAGE_EXTRACT_AND_RUN=1
 
 # --- Compilation si nécessaire ---
 if [ ! -x "$APP" ]; then
-  echo "== Binaire absent, compilation (cargo build) =="
-  (cd /app/src-tauri && cargo build) || { echo "!! échec de compilation"; exit 1; }
+  echo "== Binary missing, compiling (cargo build) =="
+  (cd /app/src-tauri && cargo build) || { echo "!! build failed"; exit 1; }
 fi
 
 # --- Display virtuel ---
-echo "== Démarrage de Xvfb =="
+echo "== Starting Xvfb =="
 Xvfb :99 -screen 0 1280x1024x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
 XVFB_PID=$!
 export DISPLAY=:99
@@ -29,7 +29,7 @@ for i in $(seq 1 20); do
 done
 
 # --- Session D-Bus ---
-echo "== Démarrage de D-Bus =="
+echo "== Starting D-Bus =="
 eval "$(dbus-launch --sh-syntax)"
 export DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID
 
@@ -40,20 +40,20 @@ export LIBGL_ALWAYS_SOFTWARE=1
 export GDK_BACKEND=x11
 export NO_AT_BRIDGE=1
 
-echo "== Lancement de l'app en headless =="
+echo "== Launching the app headless =="
 "$APP" >/tmp/app.log 2>&1 &
 APP_PID=$!
 
-echo "== Attente du serveur Kroki local (127.0.0.1:8442) =="
+echo "== Waiting for the local Kroki server (127.0.0.1:8442) =="
 ready=0
 for i in $(seq 1 80); do
   if curl -sf -m 2 http://127.0.0.1:8442/health >/dev/null 2>&1; then
     ready=1
-    echo "Serveur prêt après ~$((i / 2))s."
+    echo "Server ready after ~$((i / 2))s."
     break
   fi
   if ! kill -0 "$APP_PID" 2>/dev/null; then
-    echo "!! L'app s'est arrêtée prématurément. Log complet :"
+    echo "!! The app exited prematurely. Full log:"
     cat /tmp/app.log
     kill "$XVFB_PID" 2>/dev/null
     exit 1
@@ -62,19 +62,19 @@ for i in $(seq 1 80); do
 done
 
 if [ "$ready" -ne 1 ]; then
-  echo "!! Timeout : le serveur n'a pas répondu. Logs :"
+  echo "!! Timeout: the server did not respond. Logs:"
   echo "--- app.log ---"; cat /tmp/app.log
   echo "--- xvfb.log ---"; cat /tmp/xvfb.log
   kill "$APP_PID" "$XVFB_PID" 2>/dev/null
   exit 1
 fi
 
-echo "== Test des moteurs =="
+echo "== Engine tests =="
 node /app/scripts/linux_runtime_test.mjs
 TEST_RC=$?
 
 echo ""
-echo "== app.log (dernières lignes) =="
+echo "== app.log (last lines) =="
 tail -n 25 /tmp/app.log
 
 kill "$APP_PID" "$XVFB_PID" 2>/dev/null

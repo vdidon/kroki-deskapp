@@ -31,13 +31,13 @@ const BPMN = `<?xml version="1.0" encoding="UTF-8"?>
 
 // [type, source, famille] — famille pour le résumé
 const cases = [
-  ["svgbob", "  +--->\n  |", "natif Rust"],
-  ["pikchr", "box \"hello\"", "natif Rust"],
+  ["svgbob", "  +--->\n  |", "native Rust"],
+  ["pikchr", "box \"hello\"", "native Rust"],
   ["mermaid", "graph TD; A-->B; B-->C", "JS/WASM"],
   ["graphviz", "digraph { a -> b -> c }", "WASM"],
   ["d2", "a -> b -> c", "WASM (worker blob)"],
   ["dbml", "Table u {\n id int [pk]\n}\nTable r {\n id int [pk]\n}\nRef: u.id > r.id", "JS→DOT→WASM"],
-  ["bpmn", BPMN, "JS hors-écran"],
+  ["bpmn", BPMN, "JS offscreen"],
   ["vegalite", VEGALITE, "JS (expr interp)"],
   ["nomnoml", "[A] -> [B]", "JS/Canvas"],
 ];
@@ -49,11 +49,11 @@ for (const [type, src, fam] of cases) {
     const txt = await r.text();
     const ok = r.ok && txt.includes("<svg");
     if (ok) okCount++;
-    console.log(`${type.padEnd(9)} [${fam.padEnd(18)}] : ${ok ? "OK   " : "ÉCHEC"} (HTTP ${r.status}, ${txt.length} car.)`);
+    console.log(`${type.padEnd(9)} [${fam.padEnd(18)}]: ${ok ? "OK  " : "FAIL"} (HTTP ${r.status}, ${txt.length} chars)`);
     if (!ok) console.log("   →", txt.slice(0, 400).replace(/\s+/g, " "));
   } catch (e) {
-    console.log(`${type.padEnd(9)} [${fam.padEnd(18)}] : ÉCHEC réseau — ${e.message}`);
+    console.log(`${type.padEnd(9)} [${fam.padEnd(18)}]: network FAIL — ${e.message}`);
   }
 }
-console.log(`\nRésultat : ${okCount}/${cases.length} moteurs OK`);
+console.log(`\nResult: ${okCount}/${cases.length} engines OK`);
 process.exit(okCount === cases.length ? 0 : 2);

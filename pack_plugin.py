@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Empaquette un dossier de plugin en archive .kdext (zip, manifest.json à la
-racine) → dist/<id>-<version>.kdext + twin non versionné <id>.kdext.
+"""Packs a plugin folder into a .kdext archive (zip, manifest.json at the
+root) → dist/<id>-<version>.kdext + unversioned twin <id>.kdext.
 
     python pack_plugin.py plugins/latex-doc
 
-Sélection des fichiers : champ optionnel `packInclude` du manifest.json —
-liste explicite de chemins relatifs POSIX (ex. "vendor/highlight.esm.js") ;
-seuls ces fichiers sont embarqués, `manifest.json` et l'`entry` étant
-toujours inclus d'office ; un chemin listé introuvable est une erreur.
-Champ d'empaquetage uniquement, ignoré par l'hôte. Absent → tout le dossier
-(hors fichiers cachés, __pycache__ et dist/).
+File selection: optional `packInclude` field of manifest.json — explicit
+list of relative POSIX paths (e.g. "vendor/highlight.esm.js"); only those
+files are packed, `manifest.json` and the `entry` being always included;
+a listed path that does not exist is an error. Packaging-only field,
+ignored by the host. Absent → the whole folder (except hidden files,
+__pycache__ and dist/).
 
-Installation : glisser le .kdext sur une fenêtre de Kroki Desk (dialog de
-confiance), ou bouton « Ajouter un plugin… » du dialog Plugins.
-Boucle de dev sans repack : copier le dossier tel quel dans
-%APPDATA%\\kroki-deskapp\\plugins\\<id>\\ puis relancer l'app.
+Installation: drop the .kdext onto a Kroki Desk window (trust dialog), or
+the "Add a plugin…" button of the Plugins dialog.
+Dev loop without repacking: copy the folder as is into
+%APPDATA%\\kroki-deskapp\\plugins\\<id>\\ then restart the app.
 """
 
 import argparse
@@ -27,17 +27,17 @@ from pathlib import Path
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("plugin_dir", help="dossier du plugin (contenant manifest.json)")
+    parser.add_argument("plugin_dir", help="plugin folder (containing manifest.json)")
     args = parser.parse_args()
 
     plugin_dir = Path(args.plugin_dir).resolve()
     manifest_path = plugin_dir / "manifest.json"
     if not manifest_path.is_file():
-        sys.exit(f"manifest.json introuvable dans {plugin_dir}")
+        sys.exit(f"manifest.json not found in {plugin_dir}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     plugin_id, version = manifest.get("id"), manifest.get("version")
     if not plugin_id or not version:
-        sys.exit("manifest.json : champs id/version requis")
+        sys.exit("manifest.json: id/version fields required")
 
     # packInclude : liste explicite des fichiers à embarquer (chemins relatifs
     # POSIX) ; manifest.json et l'entry sont toujours inclus d'office.
@@ -45,7 +45,7 @@ def main() -> None:
     if files is not None and (
         not isinstance(files, list) or not all(isinstance(f, str) for f in files)
     ):
-        sys.exit("manifest.json : packInclude doit être une liste de chemins relatifs")
+        sys.exit("manifest.json: packInclude must be a list of relative paths")
 
     repo_root = Path(__file__).resolve().parent
     dist = repo_root / "dist"
@@ -75,7 +75,7 @@ def main() -> None:
             for rel_posix in selection:
                 path = plugin_dir / rel_posix
                 if not path.is_file():
-                    sys.exit(f"packInclude : fichier introuvable : {rel_posix}")
+                    sys.exit(f"packInclude: file not found: {rel_posix}")
                 zf.write(path, rel_posix)
                 packed += 1
         else:
@@ -92,8 +92,8 @@ def main() -> None:
     except OSError:
         shutil.copyfile(kdext, twin)
 
-    print(f"OK : {kdext} ({packed} fichiers)")
-    print(f"     {twin}")
+    print(f"OK: {kdext} ({packed} files)")
+    print(f"    {twin}")
 
 
 if __name__ == "__main__":

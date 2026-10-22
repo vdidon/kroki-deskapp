@@ -16,4 +16,4 @@ export CARGO_TARGET_DIR=/target
 cd /app
 cargo build-appimage
 
-echo "== AppImage disponible dans dist/ (versionnée + fichier non versionné) =="
+echo "== AppImage available in dist/ (versioned + unversioned twin) =="

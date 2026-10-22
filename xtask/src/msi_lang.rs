@@ -108,12 +108,8 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
     let base = find(&format!("_{}.msi", BASE.tag));
     let base_code = product_code(&base);
     let out = bundle_dir.join(format!("{}-{version}-multilingual.msi", crate::BIN_NAME));
-    std::fs::copy(&base, &out).unwrap_or_else(|e| {
-        die(&format!(
-            "build-msi : copie de {} impossible : {e}",
-            base.display()
-        ))
-    });
+    std::fs::copy(&base, &out)
+        .unwrap_or_else(|e| die(&format!("build-msi: cannot copy {}: {e}", base.display())));
 
     let torch = torch_exe();
     let transform = |target: &Path, lcid: u32, label: &str| {
@@ -125,7 +121,7 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
                 .arg(target)
                 .arg("-out")
                 .arg(&mst),
-            &format!("build-msi : torch {label}"),
+            &format!("build-msi: torch {label}"),
         );
         embed_transform(&out, &lcid.to_string(), &mst);
         let _ = std::fs::remove_file(&mst);
@@ -137,12 +133,8 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
     // identiques : la copie porte une propriété de plus, inerte, qui est toute
     // la différence.
     let tagged = bundle_dir.join(format!("{}.msi", BASE.lcid));
-    std::fs::copy(&base, &tagged).unwrap_or_else(|e| {
-        die(&format!(
-            "build-msi : copie de {} impossible : {e}",
-            base.display()
-        ))
-    });
+    std::fs::copy(&base, &tagged)
+        .unwrap_or_else(|e| die(&format!("build-msi: cannot copy {}: {e}", base.display())));
     add_property(
         &tagged,
         "KrokiDeskInstallerLanguage",
@@ -157,8 +149,8 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
         let code = product_code(&localized);
         if code != base_code {
             die(&format!(
-                "build-msi : ProductCode différent entre {} ({base_code}) et {} ({code}) — \
-                 une transform de langue ne peut pas changer l'identité du produit",
+                "build-msi: ProductCode differs between {} ({base_code}) and {} ({code}) — \
+                 a language transform cannot change the product identity",
                 base.display(),
                 localized.display()
             ));
@@ -172,7 +164,7 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
     }
     set_languages(&out, &lcids);
     eprintln!(
-        "xtask : MSI multilingue ({}) → {}",
+        "xtask: multilingual MSI ({}) → {}",
         lcids.join(", "),
         out.display()
     );
@@ -183,11 +175,11 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
 fn torch_exe() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
-        .unwrap_or_else(|| die("build-msi : LOCALAPPDATA non défini"));
+        .unwrap_or_else(|| die("build-msi: LOCALAPPDATA not set"));
     let torch = base.join("tauri").join("WixTools314").join("torch.exe");
     if !torch.is_file() {
         die(&format!(
-            "build-msi : {} introuvable (WiX 3 téléchargé par tauri build)",
+            "build-msi: {} not found (WiX 3 is downloaded by tauri build)",
             torch.display()
         ));
     }
@@ -209,14 +201,14 @@ impl Drop for Handle {
 
 fn check(rc: u32, what: &str) {
     if rc != ERROR_SUCCESS {
-        die(&format!("build-msi : {what} (msi.dll, code {rc})"));
+        die(&format!("build-msi: {what} (msi.dll, code {rc})"));
     }
 }
 
 fn open(path: &Path, mode: PCWSTR) -> Handle {
     let mut h = MSIHANDLE(0);
     let rc = unsafe { MsiOpenDatabaseW(&HSTRING::from(path.as_os_str()), mode, &mut h) };
-    check(rc, &format!("ouverture de {}", path.display()));
+    check(rc, &format!("opening {}", path.display()));
     Handle(h)
 }
 
@@ -246,7 +238,7 @@ fn record_string(rec: &Handle, field: u32) -> String {
     len += 1;
     let rc =
         unsafe { MsiRecordGetStringW(rec.0, field, Some(PWSTR(buf.as_mut_ptr())), Some(&mut len)) };
-    check(rc, "lecture d'un enregistrement");
+    check(rc, "reading a record");
     String::from_utf16_lossy(&buf[..len as usize])
 }
 
@@ -258,7 +250,7 @@ fn product_code(msi: &Path) -> String {
     );
     let mut rec = MSIHANDLE(0);
     let rc = unsafe { MsiViewFetch(v.0, &mut rec) };
-    check(rc, &format!("ProductCode de {}", msi.display()));
+    check(rc, &format!("ProductCode of {}", msi.display()));
     record_string(&Handle(rec), 1)
 }
 
@@ -270,18 +262,18 @@ fn add_property(msi: &Path, name: &str, value: &str) {
         let rec = Handle(unsafe { MsiCreateRecord(2) });
         check(
             unsafe { MsiRecordSetStringW(rec.0, 1, &HSTRING::from(name)) },
-            "nom de la propriété",
+            "property name",
         );
         check(
             unsafe { MsiRecordSetStringW(rec.0, 2, &HSTRING::from(value)) },
-            "valeur de la propriété",
+            "property value",
         );
         check(
             unsafe { MsiViewModify(v.0, MSIMODIFY_ASSIGN, rec.0) },
-            &format!("ajout de la propriété {name}"),
+            &format!("adding property {name}"),
         );
     }
-    check(unsafe { MsiDatabaseCommit(db.0) }, "commit de la propriété");
+    check(unsafe { MsiDatabaseCommit(db.0) }, "property commit");
 }
 
 /// Ajoute `mst` à la table `_Storages` de `msi` sous le nom `name`.
@@ -292,18 +284,18 @@ fn embed_transform(msi: &Path, name: &str, mst: &Path) {
         let rec = Handle(unsafe { MsiCreateRecord(2) });
         check(
             unsafe { MsiRecordSetStringW(rec.0, 1, &HSTRING::from(name)) },
-            "nom de la transform",
+            "transform name",
         );
         check(
             unsafe { MsiRecordSetStreamW(rec.0, 2, &HSTRING::from(mst.as_os_str())) },
-            &format!("lecture de {}", mst.display()),
+            &format!("reading {}", mst.display()),
         );
         check(
             unsafe { MsiViewModify(v.0, MSIMODIFY_ASSIGN, rec.0) },
-            &format!("insertion de la transform {name}"),
+            &format!("inserting transform {name}"),
         );
     }
-    check(unsafe { MsiDatabaseCommit(db.0) }, "commit de la transform");
+    check(unsafe { MsiDatabaseCommit(db.0) }, "transform commit");
 }
 
 /// *Template* du résumé : plateforme d'origine conservée, langues remplacées
@@ -314,7 +306,7 @@ fn set_languages(msi: &Path, lcids: &[String]) {
         let mut si = MSIHANDLE(0);
         check(
             unsafe { MsiGetSummaryInformationW(db.0, PCWSTR::null(), 1, &mut si) },
-            "ouverture du résumé",
+            "opening the summary information",
         );
         let si = Handle(si);
         let (mut kind, mut int) = (0u32, 0i32);
@@ -332,7 +324,7 @@ fn set_languages(msi: &Path, lcids: &[String]) {
                     Some(&mut len),
                 )
             },
-            "lecture du Template",
+            "reading Template",
         );
         let template = String::from_utf16_lossy(&buf[..len as usize]);
         let platform = template.split(';').next().unwrap_or("x64");
@@ -348,12 +340,15 @@ fn set_languages(msi: &Path, lcids: &[String]) {
                     &HSTRING::from(value.as_str()),
                 )
             },
-            "écriture du Template",
+            "writing Template",
         );
         check(
             unsafe { MsiSummaryInfoPersist(si.0) },
-            "enregistrement du résumé",
+            "persisting the summary information",
         );
     }
-    check(unsafe { MsiDatabaseCommit(db.0) }, "commit du résumé");
+    check(
+        unsafe { MsiDatabaseCommit(db.0) },
+        "summary information commit",
+    );
 }

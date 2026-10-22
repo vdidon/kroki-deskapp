@@ -52,8 +52,8 @@ fn main() {
         "bundled" => gen_bundled(),
         other => {
             eprintln!(
-                "xtask : sous-commande inconnue « {other} » \
-                 (attendu : build | appimage | msi | msi-merge | deb | bundled)"
+                "xtask: unknown subcommand \"{other}\" \
+                 (expected: build | appimage | msi | msi-merge | deb | bundled)"
             );
             exit(2);
         }
@@ -69,7 +69,7 @@ fn gen_bundled() {
     bundled::write_wix_fragment(&repo, &plugins, "bundled");
     let overlay = bundled::write_deb_overlay(&repo, &plugins, "bundled");
     eprintln!(
-        "bundled : src-tauri/wix/plugins.generated.wxs + {}",
+        "bundled: src-tauri/wix/plugins.generated.wxs + {}",
         overlay.display()
     );
 }
@@ -99,7 +99,7 @@ fn build_app(extra: &[String]) {
         // problème sur Linux (limite d'argv ~2 Mo) : on n'y touche pas.
         cargo.env("RUSTC_WRAPPER", "");
     }
-    run_or_die(&mut cargo, "build-app : échec du build release");
+    run_or_die(&mut cargo, "build-app: release build failed");
 
     let version = read_version(&repo);
     let arch = env::consts::ARCH;
@@ -125,8 +125,8 @@ fn build_app(extra: &[String]) {
 fn build_appimage(extra: &[String]) {
     if !cfg!(target_os = "linux") {
         eprintln!(
-            "build-appimage : l'AppImage est un format Linux — lancer sur machine/conteneur \
-             Linux (cf. CLAUDE.md § « Builds Linux »). Sous Windows : cargo build-app."
+            "build-appimage: the AppImage is a Linux format — run on a Linux machine/container \
+             (see CLAUDE.md § \"Linux builds\"). On Windows: cargo build-app."
         );
         exit(1);
     }
@@ -155,7 +155,7 @@ fn build_appimage(extra: &[String]) {
             // rien : les .so des distros sont déjà strippés, et notre binaire
             // l'est par le profil release (strip = true).
             .env("NO_STRIP", "1"),
-        "build-appimage : échec du bundling",
+        "build-appimage: bundling failed",
     );
 
     let version = read_version(&repo);
@@ -179,8 +179,8 @@ fn build_appimage(extra: &[String]) {
 fn build_msi(extra: &[String]) {
     if !cfg!(windows) {
         eprintln!(
-            "build-msi : le MSI ne se construit que sous Windows (WiX v3 n'y tourne \
-             que là). Sur Linux : cargo build-app ou cargo build-appimage."
+            "build-msi: the MSI can only be built on Windows (WiX v3 only runs \
+             there). On Linux: cargo build-app or cargo build-appimage."
         );
         exit(1);
     }
@@ -220,7 +220,7 @@ fn build_msi(extra: &[String]) {
             // Même neutralisation de sccache que build_app : tauri build lance
             // un cargo build --release, qui bute sinon sur web-sys.
             .env("RUSTC_WRAPPER", ""),
-        "build-msi : échec du bundling",
+        "build-msi: bundling failed",
     );
 
     merge_msi();
@@ -232,7 +232,7 @@ fn build_msi(extra: &[String]) {
 /// recompiler ni relancer WiX (mise au point de msi_lang.rs).
 fn merge_msi() {
     if !cfg!(windows) {
-        die("msi-merge : msi.dll et torch n'existent que sous Windows");
+        die("msi-merge: msi.dll and torch only exist on Windows");
     }
     let repo = repo_root();
     // Un MSI par langue (tauri.msi.conf.json, `wix.language`), fusionnés en un
@@ -263,10 +263,10 @@ fn merge_msi() {
 fn build_deb(extra: &[String]) {
     if !cfg!(target_os = "linux") {
         eprintln!(
-            "build-deb : le paquet .deb ne se construit que sous Linux (le bundler y \
-             pose les permissions Unix et assemble l'archive ar) — lancer sur \
-             machine/conteneur Linux (cf. CLAUDE.md § « Builds Linux »). Depuis \
-             Windows : python build_dist.py --deb-only, qui passe par Docker."
+            "build-deb: the .deb package can only be built on Linux (the bundler \
+             sets Unix permissions there and assembles the ar archive) — run on a \
+             Linux machine/container (see CLAUDE.md § \"Linux builds\"). From \
+             Windows: python build_dist.py --deb-only, which goes through Docker."
         );
         exit(1);
     }
@@ -283,7 +283,7 @@ fn build_deb(extra: &[String]) {
             .arg(&overlay)
             .args(extra)
             .current_dir(&repo),
-        "build-deb : échec du bundling",
+        "build-deb: bundling failed",
     );
 
     let version = read_version(&repo);
@@ -331,37 +331,28 @@ fn linux_tag() -> String {
 /// sont supprimés d'abord — jamais d'écriture à travers un ancien hardlink.
 fn publish_dist(repo: &Path, built: &Path, versioned: &str, unversioned: &str) {
     if !built.is_file() {
-        eprintln!("xtask : artefact introuvable : {}", built.display());
+        eprintln!("xtask: artifact not found: {}", built.display());
         exit(1);
     }
     let dist = repo.join("dist");
-    fs::create_dir_all(&dist)
-        .unwrap_or_else(|e| die(&format!("xtask : création de dist/ impossible : {e}")));
+    fs::create_dir_all(&dist).unwrap_or_else(|e| die(&format!("xtask: cannot create dist/: {e}")));
 
     let vpath = dist.join(versioned);
     let upath = dist.join(unversioned);
     let _ = fs::remove_file(&vpath);
-    fs::copy(built, &vpath).unwrap_or_else(|e| {
-        die(&format!(
-            "xtask : copie vers {} impossible : {e}",
-            vpath.display()
-        ))
-    });
+    fs::copy(built, &vpath)
+        .unwrap_or_else(|e| die(&format!("xtask: cannot copy to {}: {e}", vpath.display())));
     let _ = fs::remove_file(&upath);
     let hard = fs::hard_link(&vpath, &upath).is_ok();
     if !hard {
-        fs::copy(&vpath, &upath).unwrap_or_else(|e| {
-            die(&format!(
-                "xtask : copie vers {} impossible : {e}",
-                upath.display()
-            ))
-        });
+        fs::copy(&vpath, &upath)
+            .unwrap_or_else(|e| die(&format!("xtask: cannot copy to {}: {e}", upath.display())));
     }
     make_executable(&vpath);
     make_executable(&upath);
     eprintln!(
-        "xtask : dist/{versioned} + dist/{unversioned} ({})",
-        if hard { "hardlink" } else { "copie" }
+        "xtask: dist/{versioned} + dist/{unversioned} ({})",
+        if hard { "hardlink" } else { "copy" }
     );
 }
 
@@ -384,7 +375,7 @@ fn find_bundle(bundle_dir: &Path, version: &str, ext: &str) -> PathBuf {
         })
         .unwrap_or_else(|| {
             die(&format!(
-                "xtask : aucun artefact {ext} en version {version} dans {}",
+                "xtask: no {ext} artifact for version {version} in {}",
                 bundle_dir.display()
             ))
         })
@@ -393,12 +384,8 @@ fn find_bundle(bundle_dir: &Path, version: &str, ext: &str) -> PathBuf {
 /// Version de l'app — source de vérité unique : src-tauri/Cargo.toml.
 fn read_version(repo: &Path) -> String {
     let manifest = repo.join("src-tauri/Cargo.toml");
-    let content = fs::read_to_string(&manifest).unwrap_or_else(|e| {
-        die(&format!(
-            "xtask : lecture de {} impossible : {e}",
-            manifest.display()
-        ))
-    });
+    let content = fs::read_to_string(&manifest)
+        .unwrap_or_else(|e| die(&format!("xtask: cannot read {}: {e}", manifest.display())));
     content
         .lines()
         .find_map(|l| {
@@ -412,7 +399,7 @@ fn read_version(repo: &Path) -> String {
                 .next()
                 .map(str::to_string)
         })
-        .unwrap_or_else(|| die("xtask : champ version introuvable dans src-tauri/Cargo.toml"))
+        .unwrap_or_else(|| die("xtask: version field not found in src-tauri/Cargo.toml"))
 }
 
 /// Dossier target du crate src-tauri, en honorant CARGO_TARGET_DIR (volume
@@ -434,7 +421,7 @@ fn target_dir(repo: &Path) -> PathBuf {
 fn run_or_die(cmd: &mut Command, context: &str) {
     let status = cmd
         .status()
-        .unwrap_or_else(|e| die(&format!("{context} : lancement impossible : {e}")));
+        .unwrap_or_else(|e| die(&format!("{context}: cannot launch: {e}")));
     if !status.success() {
         exit(status.code().unwrap_or(1));
     }
@@ -448,7 +435,7 @@ fn die(msg: &str) -> ! {
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .expect("xtask/ doit être à la racine du dépôt")
+        .expect("xtask/ must be at the repository root")
         .to_path_buf()
 }
 
@@ -491,8 +478,8 @@ fn soften_gtk_plugin() {
                 .unwrap_or(false);
         if !ok {
             eprintln!(
-                "build-appimage : téléchargement de linuxdeploy-plugin-gtk.sh impossible — \
-                 le bundler le fera, mais le hook forcera GDK_BACKEND=x11 (pas de Wayland pur)."
+                "build-appimage: cannot download linuxdeploy-plugin-gtk.sh — \
+                 the bundler will, but its hook will force GDK_BACKEND=x11 (no pure Wayland)."
             );
             let _ = std::fs::remove_file(&script);
             return;
@@ -511,7 +498,7 @@ fn soften_gtk_plugin() {
         if std::fs::write(&script, patched).is_ok() {
             make_executable(&script);
             eprintln!(
-                "build-appimage : hook GTK adouci (GDK_BACKEND=x11 seulement si DISPLAY existe)."
+                "build-appimage: GTK hook softened (GDK_BACKEND=x11 only if DISPLAY is set)."
             );
         }
     }
@@ -551,8 +538,8 @@ fn ensure_tauri_cli(repo: &Path) -> PathBuf {
     }
 
     eprintln!(
-        "xtask : tauri-cli absent → installation one-shot dans \
-         xtask/target/tools/ (compilation ~10 min, uniquement la première fois)…"
+        "xtask: tauri-cli missing → one-shot install into \
+         xtask/target/tools/ (~10 min build, first time only)…"
     );
     let status = Command::new("cargo")
         .args([
@@ -565,9 +552,9 @@ fn ensure_tauri_cli(repo: &Path) -> PathBuf {
         ])
         .arg(repo.join("xtask/target/tools"))
         .status()
-        .expect("xtask : impossible de lancer cargo install");
+        .expect("xtask: cannot launch cargo install");
     if !status.success() {
-        eprintln!("xtask : échec de l'installation de tauri-cli");
+        eprintln!("xtask: tauri-cli installation failed");
         exit(1);
     }
     local

@@ -105,7 +105,7 @@ pub fn load(repo: &Path, cmd: &str) -> Vec<Plugin> {
             match fs::read_to_string(&p) {
                 Ok(t) => (p, t),
                 Err(e) => die(&format!(
-                    "{cmd} : {STRATEGY_ENV}={} illisible : {e}",
+                    "{cmd}: {STRATEGY_ENV}={} unreadable: {e}",
                     p.display()
                 )),
             }
@@ -116,11 +116,11 @@ pub fn load(repo: &Path, cmd: &str) -> Vec<Plugin> {
             .find_map(|p| fs::read_to_string(&p).ok().map(|t| (p, t)))
             .unwrap_or_else(|| {
                 die(&format!(
-                    "{cmd} : ni {STRATEGY} ni {STRATEGY_DEFAULT} à la racine du dépôt"
+                    "{cmd}: neither {STRATEGY} nor {STRATEGY_DEFAULT} at the repository root"
                 ))
             }),
     };
-    eprintln!("{cmd} : plugins embarqués selon {}", path.display());
+    eprintln!("{cmd}: bundled plugins per {}", path.display());
 
     let mut plugins: Vec<Plugin> = Vec::new();
     for (n, raw) in text.lines().enumerate() {
@@ -132,7 +132,7 @@ pub fn load(repo: &Path, cmd: &str) -> Vec<Plugin> {
             match w {
                 "on" => on = true,
                 other => die(&format!(
-                    "{cmd} : {}:{} : option inconnue « {other} » (attendu : on)",
+                    "{cmd}: {}:{}: unknown option \"{other}\" (expected: on)",
                     path.display(),
                     n + 1
                 )),
@@ -140,7 +140,7 @@ pub fn load(repo: &Path, cmd: &str) -> Vec<Plugin> {
         }
         if plugins.iter().any(|p| p.id == id) {
             die(&format!(
-                "{cmd} : {}:{} : « {id} » listé deux fois",
+                "{cmd}: {}:{}: \"{id}\" listed twice",
                 path.display(),
                 n + 1
             ));
@@ -160,7 +160,7 @@ pub fn load(repo: &Path, cmd: &str) -> Vec<Plugin> {
 fn read_manifest(kdext: &Path, id: &str, cmd: &str) -> (String, Vec<String>) {
     let file = fs::File::open(kdext).unwrap_or_else(|_| {
         die(&format!(
-            "{cmd} : {} manquant — construire d'abord les plugins livrés :\n    \
+            "{cmd}: {} missing — build the shipped plugins first:\n    \
              python build_dist.py --plugins-only",
             kdext.display()
         ))
@@ -173,19 +173,19 @@ fn read_manifest(kdext: &Path, id: &str, cmd: &str) -> (String, Vec<String>) {
         })
         .unwrap_or_else(|e| {
             die(&format!(
-                "{cmd} : manifest.json illisible dans {} : {e}",
+                "{cmd}: unreadable manifest.json in {}: {e}",
                 kdext.display()
             ))
         });
     let m: Value = serde_json::from_str(&text).unwrap_or_else(|e| {
         die(&format!(
-            "{cmd} : manifest.json invalide dans {} : {e}",
+            "{cmd}: invalid manifest.json in {}: {e}",
             kdext.display()
         ))
     });
     if m["id"].as_str() != Some(id) {
         die(&format!(
-            "{cmd} : {} déclare l'id {} au lieu de « {id} »",
+            "{cmd}: {} declares id {} instead of \"{id}\"",
             kdext.display(),
             m["id"]
         ));
@@ -218,16 +218,12 @@ pub fn stage(repo: &Path, plugins: &[Plugin], cmd: &str) {
     // Table rase : un plugin retiré de la stratégie ne doit pas survivre dans
     // un installeur ultérieur.
     let _ = fs::remove_dir_all(&payload);
-    fs::create_dir_all(&payload).unwrap_or_else(|e| {
-        die(&format!(
-            "{cmd} : création de {} impossible : {e}",
-            payload.display()
-        ))
-    });
+    fs::create_dir_all(&payload)
+        .unwrap_or_else(|e| die(&format!("{cmd}: cannot create {}: {e}", payload.display())));
     for p in plugins {
         let kdext = p.archive();
         fs::copy(repo.join("dist").join(&kdext), payload.join(&kdext))
-            .unwrap_or_else(|e| die(&format!("{cmd} : copie de {kdext} impossible : {e}")));
+            .unwrap_or_else(|e| die(&format!("{cmd}: cannot copy {kdext}: {e}")));
     }
 }
 
@@ -240,12 +236,8 @@ pub fn stage(repo: &Path, plugins: &[Plugin], cmd: &str) {
 /// de src-tauri/wix/installer.wxs pour le pourquoi de chaque mécanisme.
 pub fn write_wix_fragment(repo: &Path, plugins: &[Plugin], cmd: &str) {
     let out = repo.join("src-tauri/wix/plugins.generated.wxs");
-    fs::write(&out, wix_fragment(plugins, cmd)).unwrap_or_else(|e| {
-        die(&format!(
-            "{cmd} : écriture de {} impossible : {e}",
-            out.display()
-        ))
-    });
+    fs::write(&out, wix_fragment(plugins, cmd))
+        .unwrap_or_else(|e| die(&format!("{cmd}: cannot write {}: {e}", out.display())));
 }
 
 fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
@@ -327,7 +319,7 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
         let note_h = 228usize.saturating_sub(note_y);
         if note_h < 26 {
             die(&format!(
-                "{cmd} : trop de plugins pour la page du MSI ({} ; 6 au plus)",
+                "{cmd}: too many plugins for the MSI page ({}; 6 at most)",
                 plugins.len()
             ));
         }
@@ -469,7 +461,7 @@ pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf 
     let mut conf: Value = fs::read_to_string(&base)
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_else(|| die(&format!("{cmd} : {} illisible", base.display())));
+        .unwrap_or_else(|| die(&format!("{cmd}: {} unreadable", base.display())));
 
     let mut resources = serde_json::Map::new();
     let mut own_types = String::new();
@@ -477,7 +469,7 @@ pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf 
         .as_array_mut()
         .unwrap_or_else(|| {
             die(&format!(
-                "{cmd} : bundle.fileAssociations absent de {}",
+                "{cmd}: bundle.fileAssociations missing from {}",
                 base.display()
             ))
         });
@@ -516,10 +508,10 @@ pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf 
     // Paquet MIME : le suivi (formats natifs) + les types propres des plugins.
     let mime_base = tauri.join("linux/kroki-desk.xml");
     let xml = fs::read_to_string(&mime_base)
-        .unwrap_or_else(|e| die(&format!("{cmd} : {} illisible : {e}", mime_base.display())));
+        .unwrap_or_else(|e| die(&format!("{cmd}: {} unreadable: {e}", mime_base.display())));
     let close = xml.rfind("</mime-info>").unwrap_or_else(|| {
         die(&format!(
-            "{cmd} : </mime-info> absent de {}",
+            "{cmd}: </mime-info> missing from {}",
             mime_base.display()
         ))
     });
@@ -529,23 +521,15 @@ pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf 
         &xml[close..]
     );
     let mime_out = tauri.join("linux/kroki-desk.generated.xml");
-    fs::write(&mime_out, generated).unwrap_or_else(|e| {
-        die(&format!(
-            "{cmd} : écriture de {} impossible : {e}",
-            mime_out.display()
-        ))
-    });
+    fs::write(&mime_out, generated)
+        .unwrap_or_else(|e| die(&format!("{cmd}: cannot write {}: {e}", mime_out.display())));
     conf["bundle"]["linux"]["deb"]["files"]["/usr/share/mime/packages/kroki-desk.xml"] =
         json!("linux/kroki-desk.generated.xml");
 
     let out = tauri.join("tauri.deb.generated.json");
-    let text = serde_json::to_string_pretty(&conf).expect("sérialisation de l'overlay .deb");
-    fs::write(&out, text + "\n").unwrap_or_else(|e| {
-        die(&format!(
-            "{cmd} : écriture de {} impossible : {e}",
-            out.display()
-        ))
-    });
+    let text = serde_json::to_string_pretty(&conf).expect("serializing the .deb overlay");
+    fs::write(&out, text + "\n")
+        .unwrap_or_else(|e| die(&format!("{cmd}: cannot write {}: {e}", out.display())));
     out
 }
 

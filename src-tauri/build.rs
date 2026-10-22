@@ -34,12 +34,12 @@ fn pack_embedded_plugin() {
 
     let manifest_path = src.join("manifest.json");
     let raw = std::fs::read(&manifest_path)
-        .unwrap_or_else(|e| panic!("{} illisible : {e}", manifest_path.display()));
+        .unwrap_or_else(|e| panic!("{} unreadable: {e}", manifest_path.display()));
     let manifest: serde_json::Value = serde_json::from_slice(&raw)
-        .unwrap_or_else(|e| panic!("{} invalide : {e}", manifest_path.display()));
+        .unwrap_or_else(|e| panic!("{} invalid: {e}", manifest_path.display()));
     let include = manifest["packInclude"].as_array().unwrap_or_else(|| {
         panic!(
-            "{} : packInclude requis pour un plugin embarqué",
+            "{}: packInclude required for an embedded plugin",
             manifest_path.display()
         )
     });
@@ -49,7 +49,7 @@ fn pack_embedded_plugin() {
     for f in include {
         let f = f
             .as_str()
-            .unwrap_or_else(|| panic!("packInclude : chemin attendu, trouvé {f}"));
+            .unwrap_or_else(|| panic!("packInclude: expected a path, found {f}"));
         files.push(f.to_string());
     }
     let mut seen = HashSet::new();
@@ -62,13 +62,12 @@ fn pack_embedded_plugin() {
     let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     for rel in &files {
         let bytes = std::fs::read(src.join(rel))
-            .unwrap_or_else(|e| panic!("packInclude : {rel} introuvable dans {EMBEDDED} : {e}"));
+            .unwrap_or_else(|e| panic!("packInclude: {rel} not found in {EMBEDDED}: {e}"));
         zip.start_file(rel.as_str(), opts).unwrap();
         zip.write_all(&bytes).unwrap();
     }
     let archive = zip.finish().unwrap().into_inner();
 
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join(format!("{EMBEDDED}.kdext"));
-    std::fs::write(&out, archive)
-        .unwrap_or_else(|e| panic!("écriture de {} impossible : {e}", out.display()));
+    std::fs::write(&out, archive).unwrap_or_else(|e| panic!("cannot write {}: {e}", out.display()));
 }
