@@ -9,10 +9,11 @@
 
 kd.onRequest("initialize", () => ({ ok: true }));
 
-kd.onRequest("fence/render", async ({ source, options, theme }) => {
-  // empty block + src=: data read through the host (read:siblings confinement)
+kd.onRequest("fence/render", async ({ source, options, theme, dir }) => {
+  // empty block + src=: data read through the host (read:siblings confinement),
+  // relative to the `dir` of this request
   let text = String(source ?? "").trim();
-  if (!text && options?.src) text = (await kd.request("host/readFile", { rel: options.src })).text;
+  if (!text && options?.src) text = (await kd.request("host/readFile", { rel: options.src, dir })).text;
   const rows = text
     .trim()
     .split(/\r?\n/)

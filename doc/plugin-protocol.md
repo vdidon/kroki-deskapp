@@ -321,7 +321,7 @@ nothing special to do for multi-line constructs.
 
 | Method | Capability | Contract |
 | --- | --- | --- |
-| `host/readFile` | `read:siblings` | `params: { rel }` → `result: { text }`. Path **relative** to the `dir` of the document being processed, `read_data_file` confinement + `siblingExtensions` allowlist. `error.code = "denied"` (outside confinement/allowlist) or `"not-found"`. Valid only while a host request is being processed. |
+| `host/readFile` | `read:siblings` | `params: { rel, dir? }` → `result: { text }`. Path **relative** to the `dir` of the document being processed, `read_data_file` confinement + `siblingExtensions` allowlist. `dir` SHOULD echo the `dir` received with the request being served; when omitted, the host uses the folder of the only document being processed and answers `denied` if requests for several folders are in flight. `error.code = "denied"` (outside confinement/allowlist) or `"not-found"` (only for a file missing inside the folder). Valid only while a host request is being processed. |
 | `host/log` | — (always) | Notification `{ level: "debug"|"info"|"warn"|"error", message }`. Log visible in the runtimes info dialog. |
 
 ### 6.6 Host → plugin notifications
@@ -671,10 +671,10 @@ in automatically):
 
 ```js
 kd.onRequest("initialize", () => ({ ok: true }));
-kd.onRequest("fence/render", async ({ source, options, theme }) => {
+kd.onRequest("fence/render", async ({ source, options, theme, dir }) => {
   // empty block + src=: data read through the host (read:siblings confinement)
   let text = source.trim();
-  if (!text && options.src) text = (await kd.request("host/readFile", { rel: options.src })).text;
+  if (!text && options.src) text = (await kd.request("host/readFile", { rel: options.src, dir })).text;
   const rows = text.trim().split(/\r?\n/).map((l) => l.split(";"));
   const max = Number(options.max) || Math.max(...rows.map(([, v]) => Number(v)));
   const fg = theme === "dark" ? "#e6e6e6" : "#1f1f1f";

@@ -208,15 +208,14 @@ export interface HostToPluginNotifications {
  * confinement, hors allowlist `siblingExtensions`, ou hors traitement d'une
  * requête) / `not-found`.
  *
- * DIVERGENCE spec ↔ hôte : la spec (§6.5, exemple §12.2) ne prévoit que
- * `{ rel }`, résolu contre le `dir` « du document en cours ». L'hôte exige
- * `dir` — égal au `dir` d'une requête `document/transform`/`fence/render`
- * encore en vol — et répond `denied` sans lui. Un plugin doit donc le
- * renvoyer (l'exemple barchart ne le fait pas : sa lecture est refusée).
+ * `dir` : le `dir` reçu avec la requête `document/transform`/`fence/render`
+ * en cours — recommandé. Facultatif : sans lui, l'hôte prend le dossier du
+ * seul document en cours de traitement, et répond `denied` si des requêtes
+ * pour plusieurs dossiers sont en vol (§6.5).
  */
 export interface HostReadFileParams {
   rel: string;
-  dir: string;
+  dir?: string;
 }
 
 export interface HostReadFileResult {

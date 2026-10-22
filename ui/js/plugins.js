@@ -263,7 +263,11 @@ class PluginHost {
     }
     if (m.method === "host/readFile") {
       const rel = String(m.params?.rel ?? "");
-      const dir = String(m.params?.dir ?? "");
+      // `dir` facultatif (§6.5) : sans lui, le dossier du seul document en
+      // cours de traitement ; ambigu si plusieurs sont en vol → `denied`.
+      const dir =
+        String(m.params?.dir ?? "") ||
+        (this.activeDirs.size === 1 ? this.activeDirs.keys().next().value ?? "" : "");
       if (!this.activeDirs.has(dir)) {
         reply(null, {
           code: "denied",
