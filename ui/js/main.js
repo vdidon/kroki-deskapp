@@ -710,6 +710,22 @@ function cycleTab(dir) {
 }
 
 // --- Liens dans les documents : web → navigateur, .md relatif → onglet, ancre → scroll ---
+
+/**
+ * Fragment d'un lien, décodé. Un `%` qui n'introduit pas une séquence valide
+ * (`#100%`, `#a%zz`) ferait lever `decodeURIComponent` — le clic, déjà
+ * intercepté, ne ferait alors plus rien : le fragment est gardé brut.
+ * @param {string} s
+ * @returns {string}
+ */
+function decodeFragment(s) {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 function initLinks() {
   /** @type {HTMLElement} */ (document.getElementById("content")).addEventListener("click", (e) => {
     // `closest("a")` (et non `a[href]`) : les SVG graphviz portent leurs liens
@@ -721,7 +737,7 @@ function initLinks() {
     if (!href) return;
     if (href.startsWith("#")) {
       const v = state.views.get(state.active);
-      if (v) jumpToFragment(v, decodeURIComponent(href.slice(1)));
+      if (v) jumpToFragment(v, decodeFragment(href.slice(1)));
       return;
     }
     const dir = state.views.get(state.active)?.el.dataset.dir ?? "";
@@ -732,7 +748,7 @@ function initLinks() {
     if (hash > 0 && !/^(https?:|mailto:)/i.test(href)) {
       pendingAnchor = {
         path: normPath(dir, href.slice(0, hash)),
-        fragment: decodeURIComponent(href.slice(hash + 1)),
+        fragment: decodeFragment(href.slice(hash + 1)),
         expires: Date.now() + 10000,
       };
       invoke("open_link", { baseDir: dir, href: href.slice(0, hash) });
