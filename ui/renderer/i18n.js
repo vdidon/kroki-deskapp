@@ -1,3 +1,5 @@
+// @ts-check
+
 // Langue de la webview de rendu cachée. Contexte JS distinct de la fenêtre
 // principale (qui a `ui/js/i18n.js`, tirant `app.js` et le DOM de l'interface) :
 // même catalogue, lu par la même commande `get_i18n`, mais un `t()` autonome.
@@ -7,12 +9,19 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
+/** @type {import("../../types/ipc").I18nPayload["messages"]} */
 let messages = {};
 let plurals = new Intl.PluralRules("en");
 
 // Même contrat que `t()` de ui/js/i18n.js : paramètres `{nom}`, formes plurielles
 // choisies par `params.count`. Clé inconnue → la clé elle-même, jamais d'exception.
+/**
+ * @param {string} key
+ * @param {Record<string, unknown>} [params]
+ * @returns {string}
+ */
 export function t(key, params) {
+  /** @type {string | Record<string, string> | undefined} */
   let s = messages[key];
   if (s && typeof s === "object") {
     s = s[plurals.select(Number(params?.count ?? 0))] ?? s.other;

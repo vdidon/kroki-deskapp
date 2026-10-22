@@ -1,3 +1,5 @@
+// @ts-check
+
 // Sessions `.kdws` : bouton « Enregistrer la session » et retours utilisateur.
 // L'ouverture d'une session est entièrement côté Rust (session.rs, routée par
 // `manager::open_mixed_paths` quel que soit le canal : CLI, drop, dialog) ;
@@ -6,12 +8,23 @@
 import { invoke, listen } from "./app.js";
 import { t } from "./i18n.js";
 
-const toastEl = document.getElementById("toast");
-let toastTimer = null;
+const toastEl = /** @type {HTMLElement} */ (document.getElementById("toast"));
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let toastTimer;
 
 /** Toast transitoire en bas de fenêtre. Les erreurs restent plus longtemps.
  *  `actions` (`[{ label, run, title?, secondary? }]`) ajoute des boutons : le
- *  toast devient cliquable et reste le temps de le lire. */
+ *  toast devient cliquable et reste le temps de le lire.
+ * @typedef {object} ToastAction
+ * @property {string} label
+ * @property {() => void} run
+ * @property {string | null} [title]
+ * @property {boolean} [secondary]
+ *
+ * @param {string} message
+ * @param {boolean} [error]
+ * @param {ToastAction[]} [actions]
+ */
 export function showToast(message, error = false, actions = []) {
   toastEl.replaceChildren(message);
   for (const action of actions) {
@@ -50,7 +63,7 @@ export function showToast(message, error = false, actions = []) {
 }
 
 export async function initSession() {
-  const btn = document.getElementById("btn-save-session");
+  const btn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-save-session"));
   btn.addEventListener("click", async () => {
     btn.disabled = true;
     try {

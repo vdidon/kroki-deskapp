@@ -1,3 +1,4 @@
+// @ts-check
 // Rendu Markdown (markdown-it) + diagrammes Kroki + sécurisation DOMPurify.
 
 import { invoke, convertFileSrc, b64encode, b64decode, escapeHtml } from "./app.js";
@@ -12,6 +13,20 @@ import {
 } from "./plugins.js";
 import { paintSource } from "./sourcehl.js";
 
+/** @typedef {import("../../types/ipc").Anchor} Anchor */
+/** @typedef {import("../../types/vendor").MarkdownItStateBlock} MarkdownItStateBlock */
+/** @typedef {import("../../types/vendor").MarkdownItToken} MarkdownItToken */
+/** @typedef {import("../../types/vendor").Plotly} Plotly */
+/** @typedef {import("../../types/vendor").PlotlyHTMLElement} PlotlyHTMLElement */
+/** @typedef {import("./sourcehl.js").SourceHighlight} SourceHighlight */
+/**
+ * Document à rendre : markdown (dérivé le cas échéant), dossier de résolution
+ * des images relatives, ancres du markdown dérivé (`null` = document natif).
+ * @typedef {{ markdown: string, dir: string, lineMap?: Anchor[] | null }} RenderDoc
+ */
+/** Titre du sommaire (cf. `extractHeadings`).
+ * @typedef {{ level: number, text: string, slug: string, line: number }} Heading */
+
 // Tous les types de diagrammes supportés par Kroki (https://kroki.io).
 const KROKI_TYPES = new Set([
   "actdiag", "blockdiag", "bpmn", "bytefield", "c4plantuml", "d2", "dbml",
@@ -21,6 +36,7 @@ const KROKI_TYPES = new Set([
   "vega", "vegalite", "wavedrom", "wireviz",
 ]);
 
+/** @type {Partial<Record<string, string>>} */
 const KROKI_ALIASES = {
   dot: "graphviz",
   gv: "graphviz",
@@ -69,6 +85,13 @@ if (window.texmath && window.katex) {
 // cause du `---` de fermeture) → bouillie illisible. On le capte en un token de
 // bloc unique, rendu en table clé/valeur. Le `token.map` couvre tout le bloc
 // pour ne pas décaler les numéros de ligne source (alignement preview ↔ source).
+/**
+ * @param {MarkdownItStateBlock} state
+ * @param {number} startLine
+ * @param {number} endLine
+ * @param {boolean} silent
+ * @returns {boolean}
+ */
 function frontMatterRule(state, startLine, endLine, silent) {
   // Uniquement tout en haut du document, sans indentation.
   if (startLine !== 0 || state.blkIndent !== 0) return false;
@@ -102,7 +125,12 @@ md.block.ruler.before("table", "front_matter", frontMatterRule);
 // Découpe le YAML en lignes clé/valeur de premier niveau ; les lignes indentées
 // (YAML imbriqué, ex. `hooks:`) sont rattachées à la valeur précédente. Suffisant
 // pour un affichage lisible sans embarquer un parseur YAML complet.
+/**
+ * @param {string} yaml
+ * @returns {[string, string][]} paires `[clé, valeur]`
+ */
 function parseFrontMatterRows(yaml) {
+  /** @type {[string, string][]} */
   const rows = [];
   for (const raw of yaml.split("\n")) {
     if (!raw.trim()) continue;
@@ -133,6 +161,7 @@ md.renderer.rules.front_matter = (tokens, idx) => {
 };
 
 // --- Ancres de titres façon GitHub (permet les sommaires [..](#section)) ---
+/** @param {string} text */
 function slugify(text) {
   return text
     .trim()
@@ -198,7 +227,12 @@ md.core.ruler.push("task_lists", (mdState) => {
 });
 
 // --- Blocs ``` : un type Kroki devient un diagramme, le reste du code surligné ---
+/**
+ * @param {string} rest
+ * @returns {Record<string, string>}
+ */
 function parseDiagramOptions(rest) {
+  /** @type {Record<string, string>} */
   const opts = {};
   for (const part of rest.replace(/[{}]/g, " ").split(/\s+/)) {
     const eq = part.indexOf("=");
@@ -247,12 +281,17 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
 };
 
 /** Le langage de fence est-il servi nativement (types Kroki, alias, plotly) ?
- *  Utilisé par l'UI des plugins pour signaler les revendications ignorées. */
+ *  Utilisé par l'UI des plugins pour signaler les revendications ignorées.
+ *  @param {string} lang */
 export function isNativeFence(lang) {
   const l = String(lang || "").toLowerCase();
   return l === "plotly" || KROKI_TYPES.has(l) || l in KROKI_ALIASES;
 }
 
+/**
+ * @param {string} html
+ * @returns {string}
+ */
 function sanitizeHtml(html) {
   return window.DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
@@ -267,6 +306,10 @@ function sanitizeHtml(html) {
 // contenir, et innerHTML n'exécute jamais les <script> insérés.
 
 // Résolution de chemins relatifs Windows pour les images locales du document.
+/**
+ * @param {string} dir
+ * @param {string} rel
+ */
 function joinPath(dir, rel) {
   const parts = dir.split(/[\\/]+/).filter(Boolean);
   for (const seg of rel.split(/[\\/]+/)) {
@@ -277,8 +320,12 @@ function joinPath(dir, rel) {
   return parts.join("\\");
 }
 
+/**
+ * @param {ParentNode} root
+ * @param {string} dir
+ */
 function rewriteLocalImages(root, dir) {
-  for (const img of root.querySelectorAll("img[src]")) {
+  for (const img of /** @type {NodeListOf<HTMLImageElement>} */ (root.querySelectorAll("img[src]"))) {
     const src = img.getAttribute("src");
     if (!src || /^(https?:|data:|blob:|asset:)/i.test(src)) continue;
     let p = src.replace(/^file:\/{2,3}/i, "");
@@ -292,6 +339,10 @@ function rewriteLocalImages(root, dir) {
   }
 }
 
+/**
+ * @param {string} type
+ * @param {unknown} err
+ */
 function diagramError(type, err) {
   return (
     `<div class="kroki-error"><strong>${t("render.diagram_error", { type: escapeHtml(type) })}</strong>` +
@@ -305,14 +356,17 @@ function diagramError(type, err) {
 // est injecté en <script src 'self'> à la première figure seulement. La CSP
 // autorise déjà 'unsafe-eval' (pour d2) ; un script de même origine n'a pas besoin
 // de 'unsafe-inline'.
+/** @type {Promise<Plotly> | null} */
 let plotlyPromise = null;
+/** @returns {Promise<Plotly>} */
 function ensurePlotly() {
   if (window.Plotly) return Promise.resolve(window.Plotly);
   if (!plotlyPromise) {
     plotlyPromise = new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = "vendor/plotly.min.js";
-      s.onload = () => resolve(window.Plotly);
+      // Le bundle UMD pose `window.Plotly` en s'exécutant, avant `onload`.
+      s.onload = () => resolve(/** @type {Plotly} */ (window.Plotly));
       s.onerror = () => {
         plotlyPromise = null;
         reject(new Error(t("render.plotly_load_failed")));
@@ -327,6 +381,10 @@ function ensurePlotly() {
 // page, claire ou sombre), largeur fluide, couleur de texte adaptée. En sombre on
 // éclaircit aussi grilles/lignes d'axes de TOUS les sous-graphes. Les valeurs
 // explicites de la spec restent prioritaires (merge en dessous via `...existant`).
+/**
+ * @param {PlotlyHTMLElement} el
+ * @param {string} raw spec JSON `{data, layout, config}`
+ */
 async function renderPlotly(el, raw) {
   const fig = typeof raw === "string" ? JSON.parse(raw) : raw;
   if (!fig || typeof fig !== "object") throw new Error(t("render.plotly_invalid_spec"));
@@ -367,6 +425,7 @@ async function renderPlotly(el, raw) {
 
 // Stem d'un chemin (nom de fichier sans dossier ni extension), insensible à la
 // casse et tolérant aux chemins déjà réécrits en asset: (percent-encodés).
+/** @param {string | undefined} path */
 function fileStem(path) {
   let s = path || "";
   try {
@@ -382,12 +441,18 @@ function fileStem(path) {
 // ```plotly de même stem : c'est le fallback statique, utile hors Kroki Desk ou si
 // Plotly échoue. Le rendu interactif le rend redondant -> on masque l'image jumelle
 // une fois que Plotly a rendu (et seulement alors). En cas d'échec, le PNG reste.
+/**
+ * @param {Element} el
+ * @param {string | undefined} srcPath
+ */
 function hidePairedFallbackImage(el, srcPath) {
   const stem = fileStem(srcPath);
   if (!stem) return;
   const prev = el.previousElementSibling;
   if (!prev) return;
-  const img = prev.tagName === "IMG" ? prev : prev.querySelector?.("img");
+  const img = /** @type {HTMLElement | null} */ (
+    prev.tagName === "IMG" ? prev : prev.querySelector?.("img")
+  );
   if (img && fileStem(img.getAttribute("src") || "") === stem) {
     (img.closest("p") || img).style.display = "none";
   }
@@ -395,14 +460,24 @@ function hidePairedFallbackImage(el, srcPath) {
 
 // `depth` : profondeur d'imbrication des fences `fence:markdown` (un plugin
 // dont le markdown dérivé contient sa propre fence boucle sinon à l'infini).
+/**
+ * @param {ParentNode} root
+ * @param {string} dir
+ * @param {number} [depth]
+ * @returns {Promise<void>}
+ */
 async function hydrateDiagrams(root, dir, depth = 0) {
-  const nodes = [...root.querySelectorAll(".kroki-diagram")];
+  const nodes = [.../** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll(".kroki-diagram"))];
   await Promise.all(
     nodes.map(async (el) => {
-      const type = el.dataset.krokiType;
+      // `data-kroki-type`/`-src` sont posés par la règle fence. Un
+      // `.kroki-diagram` imité en HTML inline (DOMPurify garde class et data-*)
+      // peut en être dépourvu : b64decode(undefined) lève (catch ci-dessous),
+      // un type absent fait rejeter `invoke` — erreur affichée, rien de plus.
+      const type = /** @type {string} */ (el.dataset.krokiType);
       let source, options;
       try {
-        source = b64decode(el.dataset.krokiSrc);
+        source = b64decode(/** @type {string} */ (el.dataset.krokiSrc));
         options = JSON.parse(b64decode(el.dataset.krokiOpts || "") || "{}");
       } catch {
         return;
@@ -483,6 +558,9 @@ async function hydrateDiagrams(root, dir, depth = 0) {
 /**
  * Rend un document complet dans une vue, en préservant la position de lecture
  * (re-render suite à une modification du fichier sur disque).
+ *
+ * @param {HTMLElement} view
+ * @param {RenderDoc} doc
  */
 export async function renderDocument(view, doc) {
   const scrollTop = view.scrollTop;
@@ -513,6 +591,10 @@ export async function renderDocument(view, doc) {
 // Les exports de l'app sont autonomes (styles inlinés, images en data-URI,
 // SVG inline) et se rendent donc à l'identique ; les ressources relatives d'un
 // HTML tiers ne sont pas résolues (about:srcdoc n'a pas de base).
+/**
+ * @param {HTMLElement} view
+ * @param {string} html
+ */
 export function renderHtmlDocument(view, html) {
   const iframe = document.createElement("iframe");
   iframe.className = "html-view";
@@ -527,7 +609,12 @@ export function renderHtmlDocument(view, html) {
 // après coup. La sortie du plugin est du code tiers : seuls les
 // `<span class="…">` survivent (les classes `hljs-*` héritent du thème actif).
 // Jamais bloquant — en erreur, la fence reste non colorée.
+/**
+ * @param {ParentNode} root
+ * @returns {Promise<void>}
+ */
 async function hydratePluginHighlights(root) {
+  /** @type {Promise<void>[]} */
   const jobs = [];
   for (const code of root.querySelectorAll('pre > code[class*="language-"]')) {
     const cls = [...code.classList].find((c) => c.startsWith("language-"));
@@ -558,6 +645,10 @@ async function hydratePluginHighlights(root) {
  * `hl` (cf. `sourceHighlightFor`) demande la coloration syntaxique : elle est
  * peinte **par-dessus** les lignes déjà posées — de façon différée quand elle
  * vient d'un plugin — sans jamais changer le nombre de lignes ni leur hauteur.
+ *
+ * @param {HTMLElement} view
+ * @param {string} markdown
+ * @param {SourceHighlight} [hl]
  */
 export function renderSource(view, markdown, hl = null) {
   const scrollTop = view.scrollTop;
@@ -584,8 +675,13 @@ export function renderSource(view, markdown, hl = null) {
 // Repère la ligne source du bloc actuellement collé au haut du viewport. On prend
 // l'élément annoté (`[attr]`) dont le sommet est le plus proche du bord supérieur
 // sans le dépasser ; si tout est plus bas (défilé tout en haut), la première ligne.
+/**
+ * @param {HTMLElement} view
+ * @param {string} attr
+ * @returns {number}
+ */
 export function readTopLine(view, attr) {
-  const els = view.querySelectorAll(`[${attr}]`);
+  const els = /** @type {NodeListOf<HTMLElement>} */ (view.querySelectorAll(`[${attr}]`));
   if (!els.length) return 0;
   const top = view.scrollTop;
   let bestLine = Number(els[0].getAttribute(attr));
@@ -602,8 +698,13 @@ export function readTopLine(view, attr) {
 
 // Défile `view` pour amener au sommet l'élément annoté correspondant à `line`
 // (la plus grande ligne ≤ `line`, à défaut la première).
+/**
+ * @param {HTMLElement} view
+ * @param {string} attr
+ * @param {number} line
+ */
 export function scrollToLine(view, attr, line) {
-  const els = view.querySelectorAll(`[${attr}]`);
+  const els = /** @type {NodeListOf<HTMLElement>} */ (view.querySelectorAll(`[${attr}]`));
   if (!els.length) return;
   let target = els[0];
   let bestLine = -1;
@@ -619,6 +720,10 @@ export function scrollToLine(view, attr, line) {
 
 // Texte brut d'un token inline (titres) : on concatène le contenu textuel des
 // enfants en ignorant les marqueurs de mise en forme (`**`, `` ` ``, liens…).
+/**
+ * @param {MarkdownItToken | undefined} inline
+ * @returns {string}
+ */
 function inlineText(inline) {
   if (!inline || inline.type !== "inline") return "";
   if (!inline.children?.length) return inline.content || "";
@@ -635,9 +740,13 @@ function inlineText(inline) {
  * `md` que le rendu : les slugs (`id`) et numéros de ligne (`data-source-line`)
  * sont donc identiques à ceux du DOM affiché. Renvoie `[{level, text, slug, line}]`
  * dans l'ordre du document.
+ *
+ * @param {string} markdown
+ * @returns {Heading[]}
  */
 export function extractHeadings(markdown) {
   const tokens = md.parse(String(markdown), {});
+  /** @type {Heading[]} */
   const out = [];
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
@@ -652,6 +761,10 @@ export function extractHeadings(markdown) {
   return out;
 }
 
+/**
+ * @param {HTMLElement} view
+ * @param {unknown} message
+ */
 export function renderReadError(view, message) {
   view.innerHTML =
     `<article class="markdown-body"><div class="kroki-error">` +

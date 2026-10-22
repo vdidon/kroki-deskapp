@@ -1,3 +1,4 @@
+// @ts-check
 // Icônes des barres d'outils : registre, défauts, visibilité effective.
 //
 // Réglage global (persisté par le backend dans `settings.json`) mais
@@ -16,6 +17,20 @@ import { t } from "./i18n.js";
 // moment d'afficher (dialog Réglages, reconstruit à chaque changement de
 // langue), jamais figés à l'import. `locked` : indication commune
 // (`icons.locked_hint`, ajoutée par settings.js).
+/**
+ * @typedef {object} IconItem
+ * @property {string} id  id du bouton dans index.html
+ * @property {() => string} label
+ * @property {() => string} [hint]
+ * @property {boolean} def
+ * @property {boolean} [locked]
+ *
+ * @typedef {object} IconGroup
+ * @property {() => string} title
+ * @property {string | null} container
+ * @property {IconItem[]} items
+ */
+/** @type {IconGroup[]} */
 export const ICON_GROUPS = [
   {
     title: () => t("icons.group.window"),
@@ -88,9 +103,14 @@ export const ICON_GROUPS = [
 
 const BY_ID = new Map(ICON_GROUPS.flatMap((g) => g.items.map((it) => [it.id, it])));
 
+/** @type {Record<string, boolean>} */
 let overrides = {}; // id -> bool, uniquement les choix explicites de l'utilisateur
 
-/** Visibilité voulue pour une icône : choix explicite, sinon défaut du registre. */
+/**
+ * Visibilité voulue pour une icône : choix explicite, sinon défaut du registre.
+ * @param {string} id
+ * @returns {boolean}
+ */
 export function iconEnabled(id) {
   const it = BY_ID.get(id);
   if (!it) return true; // icône hors registre : jamais masquée par ce réglage
@@ -102,6 +122,7 @@ export function iconEnabled(id) {
  * Applique une map de choix explicites : mémorise, puis masque/affiche les
  * boutons des barres à conteneur fixe. Les actions de vue sont réévaluées par
  * l'appelant (updateViewActions), qui seul connaît l'état du document.
+ * @param {Record<string, boolean> | null | undefined} map
  */
 export function applyIcons(map) {
   overrides = { ...(map || {}) };

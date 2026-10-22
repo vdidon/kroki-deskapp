@@ -1,3 +1,4 @@
+// @ts-check
 // Coloration syntaxique de la **vue code source** (bouton « code source »).
 //
 // Contrainte structurelle : la vue est une `<div class="src-line">` par ligne
@@ -19,11 +20,19 @@
 import { pluginHighlight } from "./plugins.js";
 import { splitHighlightedLines } from "./hlsplit.js";
 
+/** Coloration demandée : `{ lang, plugin }` de `sourceHighlightFor`, ou null.
+ * @typedef {ReturnType<typeof import("./plugins.js").sourceHighlightFor>} SourceHighlight */
+
 // Au-delà, on ne colore pas : le coût (coloration + N innerHTML) ne vaut pas le
 // confort sur un fichier que personne ne lit ligne à ligne.
 const MAX_CHARS = 1_000_000;
 
-/** Sortie d'un plugin (code tiers) : on ne garde que les spans et leur classe. */
+/**
+ * Sortie d'un plugin (code tiers) : on ne garde que les spans et leur classe.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
 function sanitizeSpans(html) {
   return window.DOMPurify.sanitize(html, { ALLOWED_TAGS: ["span"], ALLOWED_ATTR: ["class"] });
 }
@@ -32,6 +41,10 @@ function sanitizeSpans(html) {
  * Applique un flot coloré aux lignes déjà rendues. Abandonne — sans rien
  * toucher — si la découpe ne recouvre pas exactement les lignes affichées ou si
  * la vue a changé entre-temps (coloration asynchrone d'un plugin).
+ *
+ * @param {HTMLElement} root
+ * @param {string[]} lines
+ * @param {string} html
  */
 function applyLines(root, lines, html) {
   if (!root.isConnected) return;
@@ -48,6 +61,10 @@ function applyLines(root, lines, html) {
  * Colore une vue source déjà construite. `hl` = `{ lang, plugin }` obtenu de
  * `sourceHighlightFor` (plugin null → grammaire hljs de l'hôte). Sans effet si
  * la grammaire est absente : la vue reste en texte brut.
+ *
+ * @param {HTMLElement} root
+ * @param {string[]} lines
+ * @param {SourceHighlight} hl
  */
 export function paintSource(root, lines, hl) {
   if (!hl || !hl.lang) return;

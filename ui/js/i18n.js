@@ -1,3 +1,4 @@
+// @ts-check
 // Langue de l'interface : catalogue courant, `t()` et traduction du HTML statique.
 //
 // Le catalogue vient du Rust (commande `get_i18n`), source unique partagée avec
@@ -18,14 +19,20 @@
 
 import { invoke } from "./app.js";
 
+/** @typedef {import("../../types/ipc").I18nPayload} I18nPayload */
+
 let locale = "en";
 let setting = "auto";
+/** @type {I18nPayload["languages"]} */
 let languages = [{ code: "en", name: "English" }];
+/** @type {I18nPayload["messages"]} */
 let messages = {};
 let plurals = new Intl.PluralRules("en");
+/** @type {Set<(locale: string) => void>} */
 const listeners = new Set();
 
 // [clé dans dataset, attribut traduit]
+/** @type {[string, string][]} */
 const ATTRS = [
   ["i18nTitle", "title"],
   ["i18nPlaceholder", "placeholder"],
@@ -34,7 +41,13 @@ const ATTRS = [
 
 // Texte de `key`, paramètres `{nom}` substitués. Une valeur objet est un jeu de
 // formes plurielles CLDR choisi par `params.count`.
+/**
+ * @param {string} key
+ * @param {Record<string, unknown>} [params]
+ * @returns {string}
+ */
 export function t(key, params) {
+  /** @type {string | Record<string, string> | undefined} — clé absente du catalogue */
   let s = messages[key];
   if (s && typeof s === "object") {
     s = s[plurals.select(Number(params?.count ?? 0))] ?? s.other;
@@ -63,18 +76,22 @@ export function getLanguages() {
 }
 
 // Traduit le sous-arbre `root` (document entier par défaut) : à rappeler sur
-// tout fragment HTML statique inséré après coup.
+// tout fragment HTML statique inséré après coup. Les sélecteurs garantissent
+// la présence de l'attribut lu, d'où les casts `string`.
+/** @param {ParentNode} [root] */
 export function applyLocale(root = document) {
   if (root === document) document.documentElement.lang = locale;
-  for (const el of root.querySelectorAll("[data-i18n]")) {
-    el.textContent = t(el.dataset.i18n);
+  for (const el of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll("[data-i18n]"))) {
+    el.textContent = t(/** @type {string} */ (el.dataset.i18n));
   }
-  for (const el of root.querySelectorAll("[data-i18n-html]")) {
-    el.innerHTML = t(el.dataset.i18nHtml);
+  for (const el of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll("[data-i18n-html]"))) {
+    el.innerHTML = t(/** @type {string} */ (el.dataset.i18nHtml));
   }
   for (const [data, attr] of ATTRS) {
-    for (const el of root.querySelectorAll(`[data-i18n-${attr}]`)) {
-      el.setAttribute(attr, t(el.dataset[data]));
+    for (const el of /** @type {NodeListOf<HTMLElement>} */ (
+      root.querySelectorAll(`[data-i18n-${attr}]`)
+    )) {
+      el.setAttribute(attr, t(/** @type {string} */ (el.dataset[data])));
     }
   }
 }
@@ -100,6 +117,7 @@ export async function loadLocale() {
 
 // `fn(locale)` après chaque changement de langue (pas au boot : les modules
 // écrivent leurs textes à l'init, après `loadLocale`).
+/** @param {(locale: string) => void} fn */
 export function onLocaleChange(fn) {
   listeners.add(fn);
 }

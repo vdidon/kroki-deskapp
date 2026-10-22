@@ -1,13 +1,18 @@
+// @ts-check
+
 // Barre d'onglets : rendu (diff minimal pour ne pas casser un drag en cours) et actions.
 
 import { invoke, state } from "./app.js";
 import { showToast } from "./session.js";
 import { t, applyLocale, onLocaleChange } from "./i18n.js";
 
-const tabsEl = document.getElementById("tabs");
-const tabbarEl = document.getElementById("tabbar");
-const actionsEl = document.getElementById("tabbar-actions");
+/** @typedef {import("../../types/ipc").TabInfo} TabInfo */
 
+const tabsEl = /** @type {HTMLElement} */ (document.getElementById("tabs"));
+const tabbarEl = /** @type {HTMLElement} */ (document.getElementById("tabbar"));
+const actionsEl = /** @type {HTMLElement} */ (document.getElementById("tabbar-actions"));
+
+/** @param {TabInfo} tab */
 function buildTab(tab) {
   const el = document.createElement("div");
   el.className = "tab";
@@ -35,7 +40,7 @@ function buildTab(tab) {
  * en cours de drag (perte de la capture du pointeur).
  */
 export function renderTabbar() {
-  const current = [...tabsEl.children].map((el) => el.dataset.id);
+  const current = /** @type {HTMLElement[]} */ ([...tabsEl.children]).map((el) => el.dataset.id);
   const wanted = state.tabs.map((t) => String(t.id));
   const sameStructure =
     current.length === wanted.length && current.every((id, i) => id === wanted[i]);
@@ -43,11 +48,11 @@ export function renderTabbar() {
   if (!sameStructure) {
     tabsEl.replaceChildren(...state.tabs.map(buildTab));
   }
-  for (const el of tabsEl.children) {
+  for (const el of /** @type {HTMLCollectionOf<HTMLElement>} */ (tabsEl.children)) {
     const tab = state.tabs.find((t) => String(t.id) === el.dataset.id);
     if (!tab) continue;
     el.classList.toggle("active", state.active === tab.id);
-    const title = el.querySelector(".tab-title");
+    const title = /** @type {HTMLElement} */ (el.querySelector(".tab-title"));
     if (title.textContent !== tab.title) title.textContent = tab.title;
     if (el.title !== tab.path) el.title = tab.path;
   }
@@ -69,13 +74,13 @@ export function renderTabbar() {
 export function updateTabbarWrap() {
   if (document.body.classList.contains("tab-dragging")) return; // géométrie figée pendant un drag
   tabsEl.style.removeProperty("--tab-max");
-  const tabs = [...tabsEl.children];
+  const tabs = /** @type {HTMLElement[]} */ ([...tabsEl.children]);
   if (!tabs.length) return;
 
   const maxTab = parseFloat(getComputedStyle(tabs[0]).maxWidth) || Infinity;
   const gap = parseFloat(getComputedStyle(tabs[0]).marginRight) || 0;
   const naturals = tabs.map((el) => {
-    const title = el.querySelector(".tab-title");
+    const title = /** @type {HTMLElement} */ (el.querySelector(".tab-title"));
     // Largeur hors-titre (paddings + croix) : constante que l'onglet soit
     // compressé ou non, le titre absorbant seul la compression (flex: 1).
     const chrome = el.getBoundingClientRect().width - title.getBoundingClientRect().width;
@@ -120,10 +125,10 @@ export function initTabbar() {
   // Redimensionnement de la fenêtre (et retour d'un drag) : réévaluer le wrap.
   new ResizeObserver(updateTabbarWrap).observe(tabbarEl);
   tabsEl.addEventListener("click", (e) => {
-    const tabEl = e.target.closest(".tab");
+    const tabEl = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".tab"));
     if (!tabEl) return;
     const docId = Number(tabEl.dataset.id);
-    if (e.target.closest(".tab-close")) {
+    if (/** @type {Element} */ (e.target).closest(".tab-close")) {
       invoke("close_tab", { docId });
     }
     // L'activation se fait au pointerdown (voir teardrag.js), comme Chrome.
@@ -131,7 +136,7 @@ export function initTabbar() {
   // Clic molette : fermer.
   tabsEl.addEventListener("auxclick", (e) => {
     if (e.button !== 1) return;
-    const tabEl = e.target.closest(".tab");
+    const tabEl = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".tab"));
     if (tabEl) invoke("close_tab", { docId: Number(tabEl.dataset.id) });
   });
   initTabMenu();
@@ -142,11 +147,14 @@ export function initTabbar() {
 
 // --- Menu contextuel d'onglet (clic droit) ---
 
-const menuEl = document.getElementById("tab-menu");
+const menuEl = /** @type {HTMLElement} */ (document.getElementById("tab-menu"));
+/** @type {number | null} */
 let menuDocId = null;
 
 /** Presse-papiers : API asynchrone, repli execCommand si la webview la refuse
- *  (contexte jugé non sécurisé, cas possible sous WebKitGTK). */
+ *  (contexte jugé non sécurisé, cas possible sous WebKitGTK).
+ * @param {string} text
+ */
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -172,10 +180,16 @@ function closeTabMenu() {
   menuDocId = null;
 }
 
+/**
+ * @param {HTMLElement} tabEl
+ * @param {number} x
+ * @param {number} y
+ */
 function openTabMenu(tabEl, x, y) {
   const idx = [...tabsEl.children].indexOf(tabEl);
   const count = tabsEl.children.length;
   menuDocId = Number(tabEl.dataset.id);
+  /** @type {Record<string, boolean>} */
   const disabled = {
     detach: count === 1, // seul onglet : la nouvelle fenêtre serait la même
     left: idx === 0,
@@ -183,7 +197,7 @@ function openTabMenu(tabEl, x, y) {
     others: count === 1,
   };
   for (const item of menuEl.querySelectorAll("button")) {
-    item.disabled = !!disabled[item.dataset.action];
+    item.disabled = !!disabled[/** @type {string} */ (item.dataset.action)]; // data-action sur chaque bouton (index.html)
   }
   menuEl.hidden = false;
   // Mesuré une fois affiché : recalé dans la fenêtre près des bords droit et bas.
@@ -194,16 +208,16 @@ function openTabMenu(tabEl, x, y) {
 
 function initTabMenu() {
   tabsEl.addEventListener("contextmenu", (e) => {
-    const tabEl = e.target.closest(".tab");
+    const tabEl = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".tab"));
     if (!tabEl) return;
     e.preventDefault(); // pas de menu natif de la webview
     openTabMenu(tabEl, e.clientX, e.clientY);
   });
   menuEl.addEventListener("click", (e) => {
-    const item = e.target.closest("button");
+    const item = /** @type {Element} */ (e.target).closest("button");
     if (!item || item.disabled || menuDocId == null) return;
     const docId = menuDocId;
-    const action = item.dataset.action;
+    const action = /** @type {string} */ (item.dataset.action);
     closeTabMenu();
     if (action === "copy-path") {
       const tab = state.tabs.find((t) => t.id === docId);
@@ -221,7 +235,7 @@ function initTabMenu() {
   window.addEventListener(
     "pointerdown",
     (e) => {
-      if (!menuEl.hidden && !menuEl.contains(e.target)) closeTabMenu();
+      if (!menuEl.hidden && !menuEl.contains(/** @type {Node | null} */ (e.target))) closeTabMenu();
     },
     true,
   );

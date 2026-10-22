@@ -1,3 +1,4 @@
+// @ts-check
 // Export du rendu de l'onglet actif en page HTML autonome (bouton de la pile
 // d'actions de vue).
 //
@@ -18,6 +19,8 @@ import { invoke, state, escapeHtml } from "./app.js";
 import { renderDocument } from "./render.js";
 import { t, getLocale } from "./i18n.js";
 
+/** @typedef {import("../../types/app").View} View */
+
 // Neutralise la mise en page « application » (body flex plein cadre, vues
 // empilées en position absolue) : la page exportée défile normalement.
 const EXPORT_CSS = `
@@ -25,15 +28,20 @@ html, body { height: auto; overflow: auto; display: block; }
 .doc-view { position: static; overflow: visible; }
 `;
 
+/** @returns {Promise<string>} */
 async function inlineStyles() {
+  /** @type {string[]} */
   const parts = [];
-  for (const node of document.querySelectorAll("head link[rel='stylesheet'], head style")) {
+  for (const node of /** @type {NodeListOf<HTMLLinkElement | HTMLStyleElement>} */ (
+    document.querySelectorAll("head link[rel='stylesheet'], head style")
+  )) {
     if (node.tagName === "STYLE") {
       parts.push(node.outerHTML);
       continue;
     }
     try {
-      const css = await (await fetch(node.getAttribute("href"))).text();
+      // Les `<link>` de feuille de style du <head> (index.html) portent tous un href.
+      const css = await (await fetch(/** @type {string} */ (node.getAttribute("href")))).text();
       const media = node.media ? ` media="${escapeHtml(node.media)}"` : "";
       parts.push(`<style${media}>\n${css}\n</style>`);
     } catch {
@@ -47,9 +55,16 @@ async function inlineStyles() {
 // sinon (vue source ou dérivée à l'écran) re-rendu dans un conteneur hors
 // écran — largeur réaliste pour les mesures de mise en page (Plotly) — sans
 // toucher à la vue de l'utilisateur.
+/**
+ * @param {View} v vue rendue, `markdown` non nul (vérifié par `exportActiveView`)
+ * @returns {Promise<Element | null>}
+ */
 async function previewArticle(v) {
   if (v.mode !== "source" && v.mode !== "derived") {
-    return v.el.querySelector("article.markdown-body")?.cloneNode(true) ?? null;
+    // cloneNode est typé Node : le clone d'un Element est un Element.
+    return /** @type {Element | null} */ (
+      v.el.querySelector("article.markdown-body")?.cloneNode(true) ?? null
+    );
   }
   const host = document.createElement("div");
   host.className = "doc-view";
@@ -57,8 +72,15 @@ async function previewArticle(v) {
     "position:fixed;left:-10000px;top:0;width:996px;height:600px;overflow:auto;";
   document.body.appendChild(host);
   try {
-    await renderDocument(host, { markdown: v.markdown, dir: v.dir, lineMap: v.lineMap });
-    return host.querySelector("article.markdown-body")?.cloneNode(true) ?? null;
+    // `markdown` et `dir` sont posés ensemble par renderActive (main.js).
+    await renderDocument(host, {
+      markdown: /** @type {string} */ (v.markdown),
+      dir: /** @type {string} */ (v.dir),
+      lineMap: v.lineMap,
+    });
+    return /** @type {Element | null} */ (
+      host.querySelector("article.markdown-body")?.cloneNode(true) ?? null
+    );
   } finally {
     host.remove();
   }

@@ -1,3 +1,4 @@
+// @ts-check
 // Syntax highlighting of LaTeX source (`latex-source`), for the application's
 // "source code" view.
 //
@@ -40,6 +41,10 @@ const TOKEN = new RegExp(
   "g",
 );
 
+/**
+ * @param {unknown} s
+ * @returns {string}
+ */
 function esc(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -47,12 +52,21 @@ function esc(s) {
     .replace(/>/g, "&gt;");
 }
 
+/**
+ * @param {string} cls classes hljs sans préfixe, séparées par une espace
+ * @param {string} text
+ * @returns {string}
+ */
 function span(cls, text) {
   const classes = cls.split(" ").map((c) => `hljs-${c}`).join(" ");
   return `<span class="${classes}">${esc(text)}</span>`;
 }
 
-/** LaTeX source → colored HTML (`hljs-*` spans, escaped text). */
+/**
+ * LaTeX source → colored HTML (`hljs-*` spans, escaped text).
+ * @param {unknown} code
+ * @returns {string}
+ */
 export function highlightLatex(code) {
   const src = String(code ?? "");
   let out = "";
@@ -62,7 +76,8 @@ export function highlightLatex(code) {
   while ((m = TOKEN.exec(src)) !== null) {
     out += esc(src.slice(last, m.index));
     last = m.index + m[0].length;
-    const g = m.groups;
+    // `TOKEN` only has named groups: `groups` is always present.
+    const g = /** @type {Record<string, string | undefined>} */ (m.groups);
     if (g.esc || g.amp) out += span("operator", m[0]);
     else if (g.comment) out += span("comment", m[0]);
     // `hljs-formula` would be the right name, but the host's GitHub themes give

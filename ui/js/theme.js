@@ -1,3 +1,4 @@
+// @ts-check
 // Thème de l'interface : « auto » (suit le système) | « light » | « dark ».
 //
 // Stratégie : en mode « auto » on ne pose AUCUN attribut sur <html> — la palette,
@@ -12,14 +13,19 @@
 const root = document.documentElement;
 const mql = window.matchMedia?.("(prefers-color-scheme: dark)");
 
+/** @typedef {"auto" | "light" | "dark"} ThemeMode */
+
+/** @type {ThemeMode} */
 let currentMode = "auto";
+/** @type {(() => void) | null} */
 let onSystemChange = null;
 
 // highlight.js : deux feuilles gouvernées par media-query en « auto », forcées via
 // l'attribut `media` en override explicite.
+/** @param {ThemeMode} mode */
 function applyHljs(mode) {
-  const light = document.getElementById("hljs-light");
-  const dark = document.getElementById("hljs-dark");
+  const light = /** @type {HTMLLinkElement | null} */ (document.getElementById("hljs-light"));
+  const dark = /** @type {HTMLLinkElement | null} */ (document.getElementById("hljs-dark"));
   if (!light || !dark) return;
   if (mode === "auto") {
     light.media = "(prefers-color-scheme: light)";
@@ -30,6 +36,7 @@ function applyHljs(mode) {
   }
 }
 
+/** @param {string} mode Réglage persisté ; toute valeur inconnue vaut « auto ». */
 export function applyTheme(mode) {
   currentMode = mode === "light" || mode === "dark" ? mode : "auto";
   if (currentMode === "auto") root.removeAttribute("data-theme");
@@ -49,6 +56,7 @@ export function docIsDark() {
 // À appeler une fois au boot : suit les bascules système, mais seulement en mode
 // « auto » (sinon l'override prime). Le callback sert à réaccorder les figures
 // Plotly — leurs couleurs sont figées au rendu, alors que la palette CSS suit seule.
+/** @param {() => void} systemChangeCallback */
 export function initTheme(systemChangeCallback) {
   onSystemChange = systemChangeCallback;
   mql?.addEventListener?.("change", () => {

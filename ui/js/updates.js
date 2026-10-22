@@ -1,3 +1,4 @@
+// @ts-check
 // Mises à jour (updates.rs) : notification seule, rien n'est installé. Au boot
 // de chaque fenêtre, une vérification automatique dont le backend décide si
 // elle a lieu (réglage, une fois par jour, première fenêtre seulement) ; à la
@@ -9,22 +10,33 @@ import { invoke } from "./app.js";
 import { t } from "./i18n.js";
 import { showToast } from "./session.js";
 
+/** @typedef {import("../../types/ipc").UpdateInfo} UpdateInfo */
+
+/** @param {string} href */
 function openUrl(href) {
   invoke("open_link", { baseDir: "", href });
 }
 
-/** Fichier de la release adapté à cette installation (ou, à défaut, sa page). */
+/**
+ * Fichier de la release adapté à cette installation (ou, à défaut, sa page).
+ * @param {UpdateInfo} info
+ */
 export function openDownload(info) {
   openUrl(info.download_url);
 }
 
+/** @param {UpdateInfo} info */
 export function openRelease(info) {
   openUrl(info.release_url);
 }
 
-/** Résultat de `check_update` forcé ; l'erreur est déjà un message traduit. */
+/**
+ * Résultat de `check_update` forcé ; l'erreur est déjà un message traduit.
+ * Jamais null : seule la vérification automatique rend `None` (updates.rs).
+ * @returns {Promise<UpdateInfo>}
+ */
 export function checkForUpdate() {
-  return invoke("check_update", { automatic: false });
+  return /** @type {Promise<UpdateInfo>} */ (invoke("check_update", { automatic: false }));
 }
 
 /** Non attendue par le boot : la requête peut prendre jusqu'à 10 s. */

@@ -1,3 +1,5 @@
+// @ts-check
+
 // erd : parseur maison de la DSL « erd » (BurntSushi/erd, écrite en Haskell, sans
 // portage JS) → Graphviz DOT. Le DOT est ensuite rendu par le graphviz WASM déjà
 // chargé (cf. renderDbml dans renderer.js). Expose window.erdToDot.
@@ -12,15 +14,48 @@
 // Non couvert (documenté) : `#` en milieu de ligne, blocs multi-lignes, pass-through
 // d'attributs Graphviz arbitraires, patte d'oie (cardinalités rendues en libellé texte).
 
+// AST interne (script classique : ces typedefs sont globaux, d'où le préfixe Erd).
+/**
+ * Bloc d'options `{ clé: valeur }` : clés en minuscules, valeurs déquotées.
+ * @typedef {Record<string, string>} ErdOpts
+ */
+/**
+ * @typedef {object} ErdAttr
+ * @property {string} name
+ * @property {boolean} pk clé primaire (marqueur `*`)
+ * @property {boolean} fk clé étrangère (marqueur `+`)
+ */
+/**
+ * @typedef {object} ErdEntity
+ * @property {string} name
+ * @property {ErdOpts} opts lu : `bgcolor`
+ * @property {ErdAttr[]} attrs
+ */
+/**
+ * Cardinalité erd brute (`?`, `1`, `*`, `+`).
+ * @typedef {"?" | "1" | "*" | "+"} ErdCard
+ */
+/**
+ * @typedef {object} ErdRel
+ * @property {string} from
+ * @property {ErdCard} c1 côté `from`
+ * @property {ErdCard} c2 côté `to`
+ * @property {string} to
+ * @property {ErdOpts} opts lu : `label`
+ */
+
 (function () {
   // `rendererT` est posé par renderer.js (module, ui/renderer/i18n.js) avant tout
   // chargement de ce script.
+  /** @type {import("../../types/renderer").RendererT} */
   const t = (key, params) => window.rendererT(key, params);
 
   // Cardinalité erd → libellé porté par l'arête.
+  /** @type {Record<ErdCard, string>} */
   const CARD = { "?": "0,1", "1": "1", "*": "0,N", "+": "1,N" };
   const HEADER_BG = "#ececff";
 
+  /** @param {unknown} s */
   function escapeHtml(s) {
     return String(s)
       .replace(/&/g, "&amp;")
@@ -31,15 +66,21 @@
 
   // Identifiant de nœud : nom d'entité DOT-quoté (Graphviz accepte toute chaîne
   // entre guillemets), guillemets internes échappés. Pas de sanitisation requise.
+  /** @param {string} name */
   function dotId(name) {
     return `"${String(name).replace(/"/g, '\\"')}"`;
   }
 
   // Extrait un éventuel bloc d'options `{ ... }` en fin de chaîne.
   // Retourne { head, opts } où opts est un objet clé→valeur (valeurs déquotées).
+  /**
+   * @param {string} text
+   * @returns {{ head: string, opts: ErdOpts }}
+   */
   function splitOptions(text) {
     const m = /\{([^}]*)\}\s*$/.exec(text);
     if (!m) return { head: text.trim(), opts: {} };
+    /** @type {ErdOpts} */
     const opts = {};
     const body = m[1];
     const re = /([A-Za-z_][\w-]*)\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^,]+)/g;
@@ -54,6 +95,7 @@
     return { head: text.slice(0, m.index).trim(), opts };
   }
 
+  /** @param {ErdAttr} attr */
   function attrCell(attr) {
     let inner = escapeHtml(attr.name);
     if (attr.pk) inner = `<u>${inner}</u>`;
@@ -62,6 +104,7 @@
     return `      <tr><td align="left">${inner}</td></tr>`;
   }
 
+  /** @param {ErdEntity} ent */
   function entityNode(ent) {
     const bg = ent.opts.bgcolor || HEADER_BG;
     const rows = [
@@ -76,6 +119,7 @@
     );
   }
 
+  /** @param {ErdRel} rel */
   function edgeLine(rel) {
     const tail = CARD[rel.c1] ?? rel.c1;
     const head = CARD[rel.c2] ?? rel.c2;
@@ -91,11 +135,20 @@
     return `  ${dotId(rel.from)} -> ${dotId(rel.to)} [${parts.join(", ")}];`;
   }
 
+  /**
+   * @param {string} src
+   * @returns {{ entities: ErdEntity[], rels: ErdRel[], title: string | null }}
+   */
   function parse(src) {
+    /** @type {ErdEntity[]} */
     const entities = [];
+    /** @type {Map<string, ErdEntity>} */
     const byName = new Map();
+    /** @type {ErdRel[]} */
     const rels = [];
+    /** @type {string | null} */
     let title = null;
+    /** @type {ErdEntity | null} */
     let current = null;
 
     const lines = String(src).replace(/\r\n?/g, "\n").split("\n");
@@ -117,8 +170,9 @@
         if (rm) {
           rels.push({
             from: rm[1].trim().replace(/^["'`]|["'`]$/g, ""),
-            c1: rm[2],
-            c2: rm[3],
+            // La regex ne capture que `[?1*+]`.
+            c1: /** @type {ErdCard} */ (rm[2]),
+            c2: /** @type {ErdCard} */ (rm[3]),
             to: rm[4].trim().replace(/^["'`]|["'`]$/g, ""),
             opts,
           });
@@ -158,6 +212,10 @@
     return { entities, rels, title };
   }
 
+  /**
+   * @param {string} src
+   * @returns {string} DOT
+   */
   function erdToDot(src) {
     const { entities, rels, title } = parse(src);
     const out = ["digraph erd {"];

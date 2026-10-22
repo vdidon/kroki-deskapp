@@ -1,3 +1,4 @@
+// @ts-check
 // Recherche plein-texte dans TOUS les documents ouverts (les onglets de la
 // fenêtre) — complète findword.js, qui ne surligne que dans la vue active.
 // La requête est cherchée dans le SOURCE réel de chaque document, relu via
@@ -15,6 +16,14 @@ import { scrollToLine } from "./render.js";
 import { collectMatchRanges } from "./textmatch.js";
 import { buildMatcher, initSearchToggles, iterMatches } from "./searchopts.js";
 
+/** @typedef {import("../../types/app").View} View */
+/** @typedef {import("../../types/ipc").TabInfo} TabInfo */
+/** @typedef {import("../../types/ipc").Anchor} Anchor */
+/** @typedef {import("./searchopts.js").SearchOptions} SearchOptions */
+/** @typedef {{ line: number, text: string, spans: [number, number][] }} Hit  ligne 0-based */
+/** @typedef {{ hits: Hit[], total: number, capped: boolean, truncated: boolean }} Hits */
+/** @typedef {{ tab: TabInfo, error: true } | (Hits & { tab: TabInfo, error?: undefined })} DocResult */
+
 const HIGHLIGHT_NAME = "search-occurrences";
 const MIN_LEN = 2; // même seuil que findword : en dessous, trop de bruit
 const MAX_LINES_PER_DOC = 200; // lignes de résultat affichées par document
@@ -28,16 +37,33 @@ const hlSupported =
   !!window.CSS.highlights &&
   typeof window.Highlight !== "undefined";
 
-let panel, input, statusEl, resultsEl, searchBtn, closeBtn;
+// Éléments d'index.html, renseignés par initGlobalSearch. Avant elle, `panel`
+// est undefined : les points d'entrée le testent (`!panel`).
+/** @type {HTMLElement} */
+let panel;
+/** @type {HTMLInputElement} */
+let input;
+/** @type {HTMLElement} */
+let statusEl;
+/** @type {HTMLElement} */
+let resultsEl;
+/** @type {HTMLElement} */
+let searchBtn;
+/** @type {HTMLElement} */
+let closeBtn;
+/** @type {SearchOptions} */
 let opts = { caseSensitive: false, wholeWord: false, regex: false };
+/** @type {(() => void) | null} */
 let onBeforeOpen = null; // hook de main.js (ferme le sommaire, exclusif du panneau)
 let seq = 0; // anti-course : seule la dernière recherche lancée peut afficher
 let debounceTimer = 0;
+/** @type {RegExp | null} */
 let shownRe = null; // motif des résultats affichés, réutilisé pour le surlignage
 // Saut vers un onglet pas encore actif : mémorisé ici, consommé par
 // `onActiveViewShown` une fois l'onglet cible rendu (même mécanique que
 // `pendingAnchor` pour les deep-links).
-let pendingJump = null; // { docId, line, expires }
+/** @type {{ docId: number, line: number, expires: number } | null} */
+let pendingJump = null;
 let searchedTabsKey = ""; // onglets couverts par les résultats affichés (ids)
 
 function clearHighlight() {
@@ -46,6 +72,7 @@ function clearHighlight() {
 
 // Surligne toutes les occurrences de la requête courante dans une vue (mêmes
 // Ranges que findword.js, cf. textmatch.js, sous un nom de highlight distinct).
+/** @param {HTMLElement} viewEl */
 function highlightView(viewEl) {
   if (!hlSupported) return;
   if (!shownRe) {
@@ -59,13 +86,20 @@ function highlightView(viewEl) {
 
 // Occurrences dans un source : une entrée par ligne matchée (positions retenues
 // pour l'extrait), total toutes occurrences confondues.
+/**
+ * @param {string} text
+ * @param {RegExp | null} re
+ * @returns {Hits}
+ */
 function findHits(text, re) {
   const lines = String(text).split("\n");
+  /** @type {Hit[]} */
   const hits = [];
   let total = 0;
   let matchedLines = 0;
   let capped = false;
   for (let i = 0; i < lines.length; i++) {
+    /** @type {[number, number][]} */
     const spans = [];
     for (const m of iterMatches(re, lines[i], MAX_PER_LINE)) {
       spans.push([m.index, m.index + m[0].length]);
@@ -84,6 +118,11 @@ function findHits(text, re) {
 
 // Extrait d'une ligne, fenêtré autour de la première occurrence, occurrences
 // marquées en <mark> (DOM construit par textContent : aucun HTML interprété).
+/**
+ * @param {string} lineText
+ * @param {[number, number][]} spans  non vide
+ * @returns {HTMLElement}
+ */
 function excerptEl(lineText, spans) {
   let start = 0;
   if (lineText.length > EXCERPT_LEN) {
@@ -113,6 +152,11 @@ function excerptEl(lineText, spans) {
 
 // Ligne du markdown généré correspondant à une ligne source (vue debug
 // « dérivée » : les data-line y sont dans le markdown du plugin).
+/**
+ * @param {Anchor[]} anchors
+ * @param {number} srcLine
+ * @returns {number}
+ */
 function mdLineForSource(anchors, srcLine) {
   let best = 0;
   for (const [mdLine, s] of anchors) {
@@ -122,6 +166,10 @@ function mdLineForSource(anchors, srcLine) {
 }
 
 // Amène la ligne source `line` en haut de la vue, quel que soit son mode.
+/**
+ * @param {View | undefined} v
+ * @param {number} line
+ */
 function scrollToHit(v, line) {
   if (!v || !v.rendered) return;
   let attr = "data-source-line"; // preview : déjà exprimé dans le source réel
@@ -134,6 +182,10 @@ function scrollToHit(v, line) {
   highlightView(v.el);
 }
 
+/**
+ * @param {number} docId
+ * @param {number} line
+ */
 function jumpTo(docId, line) {
   if (docId === state.active) {
     scrollToHit(state.views.get(docId), line);
@@ -145,6 +197,10 @@ function jumpTo(docId, line) {
 
 // Appelé par showActive (main.js) une fois l'onglet actif rendu : consomme un
 // saut en attente, sinon fait suivre le surlignage à la vue affichée.
+/**
+ * @param {View} v
+ * @param {number} id
+ */
 export function onActiveViewShown(v, id) {
   if (!panel || panel.hidden) return;
   if (pendingJump && pendingJump.docId === id) {
@@ -158,6 +214,7 @@ export function onActiveViewShown(v, id) {
   if (shownRe) highlightView(v.el);
 }
 
+/** @param {DocResult[]} results */
 function renderResults(results) {
   const scrollTop = resultsEl.scrollTop; // rafraîchissement : ne pas perdre la position
   const frag = document.createDocumentFragment();
@@ -222,6 +279,7 @@ function renderResults(results) {
 }
 
 // Nombre affiché, séparateurs de milliers de la langue courante.
+/** @param {number} n */
 function formatCount(n) {
   return n.toLocaleString(getLocale());
 }
@@ -229,6 +287,12 @@ function formatCount(n) {
 // Bilan « N occurrences dans M documents (note) ». Une phrase par combinaison
 // (document unique ou non × note) : le pluriel du catalogue ne porte que sur
 // `count` (les occurrences), et on ne recolle jamais de fragments traduits.
+/**
+ * @param {number} total
+ * @param {number} docCount
+ * @param {"capped" | "truncated" | ""} note
+ * @returns {string}
+ */
 function summaryText(total, docCount, note) {
   const p = { count: total, total: formatCount(total), docs: formatCount(docCount) };
   if (docCount === 1) {
@@ -242,6 +306,7 @@ function summaryText(total, docCount, note) {
 }
 
 // Vide les résultats ; `status` non vide = message d'erreur (motif invalide).
+/** @param {string} [status] */
 function clearResults(status = "") {
   shownRe = null;
   resultsEl.replaceChildren();
@@ -273,22 +338,27 @@ async function runSearch() {
   // Les onglets HTML (iframe) sont exclus : chercher dans leur balisage brut
   // serait du bruit, et le saut vers une ligne n'a pas de sens dans l'iframe.
   const results = await Promise.all(
-    state.tabs.filter((t) => !isHtmlPath(t.path)).map(async (tab) => {
-      try {
-        const doc = await invoke("read_document", { docId: tab.id });
-        return { tab, ...findHits(doc.markdown, re) };
-      } catch {
-        return { tab, error: true };
-      }
-    }),
+    state.tabs.filter((t) => !isHtmlPath(t.path)).map(
+      /** @returns {Promise<DocResult>} */
+      async (tab) => {
+        try {
+          const doc = await invoke("read_document", { docId: tab.id });
+          return { tab, ...findHits(doc.markdown, re) };
+        } catch {
+          return { tab, error: true };
+        }
+      },
+    ),
   );
   if (mySeq !== seq || panel.hidden) return; // recherche plus récente ou panneau fermé
   shownRe = re;
   renderResults(results);
-  const v = state.views.get(state.active);
+  // `active` null : `get` rend undefined.
+  const v = state.views.get(/** @type {number} */ (state.active));
   if (v) highlightView(v.el);
 }
 
+/** @param {number} [delay] */
 function scheduleSearch(delay = DEBOUNCE_MS) {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(runSearch, delay);
@@ -322,7 +392,7 @@ export function closeGlobalSearch() {
   shownRe = null;
   clearHighlight();
   // Rend le focus à la vue active : PgUp/PgDn/flèches y défilent à nouveau.
-  state.views.get(state.active)?.el.focus({ preventScroll: true });
+  state.views.get(/** @type {number} */ (state.active))?.el.focus({ preventScroll: true });
 }
 
 export function toggleGlobalSearch() {
@@ -339,15 +409,16 @@ export function refreshGlobalSearch() {
   scheduleSearch(0); // runSearch gère aussi la requête trop courte
 }
 
+/** @param {{ beforeOpen?: () => void }} [hooks] */
 export function initGlobalSearch({ beforeOpen } = {}) {
   onBeforeOpen = beforeOpen ?? null;
-  panel = document.getElementById("search-panel");
-  input = document.getElementById("search-input");
-  statusEl = document.getElementById("search-status");
-  resultsEl = document.getElementById("search-results");
-  searchBtn = document.getElementById("btn-search");
-  closeBtn = document.getElementById("search-close");
-  opts = initSearchToggles(document.getElementById("search-opts"), () => scheduleSearch(0));
+  panel = /** @type {HTMLElement} */ (document.getElementById("search-panel"));
+  input = /** @type {HTMLInputElement} */ (document.getElementById("search-input"));
+  statusEl = /** @type {HTMLElement} */ (document.getElementById("search-status"));
+  resultsEl = /** @type {HTMLElement} */ (document.getElementById("search-results"));
+  searchBtn = /** @type {HTMLElement} */ (document.getElementById("btn-search"));
+  closeBtn = /** @type {HTMLElement} */ (document.getElementById("search-close"));
+  opts = initSearchToggles(/** @type {HTMLElement} */ (document.getElementById("search-opts")), () => scheduleSearch(0));
   searchBtn.addEventListener("click", toggleGlobalSearch);
   // Statut, notes et bilan affichés : une nouvelle recherche les reconstruit
   // dans la langue courante (résultats rafraîchis, position de défilement gardée).

@@ -445,6 +445,40 @@ node tests/test_i18n.mjs                        # language catalogs vs. code
 `test_i18n.mjs` is to be run after any change to a displayed text (see
 « Interface language » below).
 
+### Type checking (JSDoc, no build step)
+
+Every shipped JS file (`ui/js`, `ui/renderer`, `plugins/latex-doc`) starts
+with `// @ts-check` and is type-checked in **strict** mode by the TypeScript
+compiler — types live in JSDoc comments and in `.d.ts` files, the shipped JS
+is unchanged (no transpilation, nothing added to the runtime). Run after any
+JS change; requires a global `tsc` (TypeScript ≥ 5, no npm install in the repo):
+
+```bash
+tsc -p jsconfig.json                      # main window + render webview
+tsc -p plugins/latex-doc/jsconfig.json    # latex-doc plugin (worker + Node, no DOM)
+node tests/test_ipc_types.mjs             # types/ipc.d.ts vs. the Rust commands
+```
+
+- `types/` (repo root, **not** under `ui/`, hence not embedded in the binary):
+  `ipc.d.ts` is the front ↔ back contract — `Commands` (command → args/return)
+  and `Events` (event → payload), hand-copied from the Rust signatures and serde
+  structs; `globals.d.ts` types `window.__TAURI__` on it, so `invoke`/`listen`
+  check the command name, the arguments and the returned shape. **Changing a
+  `#[tauri::command]`, a serialized struct or an emitted payload = updating
+  `ipc.d.ts`**: `test_ipc_types.mjs` catches command names, argument names and
+  `Option` mismatches, not return types. `app.d.ts` = shared window state
+  (`View`, `AppState`); `plugin-protocol.d.ts` = protocol v1 messages and the
+  `kd` worker global (reusable by third-party plugin authors);
+  `vendor.d.ts` / `renderer.d.ts` = the **used** surface of the vendored
+  globals (main window / render webview) — extend them when using a new vendor
+  API rather than casting to `any`.
+- `plugins/latex-doc/vendor/unified-latex.esm.d.ts` types the vendored parser
+  (AST as a discriminated union on `type`); it sits next to the bundle so that
+  `tsc` never parses the 245 KB file. Outside `packInclude`, hence not packed.
+- Conventions: DOM elements that `index.html` guarantees are cast
+  (`/** @type {HTMLInputElement} */ (document.getElementById("x"))`), never
+  guarded at runtime; no `any` / `@ts-ignore` without a comment saying why.
+
 A plugin mounted by junction from another repo carries its own
 tests there.
 

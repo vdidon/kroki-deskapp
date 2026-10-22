@@ -1,3 +1,5 @@
+// @ts-check
+
 // Drag d'onglets : réordonnancement dans la barre, détachement hors de la barre
 // (nouvelle fenêtre) et dépôt sur une autre fenêtre de l'application (transfert).
 //
@@ -11,11 +13,35 @@ import { invoke } from "./app.js";
 const TEAR_MARGIN = 36; // sortie verticale de la barre au-delà de laquelle on détache
 const DRAG_THRESHOLD = 5;
 
-const tabbarEl = document.getElementById("tabbar");
-const hintEl = document.getElementById("drag-hint");
+const tabbarEl = /** @type {HTMLElement} */ (document.getElementById("tabbar"));
+const hintEl = /** @type {HTMLElement} */ (document.getElementById("drag-hint"));
 
-let drag = null;
+/**
+ * Drag en cours. Les champs de réordonnancement (`order` → `rowTops`) sont posés
+ * par `beginReorder` et lus seulement en phases `reorder`/`tear`.
+ * @typedef {object} DragState
+ * @property {number} docId
+ * @property {HTMLElement} el
+ * @property {string} title
+ * @property {number} pointerId
+ * @property {number} startX
+ * @property {number} startY
+ * @property {"press" | "reorder" | "tear"} phase
+ * @property {(string | undefined)[]} order
+ * @property {DOMRect[]} rects
+ * @property {number} startIndex
+ * @property {number} curIndex
+ * @property {number[]} rowTops
+ */
 
+// `null` hors drag. Typé non nul : les fonctions ci-dessous ne sont appelées
+// que pendant un drag (gardes `if (!drag)` dans les écouteurs et
+// `cleanupVisuals`) ; un type `DragState | null` exigerait une assertion à
+// chacun de leurs accès, sans rien vérifier de plus.
+/** @type {DragState} */
+let drag = /** @type {DragState} */ (/** @type {unknown} */ (null));
+
+/** @param {PointerEvent} e */
 function isInBand(e) {
   const bar = tabbarEl.getBoundingClientRect();
   return (
@@ -27,6 +53,7 @@ function isInBand(e) {
 }
 
 function suppressNextClick() {
+  /** @param {Event} e */
   const swallow = (e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -35,8 +62,9 @@ function suppressNextClick() {
   setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 250);
 }
 
+/** @param {HTMLElement} tabsEl */
 function beginReorder(tabsEl) {
-  const tabs = [...tabsEl.children];
+  const tabs = /** @type {HTMLElement[]} */ ([...tabsEl.children]);
   drag.order = tabs.map((el) => el.dataset.id);
   drag.rects = tabs.map((el) => el.getBoundingClientRect());
   drag.startIndex = tabs.indexOf(drag.el);
@@ -50,6 +78,7 @@ function beginReorder(tabsEl) {
 
 // Index de la ligne la plus proche d'une ordonnée (les onglets font tous la
 // même hauteur : la plus proche par le centre de ligne suffit).
+/** @param {number} y */
 function rowAt(y) {
   const h = drag.rects[0].height;
   let best = 0;
@@ -61,6 +90,7 @@ function rowAt(y) {
   return best;
 }
 
+/** @param {PointerEvent} e */
 function updateReorder(e) {
   if (drag.rowTops.length > 1) {
     // Barre sur plusieurs lignes : l'onglet suit librement le curseur et la
@@ -99,7 +129,7 @@ function updateReorder(e) {
 
 function shiftSiblings() {
   const w = drag.rects[drag.startIndex].width;
-  const tabs = [...drag.el.parentElement.children];
+  const tabs = /** @type {HTMLElement[]} */ ([.../** @type {HTMLElement} */ (drag.el.parentElement).children]);
   tabs.forEach((el, i) => {
     if (el === drag.el) return;
     let offset = 0;
@@ -112,7 +142,8 @@ function shiftSiblings() {
 function enterTear() {
   drag.phase = "tear";
   drag.el.style.transform = "";
-  for (const el of drag.el.parentElement.children) el.style.transform = "";
+  for (const el of /** @type {HTMLCollectionOf<HTMLElement>} */ (/** @type {HTMLElement} */ (drag.el.parentElement).children))
+    el.style.transform = "";
   drag.el.classList.add("tearing");
   hintEl.textContent = drag.title;
   hintEl.hidden = false;
@@ -124,6 +155,7 @@ function exitTear() {
   hintEl.hidden = true;
 }
 
+/** @param {PointerEvent} e */
 function moveHint(e) {
   // Le hint n'est visible que lorsque le curseur est dans la fenêtre source ;
   // au-delà, seul le curseur système reste (limitation assumée).
@@ -142,23 +174,25 @@ function cleanupVisuals() {
   drag.el.classList.remove("dragging", "tearing");
   drag.el.style.transform = "";
   if (drag.el.parentElement) {
-    for (const el of drag.el.parentElement.children) el.style.transform = "";
+    for (const el of /** @type {HTMLCollectionOf<HTMLElement>} */ (drag.el.parentElement.children)) {
+      el.style.transform = "";
+    }
   }
   document.body.classList.remove("tab-dragging");
   hintEl.hidden = true;
 }
 
 export function initTearDrag() {
-  const tabsEl = document.getElementById("tabs");
+  const tabsEl = /** @type {HTMLElement} */ (document.getElementById("tabs"));
 
   tabsEl.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || drag) return;
-    if (e.target.closest(".tab-close")) return;
-    const tab = e.target.closest(".tab");
+    if (/** @type {Element} */ (e.target).closest(".tab-close")) return;
+    const tab = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".tab"));
     if (!tab) return;
     const docId = Number(tab.dataset.id);
     if (!tab.classList.contains("active")) invoke("activate_tab", { docId });
-    drag = {
+    drag = /** @type {DragState} */ ({
       docId,
       el: tab,
       title: tab.querySelector(".tab-title")?.textContent ?? "",
@@ -166,11 +200,11 @@ export function initTearDrag() {
       startX: e.clientX,
       startY: e.clientY,
       phase: "press",
-    };
+    });
     try {
       tab.setPointerCapture(e.pointerId);
     } catch {
-      drag = null;
+      drag = /** @type {DragState} */ (/** @type {unknown} */ (null));
     }
   });
 
@@ -203,7 +237,7 @@ export function initTearDrag() {
     if (!drag || e.pointerId !== drag.pointerId) return;
     const d = drag;
     cleanupVisuals();
-    drag = null;
+    drag = /** @type {DragState} */ (/** @type {unknown} */ (null));
     if (d.phase === "reorder" && d.curIndex !== d.startIndex) {
       suppressNextClick();
       invoke("reorder_tab", { docId: d.docId, index: d.curIndex });
@@ -216,7 +250,7 @@ export function initTearDrag() {
   const cancel = () => {
     if (!drag) return;
     cleanupVisuals();
-    drag = null;
+    drag = /** @type {DragState} */ (/** @type {unknown} */ (null));
   };
   tabsEl.addEventListener("pointercancel", cancel);
   // Un rebuild de la barre pendant un drag détache l'élément capturé :

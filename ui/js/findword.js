@@ -1,3 +1,4 @@
+// @ts-check
 // Surligne toutes les occurrences du mot actuellement sélectionné dans la vue active
 // (comme VS Code). Repose sur la CSS Custom Highlight API (`CSS.highlights` +
 // `::highlight(word-occurrences)`, cf. app.css) : AUCUNE modification du DOM — pas de
@@ -29,13 +30,19 @@ function clearHighlight() {
 
 // La vue de l'onglet actif, seulement si elle est visible (les autres vues et la
 // barre d'onglets / dialogues ne doivent pas déclencher le surlignage).
+/** @returns {HTMLElement | null} */
 function activeViewEl() {
-  const v = state.views.get(state.active);
+  // `active` null : `get` rend undefined, écarté juste après.
+  const v = state.views.get(/** @type {number} */ (state.active));
   if (!v || v.el.style.display === "none") return null;
   return v.el;
 }
 
 // Retourne le mot à pister, ou null si la sélection n'est pas un token unique exploitable.
+/**
+ * @param {Selection | null} sel
+ * @returns {string | null}
+ */
 function selectedWord(sel) {
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
   const trimmed = sel.toString().trim();
@@ -47,6 +54,10 @@ function selectedWord(sel) {
 // Un Range par occurrence dans la vue (insensible à la casse, comme une recherche ;
 // cf. textmatch.js pour le recollement des nœuds d'une ligne colorée). Le mot
 // sélectionné lui-même est inclus : la sélection native le recouvre visuellement.
+/**
+ * @param {HTMLElement} viewEl
+ * @param {string} word
+ */
 function highlightOccurrences(viewEl, word) {
   const ranges = collectMatchRanges(viewEl, buildMatcher(word));
   if (ranges.length === 0) clearHighlight();
@@ -59,7 +70,8 @@ function update() {
   const word = selectedWord(sel);
   const viewEl = activeViewEl();
   // Sélection vide/multi-mots, ou en dehors de la vue active (barre d'onglets, réglages…).
-  if (!word || !viewEl || !viewEl.contains(sel.anchorNode)) {
+  // `sel` non nul ici : `selectedWord(null)` rend null, d'où le cast.
+  if (!word || !viewEl || !viewEl.contains(/** @type {Selection} */ (sel).anchorNode)) {
     clearHighlight();
     return;
   }

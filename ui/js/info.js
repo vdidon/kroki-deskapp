@@ -1,3 +1,4 @@
+// @ts-check
 // Dialog « Informations » : version de l'app, état des runtimes/moteurs sur
 // le poste courant, accès au changelog (« Nouveautés ») et vérification des
 // mises à jour à la demande (updates.js). Les données des
@@ -10,20 +11,30 @@ import { openChangelog } from "./changelog.js";
 import { t } from "./i18n.js";
 import { checkForUpdate, openDownload, openRelease } from "./updates.js";
 
-const dialog = document.getElementById("info-dialog");
-const groupsEl = document.getElementById("info-groups");
-const versionEl = document.getElementById("info-version");
-const updateBtn = document.getElementById("info-update-check");
-const downloadBtn = document.getElementById("info-update-download");
-const releaseBtn = document.getElementById("info-update-release");
-const updateStatus = document.getElementById("info-update-status");
+/** @typedef {import("../../types/ipc").UpdateInfo} UpdateInfo */
+/** @typedef {import("../../types/ipc").RuntimeGroup} RuntimeGroup */
+
+// Éléments d'index.html, présents par construction.
+const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("info-dialog"));
+const groupsEl = /** @type {HTMLElement} */ (document.getElementById("info-groups"));
+const versionEl = /** @type {HTMLElement} */ (document.getElementById("info-version"));
+const updateBtn = /** @type {HTMLButtonElement} */ (document.getElementById("info-update-check"));
+const downloadBtn = /** @type {HTMLButtonElement} */ (document.getElementById("info-update-download"));
+const releaseBtn = /** @type {HTMLButtonElement} */ (document.getElementById("info-update-release"));
+const updateStatus = /** @type {HTMLElement} */ (document.getElementById("info-update-status"));
+/** @type {UpdateInfo | null} */
 let updateInfo = null; // dernier résultat, cible des boutons « Télécharger » / « Notes de version »
 
+/**
+ * @param {string} text
+ * @param {boolean} [error]
+ */
 function setUpdateStatus(text, error = false) {
   updateStatus.textContent = text;
   updateStatus.classList.toggle("error", error);
 }
 
+/** @param {boolean} show */
 function showUpdateLinks(show) {
   downloadBtn.hidden = !show;
   releaseBtn.hidden = !show;
@@ -50,6 +61,10 @@ async function checkUpdate() {
 }
 
 // Libellé d'un statut, traduit à l'affichage (le dialog est rendu à chaque ouverture).
+/**
+ * @param {string} status
+ * @returns {string}
+ */
 function statusLabel(status) {
   switch (status) {
     case "ok":
@@ -61,6 +76,10 @@ function statusLabel(status) {
   }
 }
 
+/**
+ * @param {RuntimeGroup} g
+ * @returns {HTMLElement}
+ */
 function renderGroup(g) {
   const status = ["ok", "blocked"].includes(g.status) ? g.status : "unsupported";
 
@@ -135,11 +154,13 @@ export async function openInfo() {
 }
 
 export function initInfo() {
-  document.getElementById("info-close").addEventListener("click", () => dialog.close());
+  /** @type {HTMLElement} */ (document.getElementById("info-close")).addEventListener("click", () => dialog.close());
   // Le changelog s'empile au-dessus du dialog (modales imbriquées, comme le
   // dialog de confiance au-dessus du dialog Plugins).
-  document.getElementById("info-changelog").addEventListener("click", openChangelog);
+  /** @type {HTMLElement} */ (document.getElementById("info-changelog")).addEventListener("click", openChangelog);
   updateBtn.addEventListener("click", checkUpdate);
-  downloadBtn.addEventListener("click", () => openDownload(updateInfo));
-  releaseBtn.addEventListener("click", () => openRelease(updateInfo));
+  // Boutons masqués tant qu'aucune vérification n'a abouti : `updateInfo` est
+  // alors renseigné (cf. checkUpdate).
+  downloadBtn.addEventListener("click", () => openDownload(/** @type {UpdateInfo} */ (updateInfo)));
+  releaseBtn.addEventListener("click", () => openRelease(/** @type {UpdateInfo} */ (updateInfo)));
 }

@@ -1,3 +1,4 @@
+// @ts-check
 // UI de gestion des plugins (spec §9.4) : dialog « Plugins » (cartes, bouton
 // Supprimer, bouton « Ajouter un plugin… ») et dialog de confiance à
 // l'installation (§9.2). Les deux voies d'ajout — drop d'un `.kdext` sur la
@@ -14,16 +15,21 @@ import { openPluginChangelog } from "./changelog.js";
 import { isNativeFence } from "./render.js";
 import { onLocaleChange, t } from "./i18n.js";
 
-const dialog = document.getElementById("plugins-dialog");
-const listEl = document.getElementById("plugins-list");
-const trustDialog = document.getElementById("plugin-trust-dialog");
-const trustTitle = document.getElementById("plugin-trust-title");
-const trustBody = document.getElementById("plugin-trust-body");
-const trustError = document.getElementById("plugin-trust-error");
-const trustInstall = document.getElementById("plugin-trust-install");
+/** @typedef {import("../../types/ipc").PluginInfo} PluginInfo */
+/** @typedef {import("../../types/ipc").ManifestPreview} ManifestPreview */
+
+// Éléments statiques de ui/index.html.
+const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("plugins-dialog"));
+const listEl = /** @type {HTMLDivElement} */ (document.getElementById("plugins-list"));
+const trustDialog = /** @type {HTMLDialogElement} */ (document.getElementById("plugin-trust-dialog"));
+const trustTitle = /** @type {HTMLHeadingElement} */ (document.getElementById("plugin-trust-title"));
+const trustBody = /** @type {HTMLDivElement} */ (document.getElementById("plugin-trust-body"));
+const trustError = /** @type {HTMLParagraphElement} */ (document.getElementById("plugin-trust-error"));
+const trustInstall = /** @type {HTMLButtonElement} */ (document.getElementById("plugin-trust-install"));
 
 // Capacités du manifeste « en clair » pour le dialog de confiance (§9.2) :
 // des fonctions, résolues à l'affichage dans la langue courante.
+/** @type {Record<string, () => string>} */
 const CAP_LABELS = {
   "document:markdown": () => t("trust.cap.document_markdown"),
   "document:html": () => t("trust.cap.document_html"),
@@ -37,6 +43,7 @@ const CAP_LABELS = {
 };
 
 // statut -> [classe du badge, libellé]
+/** @type {Record<string, [badgeClass: string, label: () => string]>} */
 const STATUS_LABELS = {
   ok: ["ok", () => t("plugins.status.ok")],
   inert: ["blocked", () => t("plugins.status.inert")],
@@ -44,6 +51,10 @@ const STATUS_LABELS = {
   broken: ["unsupported", () => t("plugins.status.broken")],
 };
 
+/**
+ * @param {string} text
+ * @returns {HTMLSpanElement}
+ */
 function chip(text) {
   const el = document.createElement("span");
   el.className = "rt-chip";
@@ -53,6 +64,10 @@ function chip(text) {
 
 // Avertissements calculés côté frontend : fences/colorations masquées par le
 // natif (le backend ne connaît ni KROKI_TYPES ni les grammaires hljs — §8.1).
+/**
+ * @param {PluginInfo} p
+ * @returns {string[]}
+ */
 function nativeClaimWarnings(p) {
   const out = [];
   for (const f of p.fences || []) {
@@ -66,6 +81,10 @@ function nativeClaimWarnings(p) {
   return out;
 }
 
+/**
+ * @param {PluginInfo} p
+ * @returns {HTMLElement}
+ */
 function renderCard(p) {
   const runtime = pluginRuntimeState(p.id);
   const statusKey = runtime.broken ? "broken" : p.status;
@@ -165,6 +184,10 @@ function renderCard(p) {
   return card;
 }
 
+/**
+ * @param {HTMLElement} container
+ * @param {unknown} err rejet d'`invoke` (chaîne d'erreur Rust)
+ */
 function alertError(container, err) {
   const p = document.createElement("p");
   p.className = "settings-error";
@@ -199,6 +222,11 @@ onLocaleChange(() => {
 // Dialog de confiance (§9.2) — obligatoire, y compris en mise à jour
 // --------------------------------------------------------------------------- //
 
+/**
+ * @param {string} label
+ * @param {string} value
+ * @returns {string} HTML échappé
+ */
 function trustRow(label, value) {
   return `<div class="trust-row"><span class="trust-label">${escapeHtml(label)}</span>` +
     `<span>${escapeHtml(value)}</span></div>`;
@@ -208,6 +236,8 @@ function trustRow(label, value) {
  * Point d'entrée commun des deux voies d'installation : lit le manifeste de
  * l'archive **sans exécuter le plugin**, affiche le dialog de confiance, puis
  * installe si l'utilisateur confirme.
+ * @param {string} path
+ * @returns {Promise<void>}
  */
 export async function requestPluginInstall(path) {
   if (!path) return;
@@ -215,6 +245,7 @@ export async function requestPluginInstall(path) {
   trustError.textContent = "";
   trustInstall.disabled = false;
 
+  /** @type {ManifestPreview | null} */
   let preview = null;
   try {
     preview = await invoke("plugin_manifest_preview", { path });
@@ -289,6 +320,7 @@ export async function requestPluginInstall(path) {
  * Vide la file des archives en attente côté Rust et les enchaîne dans le dialog
  * de confiance. Séquentiel : `showModal()` sur un dialog déjà ouvert lèverait —
  * on attend donc la fermeture avant la suivante.
+ * @returns {Promise<void>}
  */
 async function drainPendingInstalls() {
   const paths = await invoke("take_pending_plugin_installs");
@@ -300,17 +332,24 @@ async function drainPendingInstalls() {
   }
 }
 
+/** @returns {Promise<void>} */
 export async function initPluginsUi() {
-  document.getElementById("plugins-close").addEventListener("click", () => dialog.close());
-  document
-    .getElementById("plugin-add")
-    .addEventListener("click", () => invoke("pick_plugin_archive"));
-  document
-    .getElementById("plugins-open-dir")
-    .addEventListener("click", () => invoke("open_plugins_dir"));
-  document
-    .getElementById("plugin-trust-cancel")
-    .addEventListener("click", () => trustDialog.close());
+  /** @type {HTMLButtonElement} */ (document.getElementById("plugins-close")).addEventListener(
+    "click",
+    () => dialog.close(),
+  );
+  /** @type {HTMLButtonElement} */ (document.getElementById("plugin-add")).addEventListener(
+    "click",
+    () => invoke("pick_plugin_archive"),
+  );
+  /** @type {HTMLButtonElement} */ (document.getElementById("plugins-open-dir")).addEventListener(
+    "click",
+    () => invoke("open_plugins_dir"),
+  );
+  /** @type {HTMLButtonElement} */ (document.getElementById("plugin-trust-cancel")).addEventListener(
+    "click",
+    () => trustDialog.close(),
+  );
   // Drop Windows (drop_target.rs), double-clic / ligne de commande
   // (open_mixed_paths) et sélecteur natif (pick_plugin_archive) convergent ici.
   // Le drop Tauri (Linux) appelle requestPluginInstall en direct depuis

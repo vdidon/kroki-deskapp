@@ -1,3 +1,4 @@
+// @ts-check
 // Recherche dans le document affiché (Ctrl+F) — remplace la barre de recherche
 // native de la webview, qui n'était ni thémée, ni traduite de la même façon, ni
 // cohérente avec la recherche multi-documents (globalsearch.js). Même mise en
@@ -26,6 +27,9 @@ import { t, onLocaleChange } from "./i18n.js";
 import { collectMatchRanges } from "./textmatch.js";
 import { buildMatcher, initSearchToggles } from "./searchopts.js";
 
+/** @typedef {import("../../types/app").View} View */
+/** @typedef {import("./searchopts.js").SearchOptions} SearchOptions */
+
 const ALL_NAME = "find-occurrences";
 const CURRENT_NAME = "find-current";
 const DEBOUNCE_MS = 120;
@@ -37,16 +41,37 @@ const hlSupported =
   !!window.CSS.highlights &&
   typeof window.Highlight !== "undefined";
 
-let bar, input, countEl, prevBtn, nextBtn, closeBtn, ruler;
+// Éléments d'index.html, renseignés par initDocSearch. Avant elle, `bar` et
+// `ruler` sont undefined : les points d'entrée les testent (`!bar`, `!ruler`).
+/** @type {HTMLElement} */
+let bar;
+/** @type {HTMLInputElement} */
+let input;
+/** @type {HTMLElement} */
+let countEl;
+/** @type {HTMLButtonElement} */
+let prevBtn;
+/** @type {HTMLButtonElement} */
+let nextBtn;
+/** @type {HTMLButtonElement} */
+let closeBtn;
+/** @type {HTMLElement} */
+let ruler;
+/** @type {SearchOptions} */
 let opts = { caseSensitive: false, wholeWord: false, regex: false };
+/** @type {(() => void) | null} */
 let onBeforeOpen = null; // hook de main.js : ferme les panneaux de la même ancre
 let debounceTimer = 0;
+/** @type {Range[]} */
 let matches = []; // Range, dans l'ordre du document
 let current = -1;
+/** @type {View | null} */
 let matchesView = null; // vue sur laquelle portent `matches`
 // Occurrence courante de chaque document : vue → { sig, index }. N'est reprise
 // que pour la même requête et les mêmes options (`sig`).
+/** @type {WeakMap<View, { sig: string, index: number }>} */
 const positions = new WeakMap();
+/** @type {ResizeObserver | null} */
 let rulerObserver = null;
 let rulerFrame = 0;
 let toggleFrame = 0;
@@ -68,8 +93,10 @@ function clearHighlights() {
 // La vue de l'onglet actif, si elle est cherchable. Les documents HTML sont
 // rendus dans une iframe sandboxée : son contenu est inaccessible d'ici (et la
 // recherche multi-documents les exclut déjà).
+/** @returns {View | null} */
 function searchableView() {
-  const v = state.views.get(state.active);
+  // `active` null : `get` rend undefined, écarté juste après.
+  const v = state.views.get(/** @type {number} */ (state.active));
   if (!v || !v.rendered || v.kind === "html") return null;
   return v;
 }
@@ -96,6 +123,10 @@ function counter() {
   return t("docsearch.counter", { current: current + 1, total: matches.length });
 }
 
+/**
+ * @param {string} text
+ * @param {boolean} [error]
+ */
 function setStatus(text, error = false) {
   countEl.textContent = text;
   countEl.classList.toggle("error", error);
@@ -117,7 +148,7 @@ function drawRuler() {
   }
   const el = v.el;
   const box = el.getBoundingClientRect();
-  const host = ruler.parentElement.getBoundingClientRect();
+  const host = /** @type {HTMLElement} */ (ruler.parentElement).getBoundingClientRect(); // #content
   const scale = box.height / el.offsetHeight || 1;
   const barW = box.width - el.clientWidth * scale; // 0 : barre en surimpression
   const width = barW >= 4 ? barW : RULER_MIN_W;
@@ -127,8 +158,11 @@ function drawRuler() {
   ruler.style.width = `${width}px`;
   ruler.style.height = `${trackH}px`;
   const full = el.scrollHeight || 1;
+  /** @type {Set<number>} */
   const rows = new Set(); // un trait par pixel de piste, pas par occurrence
+  /** @type {HTMLElement[]} */
   const ticks = [];
+  /** @type {HTMLElement | null} */
   let currentTick = null; // posé en dernier : par-dessus un trait de même rangée
   matches.forEach((range, i) => {
     const r = range.getBoundingClientRect();
@@ -147,6 +181,11 @@ function drawRuler() {
   ruler.hidden = false;
 }
 
+/**
+ * @param {number} row
+ * @param {boolean} isCurrent
+ * @returns {HTMLElement}
+ */
 function tick(row, isCurrent) {
   const t = document.createElement("div");
   t.className = isCurrent ? "find-tick current" : "find-tick";
@@ -176,6 +215,11 @@ function watchRuler() {
 // inchangé) : la même occurrence, ou la suivante si elle vient d'être repliée.
 // `keepIndex` (changement d'onglet, re-rendu) : celle mémorisée pour ce
 // document, si la requête n'a pas changé depuis.
+/**
+ * @param {View} v
+ * @param {{ keepIndex?: boolean, anchor?: Range | null }} options
+ * @returns {number}
+ */
 function startIndex(v, { keepIndex, anchor }) {
   if (anchor) {
     const i = matches.findIndex((r) => r.compareBoundaryPoints(Range.START_TO_START, anchor) >= 0);
@@ -190,6 +234,7 @@ function startIndex(v, { keepIndex, anchor }) {
 // pixels logiques — d'où le facteur d'échelle mesuré sur la vue elle-même.
 // Les deux axes sont traités : sous zoom de page (Maj+molette) la vue défile
 // aussi horizontalement, et une occurrence peut être hors champ à droite.
+/** @param {HTMLElement} viewEl */
 function revealCurrent(viewEl) {
   const range = matches[current];
   if (!range) return;
@@ -212,6 +257,7 @@ function revealCurrent(viewEl) {
 // Relance la recherche sur la vue active. `keepIndex` reprend l'occurrence
 // mémorisée pour ce document (changement d'onglet, re-rendu), `anchor` reste
 // sur une occurrence donnée (cf. startIndex) ; sinon on repart de la 1ʳᵉ.
+/** @param {{ keepIndex?: boolean, reveal?: boolean, anchor?: Range | null }} [options] */
 function run({ keepIndex = false, reveal = true, anchor = null } = {}) {
   if (!bar || bar.hidden) return;
   matches = [];
@@ -258,6 +304,7 @@ function updateNav() {
   nextBtn.disabled = !on;
 }
 
+/** @param {number} dir  1 suivante, -1 précédente */
 function step(dir) {
   if (!matches.length) {
     run();
@@ -272,6 +319,7 @@ function step(dir) {
   if (v) revealCurrent(v.el);
 }
 
+/** @param {number} [delay] */
 function schedule(delay = DEBOUNCE_MS) {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => run(), delay);
@@ -309,7 +357,7 @@ export function closeDocSearch() {
   watchRuler();
   clearHighlights();
   // Rend le focus à la vue active : PgUp/PgDn/flèches y défilent à nouveau.
-  state.views.get(state.active)?.el.focus({ preventScroll: true });
+  state.views.get(/** @type {number} */ (state.active))?.el.focus({ preventScroll: true });
 }
 
 export function toggleDocSearch() {
@@ -317,6 +365,7 @@ export function toggleDocSearch() {
   else openDocSearch();
 }
 
+/** @param {number} [dir] */
 export function findNext(dir = 1) {
   if (!isDocSearchOpen()) {
     openDocSearch();
@@ -332,16 +381,17 @@ export function refreshDocSearch() {
   run({ keepIndex: true, reveal: false });
 }
 
+/** @param {{ beforeOpen?: () => void }} [hooks] */
 export function initDocSearch({ beforeOpen } = {}) {
   onBeforeOpen = beforeOpen ?? null;
-  bar = document.getElementById("find-bar");
-  input = document.getElementById("find-input");
-  countEl = document.getElementById("find-count");
-  prevBtn = document.getElementById("find-prev");
-  nextBtn = document.getElementById("find-next");
-  closeBtn = document.getElementById("find-close");
-  ruler = document.getElementById("find-ruler");
-  opts = initSearchToggles(document.getElementById("find-opts"), () => run());
+  bar = /** @type {HTMLElement} */ (document.getElementById("find-bar"));
+  input = /** @type {HTMLInputElement} */ (document.getElementById("find-input"));
+  countEl = /** @type {HTMLElement} */ (document.getElementById("find-count"));
+  prevBtn = /** @type {HTMLButtonElement} */ (document.getElementById("find-prev"));
+  nextBtn = /** @type {HTMLButtonElement} */ (document.getElementById("find-next"));
+  closeBtn = /** @type {HTMLButtonElement} */ (document.getElementById("find-close"));
+  ruler = /** @type {HTMLElement} */ (document.getElementById("find-ruler"));
+  opts = initSearchToggles(/** @type {HTMLElement} */ (document.getElementById("find-opts")), () => run());
   input.addEventListener("input", () => schedule());
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {

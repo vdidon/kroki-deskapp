@@ -1,3 +1,4 @@
+// @ts-check
 // Découpe d'un flot HTML coloré en une entrée par ligne.
 //
 // Module **pur** (aucune dépendance DOM ni app) : c'est la seule partie risquée
@@ -13,9 +14,14 @@
  *
  * Le nombre d'entrées retournées vaut toujours `html.split("\n").length` côté
  * texte : l'appelant s'en sert comme garde-fou avant de peindre.
+ *
+ * @param {string} html
+ * @returns {string[]}
  */
 export function splitHighlightedLines(html) {
+  /** @type {string[]} */
   const lines = [];
+  /** @type {string[]} */
   const open = []; // pile des balises ouvrantes, telles quelles (classes comprises)
   let cur = "";
   const re = /<span\b[^>]*>|<\/span>|[^<]+|</g;

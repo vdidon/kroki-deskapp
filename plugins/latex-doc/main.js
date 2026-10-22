@@ -1,3 +1,4 @@
+// @ts-check
 // latex-doc plugin — worker entry (Kroki Desk protocol v1, see
 // doc/plugin-protocol.md in the application repository).
 //

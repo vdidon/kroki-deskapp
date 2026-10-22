@@ -1,3 +1,4 @@
+// @ts-check
 // Recherche d'occurrences dans une vue, en `Range` pour la CSS Custom Highlight
 // API (findword.js, docsearch.js et globalsearch.js). Le motif arrive déjà
 // compilé en RegExp globale (cf. searchopts.js : casse, mot entier, regex).
@@ -26,25 +27,41 @@ import { iterMatches } from "./searchopts.js";
 // (un Range par occurrence) devient sensible — `.` ou `\s` en mode regex.
 const MAX_RANGES = 5000;
 
-/** Corps d'un `<details>` fermé : tout sauf son `<summary>`. */
+/** @typedef {{ node: Text, start: number }} Part  nœud texte et son offset dans le texte concaténé */
+
+/**
+ * Corps d'un `<details>` fermé : tout sauf son `<summary>`.
+ * @param {Node} node
+ * @returns {boolean}
+ */
 function inClosedDetails(node) {
   const p = node.parentElement;
-  return p?.tagName === "DETAILS" && !p.open && node.nodeName !== "SUMMARY";
+  return p?.tagName === "DETAILS" && !(/** @type {HTMLDetailsElement} */ (p).open) && node.nodeName !== "SUMMARY";
 }
 
 // Filtre du parcours : un sous-arbre replié est écarté d'un bloc (REJECT), les
 // autres éléments sont traversés sans être rendus (SKIP) — seuls les nœuds
 // texte visibles sortent du walker.
+/**
+ * @param {Node} node
+ * @returns {number}
+ */
 function visibleText(node) {
   if (node.nodeType === Node.TEXT_NODE) {
     return inClosedDetails(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
   }
-  return node.hidden === true || inClosedDetails(node)
+  // `hidden` : HTMLElement seulement — undefined sur un élément SVG/MathML.
+  return /** @type {HTMLElement} */ (node).hidden === true || inClosedDetails(node)
     ? NodeFilter.FILTER_REJECT
     : NodeFilter.FILTER_SKIP;
 }
 
-/** Positionne un offset du texte concaténé sur le nœud texte qui le porte. */
+/**
+ * Positionne un offset du texte concaténé sur le nœud texte qui le porte.
+ * @param {Part[]} parts
+ * @param {number} offset
+ * @returns {[Text, number]}
+ */
 function locate(parts, offset) {
   for (let i = parts.length - 1; i >= 0; i--) {
     if (offset >= parts[i].start) return [parts[i].node, offset - parts[i].start];
@@ -52,6 +69,12 @@ function locate(parts, offset) {
   return [parts[0].node, 0];
 }
 
+/**
+ * @param {Part[]} parts
+ * @param {string} text
+ * @param {RegExp} re
+ * @param {Range[]} ranges
+ */
 function matchGroup(parts, text, re, ranges) {
   for (const m of iterMatches(re, text, MAX_RANGES - ranges.length)) {
     const range = document.createRange();
@@ -64,8 +87,12 @@ function matchGroup(parts, text, re, ranges) {
 /**
  * Tous les `Range` couvrant les occurrences de `re` (RegExp globale) dans
  * `root`, dans l'ordre du document — contenu replié exclu.
+ * @param {Node} root
+ * @param {RegExp | null} re
+ * @returns {Range[]}
  */
 export function collectMatchRanges(root, re) {
+  /** @type {Range[]} */
   const ranges = [];
   if (!re) return ranges;
   const walker = document.createTreeWalker(
@@ -73,7 +100,9 @@ export function collectMatchRanges(root, re) {
     NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
     visibleText,
   );
+  /** @type {Node | null} */
   let key = null; // ligne source courante, ou le nœud lui-même hors vue source
+  /** @type {Part[]} */
   let parts = [];
   let text = "";
   const flush = () => {
@@ -81,8 +110,9 @@ export function collectMatchRanges(root, re) {
     parts = [];
     text = "";
   };
+  /** @type {Text | null} — le filtre n'accepte que des nœuds texte */
   let node;
-  while ((node = walker.nextNode())) {
+  while ((node = /** @type {Text | null} */ (walker.nextNode()))) {
     const value = node.nodeValue;
     if (!value) continue;
     const group = node.parentElement?.closest(".src-line") || node;

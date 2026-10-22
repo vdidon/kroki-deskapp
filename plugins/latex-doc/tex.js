@@ -1,3 +1,4 @@
+// @ts-check
 // Rendering of standalone LaTeX documents (.tex) — core of the transformation.
 //
 // A .tex fed as-is to the markdown pipeline yields nothing: commands stay
@@ -31,6 +32,14 @@
 // not reproduced.
 
 import { getParser, printRaw } from "./vendor/unified-latex.esm.js";
+
+/** @typedef {import("./vendor/unified-latex.esm.js").Node} TexNode */
+/** @typedef {import("./vendor/unified-latex.esm.js").Argument} Argument */
+/** @typedef {import("./vendor/unified-latex.esm.js").Macro} Macro */
+/** @typedef {import("./vendor/unified-latex.esm.js").Environment} Environment */
+/** @typedef {import("./vendor/unified-latex.esm.js").MathEnv} MathEnv */
+/** @typedef {import("./vendor/unified-latex.esm.js").VerbatimEnvironment} VerbatimEnvironment */
+/** @typedef {import("./vendor/unified-latex.esm.js").ArgSpec} ArgSpec */
 
 // --------------------------------------------------------------------------- //
 // Tables de correspondance
@@ -97,6 +106,7 @@ const SIZE_MACROS = new Set([
 const SPACING_MACROS = new Set([",", ";", ":", "!", " ", "\n", "\t", "quad", "qquad", "thinspace", "enspace"]);
 
 // Text symbols (outside math mode).
+/** @type {Record<string, string>} */
 const TEXT_SYMBOLS = {
   euro: "€", texteuro: "€", pounds: "£", textdollar: "$", S: "§", P: "¶",
   copyright: "©", textcopyright: "©", textregistered: "®", dag: "†", ddag: "‡",
@@ -115,6 +125,7 @@ const TEXT_SYMBOLS = {
 // LaTeX accents → combining diacritics (recomposed to NFC on emission).
 // Written as Unicode escapes: these characters are invisible in an editor
 // and get lost on copy-paste.
+/** @type {Record<string, string>} */
 const ACCENTS = {
   "'": "\u0301", // combining acute accent
   "`": "\u0300", // combining grave accent
@@ -135,6 +146,7 @@ const ACCENTS = {
 };
 
 // Inline markup: macro → markdown delimiter.
+/** @type {Record<string, string>} */
 const INLINE_STYLES = {
   textbf: "**", bf: "**", strong: "**",
   emph: "*", textit: "*", it: "*", textsl: "*",
@@ -161,7 +173,11 @@ const SEP = "\u0001"; // delimiter of reference markers (absent from a .tex)
 // Text utilities
 // --------------------------------------------------------------------------- //
 
-/** LaTeX typographic ligatures applied to text outside math. */
+/**
+ * LaTeX typographic ligatures applied to text outside math.
+ * @param {string} s
+ * @returns {string}
+ */
 function ligatures(s) {
   return s
     .replace(/---/g, "—")
@@ -177,6 +193,8 @@ function ligatures(s) {
  * Neutralizes, in text, the characters that markdown-it would interpret.
  * `$` becomes an entity: a literal `$` would break texmath's detection of
  * math delimiters.
+ * @param {string} s
+ * @returns {string}
  */
 function escapeMd(s) {
   return s.replace(/[\\`*_[\]<>|]/g, (c) => "\\" + c).replace(/\$/g, "&#36;");
@@ -185,6 +203,8 @@ function escapeMd(s) {
 /**
  * Undoes `escapeMd` for inline code content: between backticks, markdown
  * interprets nothing and a backslash would remain visible (`B2B\_Market`).
+ * @param {string} s
+ * @returns {string}
  */
 function unescapeMd(s) {
   return s.replace(/\\([\\`*_[\]<>|])/g, "$1").replace(/&#36;/g, "$");
@@ -193,6 +213,8 @@ function unescapeMd(s) {
 /**
  * Columns of a `tabular` spec → markdown alignments. Token-based reading:
  * filtering by character would read the `c` of `p{5cm}` as a centered column.
+ * @param {string} spec
+ * @returns {string[]} one `l`/`c`/`r` per column
  */
 function columnAligns(spec) {
   const out = [];
@@ -236,7 +258,11 @@ function columnAligns(spec) {
   return out;
 }
 
-/** Same for a table cell: `|` must disappear too. */
+/**
+ * Same for a table cell: `|` must disappear too.
+ * @param {string} s
+ * @returns {string}
+ */
 function escapeCell(s) {
   return s.replace(/\|/g, "\\|");
 }
@@ -245,12 +271,19 @@ function escapeCell(s) {
  * Collapses onto a single line: a `\\` in a title or a cell would produce a
  * markdown line break that would split the title in two or break the
  * table.
+ * @param {string} s
+ * @returns {string}
  */
 function oneLine(s) {
   return s.replace(/\s+/g, " ").trim();
 }
 
-/** Name of an environment (`n.env` is a list of nodes). */
+/**
+ * Name of an environment (`n.env` is a string, or a `string` node for a
+ * `mathenv`).
+ * @param {Environment | MathEnv | VerbatimEnvironment} node
+ * @returns {string}
+ */
 function envName(node) {
   try {
     return printRaw(node.env).trim();
@@ -259,13 +292,21 @@ function envName(node) {
   }
 }
 
-/** 0-based source line of a node, or null. */
+/**
+ * 0-based source line of a node, or null.
+ * @param {TexNode} node
+ * @returns {number | null}
+ */
 function srcLine(node) {
   const l = node?.position?.start?.line;
   return typeof l === "number" ? Math.max(0, l - 1) : null;
 }
 
-/** Safe HTML attribute value — a LaTeX label is free text. */
+/**
+ * Safe HTML attribute value — a LaTeX label is free text.
+ * @param {string} s
+ * @returns {string}
+ */
 function attrValue(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -274,7 +315,12 @@ function attrValue(s) {
     .replace(/"/g, "&quot;");
 }
 
-/** Safe HTML identifier, derived from a number or a title. */
+/**
+ * Safe HTML identifier, derived from a number or a title.
+ * @param {string} prefix
+ * @param {string} key
+ * @returns {string}
+ */
 function slug(prefix, key) {
   const body = String(key)
     .toLowerCase()
@@ -283,18 +329,33 @@ function slug(prefix, key) {
   return `${prefix}-${body || "x"}`;
 }
 
-/** Content of an argument, as raw LaTeX. */
+/**
+ * Content of an argument, as raw LaTeX.
+ * @param {{ args?: Argument[] }} node macro or environment
+ * @param {number} i
+ * @returns {string}
+ */
 function argRaw(node, i) {
   const a = node.args?.[i];
   return a ? printRaw(a.content).trim() : "";
 }
 
-/** Nodes of an argument (empty list if absent). */
+/**
+ * Nodes of an argument (empty list if absent).
+ * @param {{ args?: Argument[] }} node macro or environment
+ * @param {number} i
+ * @returns {TexNode[]}
+ */
 function argNodes(node, i) {
   return node.args?.[i]?.content ?? [];
 }
 
-/** True if the argument exists and was delimited (tells an absent `[]` from an empty one). */
+/**
+ * True if the argument exists and was delimited (tells an absent `[]` from an empty one).
+ * @param {{ args?: Argument[] }} node macro or environment
+ * @param {number} i
+ * @returns {boolean}
+ */
 function hasArg(node, i) {
   const a = node.args?.[i];
   return !!a && a.openMark !== "";
@@ -305,9 +366,38 @@ function hasArg(node, i) {
 // --------------------------------------------------------------------------- //
 
 /**
+ * User macro (`\newcommand`, `\DeclareMathOperator`, `\def`).
+ * @typedef {object} MacroDef
+ * @property {number} nargs number of arguments, the optional one included
+ * @property {string | null} optional default value of the optional argument, null without one
+ * @property {string} body LaTeX body, `#1`…`#9` not substituted
+ */
+
+/**
+ * Environment declared by `\newtheorem`.
+ * @typedef {object} TheoremSpec
+ * @property {string} label displayed name ("Proposition")
+ * @property {string} counter counter name — another environment's if shared (`[theorem]`)
+ * @property {string | null} parent parent counter (`[section]`), null without one
+ * @property {boolean} numbered false for `\newtheorem*`
+ * @property {string} style `\theoremstyle` in force at the declaration
+ */
+
+/**
+ * Definitions collected from the document by `collectDefs`.
+ * @typedef {object} Defs
+ * @property {Map<string, MacroDef>} macros by name, without the backslash
+ * @property {Map<string, TheoremSpec>} theorems by environment name
+ * @property {{ title?: string, author?: string, date?: string }} meta raw LaTeX
+ * @property {string} theoremStyle current `\theoremstyle`
+ */
+
+/**
  * Collects the document's definitions. Called on a first "bare" parse
  * (unknown signatures): `\newcommand` & co. have a signature built into the
  * parser, so they are correctly split even at this stage.
+ * @param {TexNode[]} nodes
+ * @param {Defs} defs filled in place
  */
 function collectDefs(nodes, defs) {
   for (const n of nodes) {
@@ -362,7 +452,7 @@ function collectDefs(nodes, defs) {
       const m = /^\\([A-Za-z@]+)\{([\s\S]*)\}$/.exec(raw.trim());
       if (m) defs.macros.set(m[1], { nargs: 0, optional: null, body: m[2] });
     } else if (name === "title" || name === "author" || name === "date") {
-      const v = argRaw(n, n.args?.length > 1 ? n.args.length - 1 : 0);
+      const v = argRaw(n, n.args && n.args.length > 1 ? n.args.length - 1 : 0);
       if (v) defs.meta[name] = v;
     }
     for (const a of n.args ?? []) collectDefs(a.content ?? [], defs);
@@ -373,9 +463,12 @@ function collectDefs(nodes, defs) {
  * Expander for user macros, applied to **textual** LaTeX (formulas, macro
  * bodies). Works by scanning: read the name, then as many `{…}` groups as the
  * definition expects, and substitute `#1`…`#9`.
+ * @param {Map<string, MacroDef>} macros
+ * @returns {(text: string) => string}
  */
 function makeExpander(macros) {
   // Reads a balanced group starting at `i` (which must point at `{`).
+  /** @type {(s: string, i: number) => { body: string, next: number } | null} */
   const readGroup = (s, i) => {
     let depth = 0;
     for (let j = i; j < s.length; j++) {
@@ -390,6 +483,7 @@ function makeExpander(macros) {
     return null;
   };
 
+  /** @type {(text: string, depth: number) => string} */
   const expand = (text, depth) => {
     if (depth > MAX_EXPANSION_DEPTH || !text.includes("\\")) return text;
     let out = "";
@@ -416,6 +510,7 @@ function makeExpander(macros) {
       }
       let j = i + m[0].length;
       while (text[j] === " ") j++; // LaTeX swallows the spaces after a macro name
+      /** @type {string[]} */
       const args = [];
       // Optional argument `[…]` in first position, if declared.
       if (def.optional !== null && text[j] === "[") {
@@ -478,6 +573,8 @@ const DEF_MARKERS = /\\(newcommand|renewcommand|providecommand|DeclareMathOperat
  * parser dominates the cost of rendering and this pass pays it twice.
  * Falls back to the full source as soon as a declaration lingers in the body
  * (`\newtheorem` after `\begin{document}` is legal, see collectDefs).
+ * @param {string} source
+ * @returns {string}
  */
 function defsScope(source) {
   const cut = source.indexOf("\\begin{document}");
@@ -508,7 +605,12 @@ const TIKZ_PACKAGES = new Set([
 const TIKZ_DECLARATIONS =
   /\\(usepackage|RequirePackage|usetikzlibrary|usepgfplotslibrary|tikzset|pgfplotsset|tikzstyle|newcommand|renewcommand|providecommand|DeclareMathOperator|definecolor|colorlet)(?![A-Za-z@])(\*?)/g;
 
-/** Reads a balanced group (`{…}` or `[…]`) opened at `i`; returns the index that follows it. */
+/**
+ * Reads a balanced group (`{…}` or `[…]`) opened at `i`; returns the index that follows it.
+ * @param {string} s
+ * @param {number} i
+ * @returns {number}
+ */
 function skipGroup(s, i) {
   const open = s[i];
   const close = open === "{" ? "}" : "]";
@@ -527,6 +629,8 @@ function skipGroup(s, i) {
  * Preamble lines of a standalone TikZ figure, drawn from the document's
  * preamble: whitelisted packages, TikZ libraries and styles, user macros and
  * colors. A fragment without a preamble yields none.
+ * @param {string} source
+ * @returns {string[]}
  */
 function tikzPreamble(source) {
   const cut = source.indexOf("\\begin{document}");
@@ -536,6 +640,7 @@ function tikzPreamble(source) {
   TIKZ_DECLARATIONS.lastIndex = 0;
   for (let m; (m = TIKZ_DECLARATIONS.exec(pre)); ) {
     const name = m[1];
+    /** @type {string[]} */
     const groups = [];
     let i = m.index + m[0].length;
     for (;;) {
@@ -546,7 +651,9 @@ function tikzPreamble(source) {
         groups.push(pre.slice(j, end));
         i = end;
       } else if (pre[j] === "\\" && !groups.length && /command|Operator/.test(name)) {
-        const cs = /^\\([A-Za-z@]+|.)/.exec(pre.slice(j)); // `\newcommand\foo{…}`
+        // Null only if this `\` ends the preamble or precedes a line break
+        // (`\newcommand\\begin{document}`): TypeError, degraded rendering.
+        const cs = /** @type {RegExpExecArray} */ (/^\\([A-Za-z@]+|.)/.exec(pre.slice(j))); // `\newcommand\foo{…}`
         groups.push(`{${cs[0]}}`);
         i = j + cs[0].length;
       } else if (pre[j] === "=" && name === "tikzstyle") {
@@ -595,10 +702,20 @@ const LABELS = {
   },
 };
 /**
+ * @typedef {object} Messages
+ * @property {(name: string) => string} unknownCommand
+ * @property {(name: string) => string} unformattedEnv
+ * @property {(n: number, list: string) => string} unresolved
+ * @property {string} degraded
+ * @property {string} degradedBanner
+ * @property {string} defaultTitle
+ */
+/**
  * Messages addressed to the user — warnings shown in the host's banner and the
  * degraded-rendering banner — in the language of the **interface** (`locale`
  * given by the host, protocol §6.1), not of the document: they talk about the
  * rendering, not about the text.
+ * @type {Record<"en" | "fr", Messages>}
  */
 const MESSAGES = {
   en: {
@@ -622,7 +739,11 @@ const MESSAGES = {
   },
 };
 
-/** Interface language given by the host (`"fr"`, `"en"`…) → message set. */
+/**
+ * Interface language given by the host (`"fr"`, `"en"`…) → message set.
+ * @param {unknown} locale
+ * @returns {Messages}
+ */
 export function uiMessages(locale) {
   return String(locale ?? "").toLowerCase().startsWith("fr") ? MESSAGES.fr : MESSAGES.en;
 }
@@ -644,9 +765,12 @@ const OTHER_LANGUAGES = new Set([
  * the last language among the babel and class options (babel's own rule —
  * class options are passed on to it). English when nothing is declared or
  * the language is not one the plugin has labels for.
+ * @param {unknown} source
+ * @returns {"en" | "fr"}
  */
 export function docLanguage(source) {
   const pre = String(source).split(/\\begin\s*\{document\}/)[0].replace(/(?<!\\)%.*$/gm, "");
+  /** @type {(name: string) => "en" | "fr"} */
   const toLang = (name) => (FRENCH.has(name.trim().toLowerCase()) ? "fr" : "en");
   const poly = /\\set(?:default|main)language\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}/.exec(pre);
   if (poly) return toLang(poly[1]);
@@ -656,19 +780,27 @@ export function docLanguage(source) {
   const opts = [cls?.[1], babel[1]].filter(Boolean).join(",").split(",").map((o) => o.trim());
   const main = opts.find((o) => o.startsWith("main="));
   if (main) return toLang(main.slice(5));
+  /** @type {(o: string) => boolean} */
   const isLang = (o) => FRENCH.has(o.toLowerCase()) || OTHER_LANGUAGES.has(o.toLowerCase());
   const langs = opts.filter(isLang);
   return langs.length ? toLang(langs[langs.length - 1]) : "en";
 }
 
+/**
+ * @param {string} source line endings already normalized to `\n`
+ * @param {{ title: string, fragment: boolean, M: Messages }} options
+ * @returns {TransformResult}
+ */
 function generate(source, { title, fragment, M }) {
   const L = LABELS[docLanguage(source)];
+  /** @type {Defs} */
   const defs = { macros: new Map(), theorems: new Map(), meta: {}, theoremStyle: "plain" };
   const nude = getParser().parse(defsScope(source));
   collectDefs(nude.content, defs);
 
   // Second parse: the parser now knows the signature of user macros, so
   // their arguments are correctly attached.
+  /** @type {Record<string, ArgSpec>} */
   const signatures = {};
   for (const [name, def] of defs.macros) {
     const sig = (def.optional !== null ? "o" : "") + "m".repeat(def.nargs - (def.optional !== null ? 1 : 0));
@@ -677,6 +809,7 @@ function generate(source, { title, fragment, M }) {
   // Same for theorem environments: the parser only knows the usual names
   // (`theorem`, `remark`…). Without a signature, the title of a
   // `\begin{hypothese}[Title]` would stay in the body, brackets included.
+  /** @type {Record<string, ArgSpec>} */
   const envSignatures = {};
   for (const name of defs.theorems.keys()) envSignatures[name] = { signature: "o" };
   // `longtable` is unknown to the parser: without a signature, its column spec
@@ -684,16 +817,25 @@ function generate(source, { title, fragment, M }) {
   envSignatures.longtable = { signature: "o m" };
   const parser = getParser({ macros: signatures, environments: envSignatures });
   const ast = parser.parse(source);
-  const docEnv = ast.content.find((n) => n.type === "environment" && envName(n) === "document");
+  const docEnv = ast.content.find(
+    /** @returns {n is Environment} */ (n) => n.type === "environment" && envName(n) === "document",
+  );
   const body = docEnv ? docEnv.content : ast.content;
 
   const expand = makeExpander(defs.macros);
+  /** @type {string[]} */
   const out = []; // one entry = one line of markdown
+  /** @type {Array<[number, number]>} */
   const anchors = [[0, 0]];
+  /** @type {Set<string>} */
   const warnings = new Set();
+  /** @type {Map<string, { text: string, anchor: string }>} */
   const labels = new Map(); // LaTeX label → { text, anchor }
+  /** @type {Map<string, number>} */
   const anchorLines = new Map(); // anchor id → index of its line in `out`
+  /** @type {string[]} */
   const footnotes = [];
+  /** @type {Map<string, number>} */
   const counters = new Map();
   let sectionNums = [0, 0, 0, 0];
   let inAppendix = false; // after `\appendix`: lettered sections (A, B.2…)
@@ -703,6 +845,7 @@ function generate(source, { title, fragment, M }) {
   const levelShift = body.some((n) => n.type === "macro" && n.content === "part") ? 1 : 0;
   let lastAnchoredSrc = -1;
 
+  /** @param {string} line */
   const push = (line) => out.push(line);
   const blank = () => {
     if (out.length && out[out.length - 1] !== "") out.push("");
@@ -711,6 +854,7 @@ function generate(source, { title, fragment, M }) {
    * Removes an already emitted line **while realigning the anchors**: those
    * that follow it would otherwise point one line too low (the preview ↔ source
    * sync would drift across everything after a list).
+   * @param {number} i
    */
   const removeLine = (i) => {
     if (i < 0 || i >= out.length) return;
@@ -718,6 +862,7 @@ function generate(source, { title, fragment, M }) {
     for (const a of anchors) if (a[0] > i) a[0] -= 1;
     for (const [id, l] of anchorLines) if (l > i) anchorLines.set(id, l - 1);
   };
+  /** @param {TexNode} node */
   const anchorAt = (node) => {
     const l = srcLine(node);
     if (l === null || l === lastAnchoredSrc) return;
@@ -725,11 +870,13 @@ function generate(source, { title, fragment, M }) {
     lastAnchoredSrc = l;
   };
 
+  /** @param {string} name counter */
   const bump = (name) => {
     const v = (counters.get(name) ?? 0) + 1;
     counters.set(name, v);
     return v;
   };
+  /** @param {number} depth */
   const sectionPrefix = (depth) =>
     sectionNums
       .slice(0, depth)
@@ -737,15 +884,20 @@ function generate(source, { title, fragment, M }) {
       .join(".");
 
   // --- references ------------------------------------------------------- //
+  /** @type {(kind: "r" | "e" | "t", key: string) => string} */
   const ref = (kind, key) => `${SEP}${kind}${SEP}${key}${SEP}`;
+  /** @type {(key: string, text: string, anchor: string) => void} */
   const defineLabel = (key, text, anchor) => {
     if (key) labels.set(key, { text, anchor });
   };
   // Current target of a `\label`: updated by each numbered object.
+  /** @type {{ text: string, anchor: string } | null} */
   let pendingLabel = null;
+  /** @type {(text: string, anchor: string) => void} */
   const openLabelTarget = (text, anchor) => {
     pendingLabel = { text, anchor };
   };
+  /** @param {string} key */
   const takeLabel = (key) => {
     if (pendingLabel) defineLabel(key, pendingLabel.text, pendingLabel.anchor);
     else defineLabel(key, "", "");
@@ -754,6 +906,7 @@ function generate(source, { title, fragment, M }) {
   // Places an invisible HTML anchor (block: no stray paragraph). The line
   // is remembered so that `\label` aliases can be grafted onto it later (see the
   // end of `generate`) — grafting onto the existing line, hence without shifting `anchors`.
+  /** @param {string} id */
   const anchorDiv = (id) => {
     anchorLines.set(id, out.length);
     push(`<div id="${id}"></div>`);
@@ -761,7 +914,12 @@ function generate(source, { title, fragment, M }) {
   };
 
   // --- expansion of user macros in the inline flow ----------------------- //
+  /** @type {Map<string, TexNode[]>} */
   const expandCache = new Map();
+  /**
+   * @param {Macro} n
+   * @returns {TexNode[]}
+   */
   const expandMacroNode = (n) => {
     const key = n.content + "\u0000" + (n.args ?? []).map((a) => a.openMark + printRaw(a.content) + a.closeMark).join("");
     let nodes = expandCache.get(key);
@@ -780,8 +938,11 @@ function generate(source, { title, fragment, M }) {
    * Prepares a formula's content for KaTeX: extraction of `\label`s
    * (meaningless to a renderer) then expansion of the preamble's macros,
    * which KaTeX does not know.
+   * @param {string} raw
+   * @returns {{ math: string, labels: string[] }}
    */
   const prepareMath = (raw) => {
+    /** @type {string[]} */
     const found = [];
     let s = raw.replace(/\\label\{([^}]*)\}/g, (_, k) => {
       found.push(k);
@@ -810,6 +971,11 @@ function generate(source, { title, fragment, M }) {
     return { math: s.trim(), labels: found };
   };
 
+  /**
+   * @param {TexNode} node
+   * @param {string} content raw LaTeX of the formula
+   * @param {string} env math environment, "" for `\[…\]`
+   */
   const emitDisplayMath = (node, content, env) => {
     const { math, labels: found } = prepareMath(content);
     const numbered = env ? NUMBERED_MATH.has(env) : false;
@@ -841,6 +1007,9 @@ function generate(source, { title, fragment, M }) {
    * accumulated so that ligatures then escaping are applied in one go (the
    * ligatures cross node boundaries: `-`, `-`, `-` are three distinct
    * `string` nodes).
+   * @param {TexNode[]} nodes
+   * @param {number} [depth] user macro expansion depth
+   * @returns {string}
    */
   const emitInline = (nodes, depth = 0) => {
     let res = "";
@@ -920,6 +1089,11 @@ function generate(source, { title, fragment, M }) {
   /**
    * Renders a macro in an inline context. Returns the text and, if the macro
    * consumed following nodes (accents `\'e`), the index reached.
+   * @param {Macro} n
+   * @param {TexNode[]} siblings list holding `n`, at index `i`
+   * @param {number} i
+   * @param {number} depth
+   * @returns {{ text: string, next?: number }}
    */
   const emitInlineMacro = (n, siblings, i, depth) => {
     const name = n.content;
@@ -942,13 +1116,13 @@ function generate(source, { title, fragment, M }) {
       return { text: emitInline(argNodes(n, n.args?.length ? n.args.length - 1 : 0), depth) };
     }
     if (name === "ref" || name === "autoref" || name === "pageref" || name === "cref" || name === "Cref") {
-      return { text: ref("r", argRaw(n, n.args?.length > 1 ? n.args.length - 1 : 0)) };
+      return { text: ref("r", argRaw(n, n.args && n.args.length > 1 ? n.args.length - 1 : 0)) };
     }
     if (name === "eqref") {
-      return { text: ref("e", argRaw(n, n.args?.length > 1 ? n.args.length - 1 : 0)) };
+      return { text: ref("e", argRaw(n, n.args && n.args.length > 1 ? n.args.length - 1 : 0)) };
     }
     if (name === "label") {
-      takeLabel(argRaw(n, n.args?.length > 1 ? n.args.length - 1 : 0));
+      takeLabel(argRaw(n, n.args && n.args.length > 1 ? n.args.length - 1 : 0));
       return { text: "" };
     }
     if (name === "cite" || name === "citep" || name === "citet") {
@@ -965,7 +1139,7 @@ function generate(source, { title, fragment, M }) {
       return { text: u ? `<${u}>` : "" };
     }
     if (name === "href") {
-      const u = argRaw(n, n.args?.length > 1 ? n.args.length - 2 : 0);
+      const u = argRaw(n, n.args && n.args.length > 1 ? n.args.length - 2 : 0);
       const t = emitInline(argNodes(n, n.args?.length ? n.args.length - 1 : 0), depth) || u;
       return { text: u ? `[${t}](${u})` : t };
     }
@@ -1015,7 +1189,11 @@ function generate(source, { title, fragment, M }) {
 
   // --- blocks ------------------------------------------------------------- //
 
-  /** Emits a paragraph from accumulated inline nodes. */
+  /**
+   * Emits a paragraph from accumulated inline nodes.
+   * @param {TexNode[]} nodes
+   * @param {string} indent
+   */
   const flushPara = (nodes, indent) => {
     if (!nodes.length) return;
     // Spaces are normalized, but **not** line breaks: the only ones present
@@ -1038,6 +1216,7 @@ function generate(source, { title, fragment, M }) {
     push("");
   };
 
+  /** @type {(n: TexNode) => boolean} */
   const isBlockNode = (n) =>
     n.type === "environment" ||
     n.type === "mathenv" ||
@@ -1045,7 +1224,11 @@ function generate(source, { title, fragment, M }) {
     n.type === "verbatim" ||
     (n.type === "macro" && BLOCK_MACROS.has(n.content));
 
-  /** Meaningful nodes (excluding spaces, comments and pure layout). */
+  /**
+   * Meaningful nodes (excluding spaces, comments and pure layout).
+   * @param {TexNode[]} nodes
+   * @returns {TexNode[]}
+   */
   const meaningful = (nodes) =>
     nodes.filter(
       (x) =>
@@ -1059,9 +1242,12 @@ function generate(source, { title, fragment, M }) {
    * Raw text of a box in a monospace font (`\fbox{\parbox{…}{\ttfamily …}}`,
    * a common idiom for a JSON or code example): rendered as a code block,
    * `\\` line endings and `\hspace{…em}` indentation included.
+   * @param {TexNode[]} nodes
+   * @returns {string}
    */
   const codeText = (nodes) => {
     let s = "";
+    /** @param {TexNode[]} list */
     const walk = (list) => {
       for (const x of list) {
         if (x.type === "string") s += x.content;
@@ -1091,7 +1277,11 @@ function generate(source, { title, fragment, M }) {
       .replace(/^\n+|\n+$/g, "");
   };
 
-  /** Quote prefix on the lines emitted since `start` (blank lines included). */
+  /**
+   * Quote prefix on the lines emitted since `start` (blank lines included).
+   * @param {number} start index in `out`
+   * @param {string} indent
+   */
   const quoteFrom = (start, indent) => {
     let end = out.length;
     while (end > start && out[end - 1] === "") end--;
@@ -1104,16 +1294,20 @@ function generate(source, { title, fragment, M }) {
    * Paragraph reduced to a framed box (`\fbox{\parbox{…}{…}}`, often centered):
    * rendered as a quote — or as a code block if the content is in `\ttfamily`.
    * Returns false if the paragraph is not of this form.
+   * @param {TexNode[]} nodes
+   * @param {string} indent
+   * @returns {boolean}
    */
   const emitBoxed = (nodes, indent) => {
     const sole = meaningful(nodes);
     if (sole.length !== 1 || sole[0].type !== "macro" || !["fbox", "framebox", "fcolorbox", "colorbox"].includes(sole[0].content)) {
       return false;
     }
-    let inner = argNodes(sole[0], sole[0].args.length - 1);
+    // Built-in signature (even when redefined): `args` is always present.
+    let inner = argNodes(sole[0], /** @type {Argument[]} */ (sole[0].args).length - 1);
     const wrapped = meaningful(inner);
     if (wrapped.length === 1 && wrapped[0].type === "macro" && wrapped[0].content === "parbox") {
-      inner = argNodes(wrapped[0], wrapped[0].args.length - 1);
+      inner = argNodes(wrapped[0], /** @type {Argument[]} */ (wrapped[0].args).length - 1);
     } else if (wrapped.length === 1 && wrapped[0].type === "environment" && envName(wrapped[0]) === "minipage") {
       inner = wrapped[0].content ?? [];
     }
@@ -1136,7 +1330,12 @@ function generate(source, { title, fragment, M }) {
     return true;
   };
 
+  /**
+   * @param {TexNode[]} nodes
+   * @param {string} [indent]
+   */
   const emitBlocks = (nodes, indent = "") => {
+    /** @type {TexNode[]} */
     let inline = [];
     const flushInline = () => {
       if (!emitBoxed(inline, indent)) flushPara(inline, indent);
@@ -1163,13 +1362,16 @@ function generate(source, { title, fragment, M }) {
     flushInline();
   };
 
+  /** @type {Record<string, number>} */
   const SECTION_LEVELS = {
     part: 1, chapter: 1, section: 1, subsection: 2, subsubsection: 3,
     paragraph: 4, subparagraph: 4,
   };
 
+  /** @type {Array<[number, string]>} */
   const ROMAN = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"],
     [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+  /** @param {number} v */
   const roman = (v) => ROMAN.reduce((s, [k, r]) => {
     for (; v >= k; v -= k) s += r;
     return s;
@@ -1179,6 +1381,7 @@ function generate(source, { title, fragment, M }) {
    * `\part`: own roman counter (`\ref` → "II"), which does **not** touch
    * the sections — in the `article` class, their numbering continues from one
    * part to the next.
+   * @param {Macro} n
    */
   const emitPart = (n) => {
     const starred = argRaw(n, 0) === "*";
@@ -1193,6 +1396,10 @@ function generate(source, { title, fragment, M }) {
     push("");
   };
 
+  /**
+   * @param {Macro} n
+   * @param {string} name key of SECTION_LEVELS
+   */
   const emitSection = (n, name) => {
     const depth = SECTION_LEVELS[name];
     const starred = argRaw(n, 0) === "*";
@@ -1228,6 +1435,7 @@ function generate(source, { title, fragment, M }) {
    * the body, as amsthm typesets it: "**Proposition 8** (Title). Under H1…".
    * If the body starts with something other than a paragraph (formula, list,
    * table), the header stays on its own line.
+   * @param {number} h index of the header line in `out`
    */
   const runInHeader = (h) => {
     const p = h + 2;
@@ -1238,6 +1446,11 @@ function generate(source, { title, fragment, M }) {
     removeLine(h);
   };
 
+  /**
+   * @param {Environment} n
+   * @param {string} name
+   * @param {TheoremSpec} spec
+   */
   const emitTheorem = (n, name, spec) => {
     const titleNodes = hasArg(n, 0) ? argNodes(n, 0) : [];
     let num = "";
@@ -1262,6 +1475,7 @@ function generate(source, { title, fragment, M }) {
     runInHeader(h);
   };
 
+  /** @param {Environment} n */
   const emitProof = (n) => {
     blank();
     anchorAt(n);
@@ -1277,9 +1491,19 @@ function generate(source, { title, fragment, M }) {
   };
 
   /**
+   * @typedef {object} ListItem
+   * @property {string} marker explicit marker (`\item[(a)]`), "" without one
+   * @property {TexNode[]} nodes body
+   * @property {TexNode} [node] the `\item` itself
+   */
+  /**
    * Emits list items. An explicit marker (`\item[(a)]`) replaces the
    * numbered bullet — the "1. (a)" duplicate does not exist in LaTeX; it is
    * bold in `description`, roman elsewhere.
+   * @param {ListItem[]} items
+   * @param {boolean} ordered
+   * @param {string} indent
+   * @param {boolean} boldMarkers
    */
   const emitItems = (items, ordered, indent, boldMarkers) => {
     const numbered = ordered && items.every((it) => !it.marker);
@@ -1302,8 +1526,16 @@ function generate(source, { title, fragment, M }) {
     push("");
   };
 
+  /**
+   * @param {Environment} n
+   * @param {boolean} ordered
+   * @param {string} indent
+   * @param {boolean} [boldMarkers]
+   */
   const emitList = (n, ordered, indent, boldMarkers = false) => {
+    /** @type {ListItem[]} */
     const items = [];
+    /** @type {ListItem | null} */
     let cur = null;
     for (const c of n.content ?? []) {
       if (c.type === "macro" && c.content === "item") {
@@ -1333,7 +1565,12 @@ function generate(source, { title, fragment, M }) {
     emitItems(items, ordered, indent, boldMarkers);
   };
 
-  /** Shifts the positions of a subtree re-parsed in isolation (source lines). */
+  /**
+   * Shifts the positions of a subtree re-parsed in isolation (source lines).
+   * @param {TexNode[]} nodes modified in place
+   * @param {number} delta
+   * @returns {TexNode[]}
+   */
   const shiftLines = (nodes, delta) => {
     for (const x of nodes) {
       if (x.position) {
@@ -1361,7 +1598,11 @@ function generate(source, { title, fragment, M }) {
    * the text of each `\node` (in source order) and the TikZ source therefore
    * remain available, folded under the figure.
    */
-  let tikzLines = null;
+  let tikzLines = /** @type {string[] | null} */ (null);
+  /**
+   * @param {Environment} n
+   * @param {string} indent
+   */
   const emitTikz = (n, indent) => {
     const off = n.position?.start?.offset;
     const endOff = n.position?.end?.offset;
@@ -1380,6 +1621,7 @@ function generate(source, { title, fragment, M }) {
       "\\end{document}",
     ];
     const baseLine = srcLine(n) ?? 0;
+    /** @type {ListItem[]} */
     const items = [];
     const re = /\\node(?![A-Za-z@])/g;
     for (let m; (m = re.exec(raw)); ) {
@@ -1445,12 +1687,17 @@ function generate(source, { title, fragment, M }) {
    * other hand, is indeed a macro.
    * The first row becomes the header: markdown has no header-less table, and a
    * table whose first row is content remains readable.
+   * @param {Environment} n
+   * @param {string} indent
    */
   const emitTabular = (n, indent) => {
     const spec = argRaw(n, n.args?.length ? n.args.length - 1 : 0);
     const aligns = columnAligns(spec).map((c) => (c === "c" ? ":---:" : c === "r" ? "---:" : "---"));
+    /** @type {string[][]} */
     const rows = [];
+    /** @type {string[]} */
     let row = [];
+    /** @type {TexNode[]} */
     let cell = [];
     // `longtable`: the rows that precede `\endfoot`/`\endlastfoot` are page
     // footers, and those between `\endfirsthead` and `\endhead` the repeated
@@ -1495,6 +1742,7 @@ function generate(source, { title, fragment, M }) {
     endRow();
     if (!rows.length) return;
     const width = Math.max(...rows.map((r) => r.length));
+    /** @param {string[]} r */
     const pad = (r) => [...r, ...Array(width - r.length).fill("")];
     const sep = Array.from({ length: width }, (_, i) => aligns[i] ?? "---");
     blank();
@@ -1505,6 +1753,10 @@ function generate(source, { title, fragment, M }) {
     push("");
   };
 
+  /**
+   * @param {Environment} n
+   * @param {"table" | "figure"} kind
+   */
   const emitFloat = (n, kind) => {
     // `table`/`figure`: the float itself does not exist in markdown, we render
     // its content then its caption, numbered as LaTeX would.
@@ -1514,8 +1766,11 @@ function generate(source, { title, fragment, M }) {
     anchorAt(n);
     anchorDiv(anchor);
     openLabelTarget(String(num), anchor);
+    /** @type {Macro[]} */
     const caption = [];
+    /** @type {TexNode[]} */
     const rest = [];
+    /** @param {TexNode[]} nodes */
     const split = (nodes) => {
       for (const c of nodes) {
         if (c.type === "macro" && c.content === "caption") caption.push(c);
@@ -1532,6 +1787,11 @@ function generate(source, { title, fragment, M }) {
     }
   };
 
+  /**
+   * @param {VerbatimEnvironment | Environment} n
+   * @param {string} indent
+   * @param {string} [lang] info string of the fence
+   */
   const emitVerbatim = (n, indent, lang = "") => {
     // The line end that follows `\begin{verbatim}` and the one that precedes
     // `\end{verbatim}` are not part of the content.
@@ -1544,6 +1804,10 @@ function generate(source, { title, fragment, M }) {
     push("");
   };
 
+  /**
+   * @param {TexNode} n
+   * @param {string} [indent]
+   */
   const emitBlockNode = (n, indent = "") => {
     if (n.type === "mathenv" || n.type === "displaymath") {
       const env = n.type === "mathenv" ? envName(n) : "";
@@ -1632,11 +1896,13 @@ function generate(source, { title, fragment, M }) {
     // `\title{Title \\ \large Subtitle}`: a segment opened by a size change
     // is a subtitle, rendered under the h1; a bare `\\` only breaks an
     // overly long line and stays folded into the title.
+    /** @type {TexNode[][]} */
     const lines = [[]];
     for (const x of defs.meta.title ? parser.parse(defs.meta.title).content : []) {
       if (x.type === "macro" && (x.content === "\\" || x.content === "newline")) lines.push([]);
       else lines[lines.length - 1].push(x);
     }
+    /** @type {TexNode[][]} */
     const segments = [];
     for (const nodes of lines) {
       const first = nodes.find((x) => x.type !== "whitespace" && x.type !== "comment");
@@ -1654,7 +1920,8 @@ function generate(source, { title, fragment, M }) {
     }
     const by = [defs.meta.author, defs.meta.date]
       .filter(Boolean)
-      .map((v) => emitInline(parser.parse(v).content).trim())
+      // `filter(Boolean)` has removed the undefined entries.
+      .map((v) => emitInline(parser.parse(/** @type {string} */ (v)).content).trim())
       .filter(Boolean);
     if (by.length) {
       push(`*${by.join(" — ")}*`);
@@ -1686,6 +1953,7 @@ function generate(source, { title, fragment, M }) {
   // would force the case: `sigmaU` → `sigmau`).
   // Grafting happens *onto* the existing anchor line: no line is
   // created, `anchors` (preview ↔ source sync) stays exact.
+  /** @type {Map<number, string[]>} */
   const aliases = new Map(); // line index → labels to graft onto it
   for (const [key, target] of labels) {
     const line = target.anchor ? anchorLines.get(target.anchor) : undefined;
@@ -1738,12 +2006,22 @@ function generate(source, { title, fragment, M }) {
 // Plugin API
 // --------------------------------------------------------------------------- //
 
-/** Fence long enough to contain the source without delimiter collision. */
+/**
+ * Fence long enough to contain the source without delimiter collision.
+ * @param {string} source
+ * @returns {string}
+ */
 function fenceFor(source) {
   const longest = Math.max(2, ...[...String(source).matchAll(/`+/g)].map((m) => m[0].length));
   return "`".repeat(Math.max(3, longest + 1));
 }
 
+/**
+ * @typedef {object} TransformResult
+ * @property {string} markdown
+ * @property {Array<[number, number]>} anchors `[markdown line, source line]`, 0-based, sorted
+ * @property {string[]} warnings
+ */
 /**
  * Transforms a LaTeX source into a markdown document ready for the host's
  * rendering pipeline. Never throws: in case of the unexpected, the whole
@@ -1756,6 +2034,10 @@ function fenceFor(source) {
  * labels written into the rendering follow the document's language instead.
  *
  * Returns `{ markdown, anchors, warnings }` — see remapLine (`ui/js/anchors.js`).
+ *
+ * @param {unknown} source
+ * @param {{ title?: string, fragment?: boolean, locale?: string }} [options]
+ * @returns {TransformResult}
  */
 export function texToMarkdown(source, { title, fragment = false, locale } = {}) {
   const M = uiMessages(locale);
@@ -1763,7 +2045,8 @@ export function texToMarkdown(source, { title, fragment = false, locale } = {}) 
   const src = String(source ?? "").replace(/\r\n?/g, "\n");
   try {
     return generate(src, { title, fragment, M });
-  } catch (err) {
+  } catch (/** @type {any} */ err) {
+    // `any`: a thrown value has no known shape — the banner expression handles every one.
     const fence = fenceFor(src);
     const markdown = [
       ...(fragment ? [] : [`# ${title}`, ""]),

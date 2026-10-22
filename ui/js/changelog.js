@@ -1,3 +1,4 @@
+// @ts-check
 // Dialog « Nouveautés » : affiche un changelog markdown rendu par une
 // instance markdown-it dédiée — sans la fence Kroki de render.js : un
 // changelog est de la prose, un moteur de diagrammes n'y a rien à hydrater —
@@ -9,10 +10,13 @@
 import { invoke } from "./app.js";
 import { onLocaleChange, t } from "./i18n.js";
 
-const dialog = document.getElementById("changelog-dialog");
-const title = document.getElementById("changelog-title");
-const hint = document.getElementById("changelog-hint");
-const body = document.getElementById("changelog-body");
+/** @typedef {import("../../types/ipc").PluginInfo} PluginInfo */
+
+// Éléments statiques de ui/index.html.
+const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("changelog-dialog"));
+const title = /** @type {HTMLHeadingElement} */ (document.getElementById("changelog-title"));
+const hint = /** @type {HTMLParagraphElement} */ (document.getElementById("changelog-hint"));
+const body = /** @type {HTMLDivElement} */ (document.getElementById("changelog-body"));
 
 const md = window.markdownit({ linkify: true });
 
@@ -20,11 +24,13 @@ const md = window.markdownit({ linkify: true });
 // "plugin:<id>") : le changelog de l'app est figé à la compilation, ceux des
 // plugins peuvent changer à chaque installation — on ne cache que le dernier
 // rendu, suffisant pour les réouvertures successives du même contenu.
+/** @type {string | null} */
 let shownKey = null;
 
 // Source dont l'en-tête (titre + indication) est affiché : `null` pour
 // l'application, l'entrée `list_plugins` pour un plugin. Le titre et
 // l'indication sont dans la langue courante, refaits si elle change.
+/** @type {PluginInfo | null} */
 let headerPlugin = null;
 
 function setHeader() {
@@ -44,6 +50,10 @@ function setHeader() {
 // cible dans le dialog, elles ne feraient que casser la navigation. `[2.2.2]`
 // redevient du texte littéral dans les titres, fidèle au format
 // Keep a Changelog.
+/**
+ * @param {string} src
+ * @returns {string}
+ */
 function prepareApp(src) {
   const start = src.search(/^## /m);
   const versions = start >= 0 ? src.slice(start) : src;
@@ -53,16 +63,22 @@ function prepareApp(src) {
 // Prépare le markdown d'un plugin : plus conservateur que `prepareApp` (un
 // préambule peut porter du contenu), on ne coupe que le titre `# …` de tête
 // — redondant avec l'en-tête du dialog — et les liens de référence en pied.
+/**
+ * @param {string} src
+ * @returns {string}
+ */
 function preparePlugin(src) {
   return src.replace(/^# .*\n+/, "").replace(/^\[[^\]]+\]:\s*#.*$/gm, "");
 }
 
+/** @param {string} markdown */
 function render(markdown) {
   body.innerHTML = window.DOMPurify.sanitize(md.render(markdown), {
     USE_PROFILES: { html: true },
   });
 }
 
+/** @param {unknown} err rejet d'`invoke` (chaîne d'erreur Rust) */
 function renderError(err) {
   body.replaceChildren();
   const error = document.createElement("p");
@@ -91,7 +107,11 @@ export async function openChangelog() {
   show();
 }
 
-/** Changelog d'un plugin installé (`p` = entrée `list_plugins`). */
+/**
+ * Changelog d'un plugin installé (`p` = entrée `list_plugins`).
+ * @param {PluginInfo} p
+ * @returns {Promise<void>}
+ */
 export async function openPluginChangelog(p) {
   const key = `plugin:${p.id}`;
   if (shownKey !== key) {
@@ -110,11 +130,15 @@ export async function openPluginChangelog(p) {
 
 export function initChangelog() {
   onLocaleChange(setHeader);
-  document.getElementById("changelog-close").addEventListener("click", () => dialog.close());
+  /** @type {HTMLButtonElement} */ (document.getElementById("changelog-close")).addEventListener(
+    "click",
+    () => dialog.close(),
+  );
   // Liens éventuels du corps (URL citées dans une entrée) : navigateur système
   // via le backend, jamais de navigation de la webview elle-même.
   body.addEventListener("click", (e) => {
-    const a = e.target.closest("a");
+    // Cible d'un clic : toujours un élément (jamais un nœud texte).
+    const a = /** @type {Element} */ (e.target).closest("a");
     if (!a) return;
     e.preventDefault();
     const href = (a.getAttribute("href") || "").trim();

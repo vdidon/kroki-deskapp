@@ -1,3 +1,5 @@
+// @ts-check
+
 // Webview cachée : exécute les moteurs de rendu JS/WASM et répond aux jobs
 // envoyés par le backend (event "render-job" → invoke render_job_done).
 //
@@ -19,7 +21,12 @@ window.rendererT = t;
 // ---------- chargement à la demande des vendors ----------
 // Injecte un <script> classique (non-module) et résout au chargement. Mémoïsé
 // par URL : un vendor partagé (graphre, vega…) n'est chargé qu'une fois.
+/** @type {Map<string, Promise<void>>} */
 const SCRIPTS = new Map();
+/**
+ * @param {string} src
+ * @returns {Promise<void>}
+ */
 function loadScript(src) {
   let p = SCRIPTS.get(src);
   if (!p) {
@@ -36,13 +43,16 @@ function loadScript(src) {
 }
 // Charge plusieurs scripts classiques en SÉQUENCE (ordre d'exécution imposé par
 // leurs dépendances : graphre avant nomnoml, shims autour de bytefield…).
+/** @param {...string} srcs */
 async function loadInOrder(...srcs) {
   for (const src of srcs) await loadScript(src);
 }
 
 // ---------- mermaid ----------
+/** @type {string | null} */
 let mermaidTheme = null;
 let mermaidSeq = 0;
+/** @type {Engine} */
 async function renderMermaid(source, options) {
   await loadScript("./vendor/mermaid.min.js");
   const theme = options.theme || "default";
@@ -55,11 +65,16 @@ async function renderMermaid(source, options) {
 }
 
 // ---------- graphviz (WASM officiel, import dynamique) ----------
+/** @type {Promise<import("../../types/renderer").Graphviz> | null} */
 let gvPromise = null;
 async function getGraphviz() {
-  gvPromise ??= import("./vendor/graphviz.es.js").then(({ Graphviz }) => Graphviz.load());
+  // Cast : tsc n'infère du bundle minifié qu'une surface sans garantie.
+  gvPromise ??= /** @type {Promise<import("../../types/renderer").GraphvizModule>} */ (
+    import("./vendor/graphviz.es.js")
+  ).then(({ Graphviz }) => Graphviz.load());
   return gvPromise;
 }
+/** @type {Engine} */
 async function renderGraphviz(source, options) {
   const gv = await getGraphviz();
   const engine = options.layout || options.engine || "dot";
@@ -79,6 +94,7 @@ function exprInterpreter() {
   );
 }
 
+/** @param {unknown} spec */
 async function renderVega(spec) {
   await loadVega();
   const runtime = window.vega.parse(spec, null, { ast: true });
@@ -93,16 +109,23 @@ async function renderVega(spec) {
   }
 }
 
+/**
+ * @param {string} source
+ * @param {string} label
+ * @returns {unknown}
+ */
 function parseJsonStrict(source, label) {
   try {
     return JSON.parse(source);
   } catch (e) {
-    throw new Error(t("renderer.json_invalid", { label, detail: e.message }));
+    // JSON.parse ne lève que des SyntaxError.
+    throw new Error(t("renderer.json_invalid", { label, detail: /** @type {SyntaxError} */ (e).message }));
   }
 }
 
 // ---------- wavedrom ----------
 let waveSeq = 0;
+/** @type {Engine} */
 async function renderWavedrom(source) {
   await loadInOrder("./vendor/wavedrom-default.js", "./vendor/wavedrom.min.js");
   const obj = parseJsonStrict(source, "WaveDrom");
@@ -112,7 +135,10 @@ async function renderWavedrom(source) {
   document.body.appendChild(el);
   try {
     const wd = window.WaveDrom;
-    const render = wd.renderWaveForm || wd.RenderWaveForm;
+    // Le bundle n'expose que `RenderWaveForm` : `render` n'est jamais undefined.
+    const render = /** @type {NonNullable<import("../../types/renderer").WaveDrom["RenderWaveForm"]>} */ (
+      wd.renderWaveForm || wd.RenderWaveForm
+    );
     render.call(wd, idx, obj, "WaveDrom_Display_");
     const svg = el.querySelector("svg") || el.firstElementChild;
     if (!svg) throw new Error(t("renderer.wavedrom_empty"));
@@ -125,9 +151,11 @@ async function renderWavedrom(source) {
 // ---------- bytefield ----------
 // shim-pre installe un pseudo-Node (window.module), bytefield-svg s'y exporte,
 // shim-post récupère l'export : ordre strict garanti par loadInOrder.
+/** @type {Engine} */
 async function renderBytefield(source) {
   await loadInOrder("./shim-pre.js", "./vendor/bytefield-svg.js", "./shim-post.js");
-  const fn = window.__bytefield;
+  // Forme attendue de l'export CommonJS ; `typeof` ci-dessous en vérifie le seul point vérifiable.
+  const fn = /** @type {((source: string) => string) | null | undefined} */ (window.__bytefield);
   if (typeof fn !== "function") {
     throw new Error(t("renderer.engine_init", { name: "bytefield-svg" }));
   }
@@ -137,17 +165,20 @@ async function renderBytefield(source) {
 // ---------- d2 (WASM officiel @terrastruct/d2, chargé à la demande) ----------
 // Import dynamique : le bundle fait ~8 Mo, inutile de le parser tant qu'aucun
 // diagramme d2 n'est demandé.
+/** @type {Promise<import("../../types/renderer").D2> | null} */
 let d2Promise = null;
 async function getD2() {
   if (!d2Promise) {
-    d2Promise = import("./vendor/d2.esm.js").then(({ D2 }) => new D2());
+    d2Promise = /** @type {Promise<import("../../types/renderer").D2Module>} */ (import("./vendor/d2.esm.js")).then(({ D2 }) => new D2());
   }
   return d2Promise;
 }
 // Le wrapper D2 ne suit qu'un seul échange (compile/render) à la fois sur son
 // worker : deux appels concurrents écraseraient leurs callbacks. On les
 // sérialise (le document rend tous les diagrammes via Promise.all).
+/** @type {Promise<void>} */
 let d2Queue = Promise.resolve();
+/** @type {Engine} */
 function renderD2(source, options) {
   const task = d2Queue.then(() => d2CompileRender(source, options));
   d2Queue = task.then(
@@ -156,17 +187,23 @@ function renderD2(source, options) {
   );
   return task;
 }
+/** @type {Engine} */
 async function d2CompileRender(source, options) {
   const d2 = await getD2();
+  /** @type {import("../../types/renderer").D2CompileOptions} */
   const compileOpts = {};
   if (options.layout) compileOpts.layout = options.layout; // "dagre" (défaut) | "elk"
   if (options.theme != null) compileOpts.themeID = Number(options.theme);
-  if (options.sketch != null) compileOpts.sketch = options.sketch === true || options.sketch === "true";
+  // `=== true` jamais vrai : `render_diagram` ne transmet que des chaînes
+  // (BTreeMap<String, String>) ; conservé tel quel, le cast ne fait que le taire.
+  if (options.sketch != null)
+    compileOpts.sketch = /** @type {unknown} */ (options.sketch) === true || options.sketch === "true";
   const result = await d2.compile(source, compileOpts);
   return d2.render(result.diagram, result.renderOptions);
 }
 
 // ---------- dbml : génère le DOT puis le rend via le moteur graphviz embarqué ----------
+/** @type {Engine} */
 async function renderDbml(source) {
   await loadScript("./vendor/dbml.js");
   if (typeof window.dbmlToDot !== "function") {
@@ -177,6 +214,7 @@ async function renderDbml(source) {
 }
 
 // ---------- erd : parseur maison → DOT, rendu via le moteur graphviz embarqué ----------
+/** @type {Engine} */
 async function renderErd(source) {
   await loadScript("./erd.js");
   if (typeof window.erdToDot !== "function") {
@@ -186,12 +224,14 @@ async function renderErd(source) {
 }
 
 // ---------- nomnoml (nécessite graphre) ----------
+/** @type {Engine} */
 async function renderNomnoml(source) {
   await loadInOrder("./vendor/graphre.js", "./vendor/nomnoml.js");
   return window.nomnoml.renderSvg(source);
 }
 
 // ---------- bpmn (bpmn-js, rendu headless dans un conteneur hors écran) ----------
+/** @type {Engine} */
 async function renderBpmn(source) {
   await loadScript("./vendor/bpmn-viewer.min.js");
   const Bpmn = window.BpmnJS;
@@ -217,13 +257,16 @@ async function renderBpmn(source) {
 // ---------- excalidraw (@excalidraw/excalidraw exportToSvg, bundle vendoré) ----------
 // Import dynamique : bundle ~8 Mo, inutile tant qu'aucune scène excalidraw n'est
 // demandée.
+/** @type {Promise<import("../../types/renderer").ExcalidrawModule> | null} */
 let excalidrawPromise = null;
 async function getExcalidraw() {
   if (!excalidrawPromise) {
     // La CSP bloque les polices CDN ; on pointe l'asset path en local pour
     // éviter tout fetch réseau (les manquantes 404 vite, sans pendre).
     window.EXCALIDRAW_ASSET_PATH = window.location.origin + "/";
-    excalidrawPromise = import("./vendor/excalidraw.esm.js");
+    excalidrawPromise = /** @type {Promise<import("../../types/renderer").ExcalidrawModule>} */ (
+      import("./vendor/excalidraw.esm.js")
+    );
   }
   return excalidrawPromise;
 }
@@ -234,6 +277,7 @@ async function getExcalidraw() {
 // cassés et on réécrit chaque famille vers une pile système (texte lisible, hors-ligne).
 // Familles excalidraw → piles système (guillemets SIMPLES en interne : la valeur
 // est réinjectée dans un attribut `font-family="…"` à guillemets doubles).
+/** @type {Record<string, string>} */
 const EXCALIDRAW_FONT_MAP = {
   Excalifont: "'Segoe Print', 'Comic Sans MS', cursive",
   Virgil: "'Segoe Print', 'Comic Sans MS', cursive",
@@ -251,19 +295,25 @@ const EXCALIDRAW_FONT_MAP = {
 };
 // Mappe une valeur font-family (ex. "Virgil, Segoe UI Emoji") vers une pile système
 // d'après son premier token ; inchangée si la police n'est pas une police excalidraw.
+/** @param {string} value */
 function mapExcalidrawFamily(value) {
   const first = value.split(",")[0].trim().replace(/^['"]|['"]$/g, "");
   return EXCALIDRAW_FONT_MAP[first] || value;
 }
+/** @param {string} svg */
 function fixExcalidrawFonts(svg) {
   return svg
     .replace(/<style class="style-fonts">[\s\S]*?<\/style>/g, "")
-    .replace(/font-family="([^"]*)"/g, (_m, v) => `font-family="${mapExcalidrawFamily(v)}"`)
-    .replace(/font-family:\s*([^;"}]+)/g, (_m, v) => `font-family: ${mapExcalidrawFamily(v)}`);
+    .replace(/font-family="([^"]*)"/g, (_m, /** @type {string} */ v) => `font-family="${mapExcalidrawFamily(v)}"`)
+    .replace(/font-family:\s*([^;"}]+)/g, (_m, /** @type {string} */ v) => `font-family: ${mapExcalidrawFamily(v)}`);
 }
 
+/** @type {Engine} */
 async function renderExcalidraw(source) {
-  const scene = parseJsonStrict(source, "Excalidraw");
+  // Forme supposée, vérifiée juste après sur `elements` (seul champ requis).
+  const scene = /** @type {Partial<import("../../types/renderer").ExcalidrawScene> | null} */ (
+    parseJsonStrict(source, "Excalidraw")
+  );
   if (!scene || !Array.isArray(scene.elements)) {
     throw new Error(t("renderer.excalidraw_invalid_scene"));
   }
@@ -282,6 +332,12 @@ async function renderExcalidraw(source) {
   return fixExcalidrawFonts(svg.outerHTML);
 }
 
+/**
+ * Moteur : source (+ options du job, toujours des chaînes, cf. `render_diagram`)
+ * → SVG sérialisé.
+ * @typedef {(source: string, options: Record<string, string>) => Promise<string>} Engine
+ */
+/** @type {Record<string, Engine>} */
 const ENGINES = {
   mermaid: renderMermaid,
   graphviz: renderGraphviz,
@@ -309,14 +365,15 @@ await initI18n();
 await listen("render-job", async (e) => {
   const { id, dtype, source, options } = e.payload;
   try {
-    const engine = ENGINES[dtype];
+    const engine = /** @type {Engine | undefined} */ (ENGINES[dtype]);
     if (!engine) throw new Error(t("renderer.unknown_engine", { type: dtype }));
     const svg = await engine(source, options || {});
     if (typeof svg !== "string" || !svg.includes("<svg")) {
       throw new Error(t("renderer.no_svg", { type: dtype }));
     }
     await invoke("render_job_done", { id, svg, error: null });
-  } catch (err) {
+  } catch (/** @type {any} */ err) {
+    // `any` : un moteur peut lever n'importe quoi ; `?.`/`??` gèrent le non-Error.
     await invoke("render_job_done", {
       id,
       svg: null,

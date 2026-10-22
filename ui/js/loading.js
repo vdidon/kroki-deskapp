@@ -1,3 +1,4 @@
+// @ts-check
 // Voile de chargement de la zone de rendu.
 //
 // Afficher un gros document se fait en deux temps : la transformation par le
@@ -41,6 +42,7 @@ const HEAVY_CHARS = 60000;
 const overlay = document.getElementById("loading-overlay");
 const labelEl = overlay?.querySelector(".loading-label");
 
+/** @type {ReturnType<typeof setTimeout> | null} */
 let timer = null;
 let depth = 0; // rendus imbriqués (renderActive appelé pendant une bascule)
 
@@ -48,6 +50,8 @@ let depth = 0; // rendus imbriqués (renderActive appelé pendant une bascule)
  * Signale le début d'une phase de rendu. Le voile n'apparaîtra que si elle
  * dure plus de `DELAY_MS`. À apparier systématiquement avec `endLoading`
  * dans un `finally` : un rendu qui échoue ne doit pas laisser le voile posé.
+ *
+ * @param {string} [label]
  */
 export function beginLoading(label = t("loading.rendering")) {
   depth += 1;
@@ -69,6 +73,8 @@ export function loadingVisible() {
  * voile est affiché. Sur un document rapide il n'apparaît jamais, et l'attente
  * de deux frames n'est pas payée. Deux `requestAnimationFrame` imbriqués :
  * le premier s'exécute avant le paint du frame courant, le second après.
+ *
+ * @returns {Promise<void>}
  */
 export function paintLoading() {
   if (!loadingVisible()) return Promise.resolve();
@@ -85,6 +91,8 @@ export function paintLoading() {
  * À utiliser en plus de `beginLoading`, pas à sa place : le délai couvre les
  * phases asynchrones (transformation par un plugin), celle-ci les phases
  * bloquantes, et un même rendu enchaîne souvent les deux.
+ *
+ * @param {string | null | undefined} text
  */
 export async function beforeHeavyRender(text) {
   if (!overlay || String(text ?? "").length < HEAVY_CHARS) return;

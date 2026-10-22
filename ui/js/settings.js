@@ -1,3 +1,4 @@
+// @ts-check
 // Réglages : thème, langue, icônes des barres d'outils, serveur externe optionnel,
 // API Kroki locale et vérification des mises à jour, persistés côté Rust.
 
@@ -7,26 +8,33 @@ import { openPlugins } from "./plugins_ui.js";
 import { ICON_GROUPS, applyIcons } from "./icons.js";
 import { getLanguages, getLanguageSetting, loadLocale, onLocaleChange, t } from "./i18n.js";
 
-const dialog = document.getElementById("settings-dialog");
-const themeSelect = document.getElementById("theme-select");
-const languageSelect = document.getElementById("language-select");
-const iconsBox = document.getElementById("icons-config");
-const urlInput = document.getElementById("kroki-url");
-const serverEnabled = document.getElementById("server-enabled");
-const serverPort = document.getElementById("server-port");
-const supportedHint = document.getElementById("supported-hint");
-const serverHint = document.getElementById("server-hint");
-const updateCheck = document.getElementById("update-check");
-const errorEl = document.getElementById("settings-error");
+/** @typedef {import("../../types/ipc").SettingsInfo} SettingsInfo */
 
+// Éléments d'index.html, présents par construction.
+const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("settings-dialog"));
+const themeSelect = /** @type {HTMLSelectElement} */ (document.getElementById("theme-select"));
+const languageSelect = /** @type {HTMLSelectElement} */ (document.getElementById("language-select"));
+const iconsBox = /** @type {HTMLElement} */ (document.getElementById("icons-config"));
+const urlInput = /** @type {HTMLInputElement} */ (document.getElementById("kroki-url"));
+const serverEnabled = /** @type {HTMLInputElement} */ (document.getElementById("server-enabled"));
+const serverPort = /** @type {HTMLInputElement} */ (document.getElementById("server-port"));
+const supportedHint = /** @type {HTMLElement} */ (document.getElementById("supported-hint"));
+const serverHint = /** @type {HTMLElement} */ (document.getElementById("server-hint"));
+const updateCheck = /** @type {HTMLInputElement} */ (document.getElementById("update-check"));
+const errorEl = /** @type {HTMLElement} */ (document.getElementById("settings-error"));
+
+/** @type {(() => void) | null} */
 let onSaved = null;
 // Choix explicites en cours d'édition (id -> bool). Une case jamais touchée
 // n'entre pas dans cet objet : elle n'est donc pas enregistrée et continue de
 // suivre le défaut du registre (cf. icons.js).
+/** @type {Record<string, boolean>} */
 let iconWork = {};
+/** @type {Map<string, HTMLInputElement>} */
 const iconBoxes = new Map(); // id -> <input type=checkbox>
 // Dernier état reçu de `get_settings` : sert à recalculer l'indication des types
 // pris en charge si la langue change pendant que le dialog est ouvert.
+/** @type {SettingsInfo | null} */
 let supportedInfo = null;
 
 function updateServerHint() {
@@ -50,7 +58,7 @@ function updateSupportedHint() {
 // vient d'index.html (traduite par data-i18n).
 function buildLanguageUi() {
   const current = languageSelect.value;
-  const auto = languageSelect.querySelector('option[value="auto"]');
+  const auto = /** @type {HTMLOptionElement} */ (languageSelect.querySelector('option[value="auto"]'));
   const options = getLanguages().map(({ code, name }) => {
     const opt = document.createElement("option");
     opt.value = code;
@@ -129,7 +137,7 @@ export async function openSettings() {
   syncIconBoxes();
   urlInput.value = s.external_url;
   serverEnabled.checked = s.server_enabled;
-  serverPort.value = s.server_port;
+  serverPort.value = String(s.server_port);
   updateCheck.checked = s.update_check;
   supportedInfo = s;
   updateSupportedHint();
@@ -138,6 +146,7 @@ export async function openSettings() {
   dialog.showModal();
 }
 
+/** @param {() => void} savedCallback */
 export function initSettings(savedCallback) {
   onSaved = savedCallback;
 
@@ -158,9 +167,9 @@ export function initSettings(savedCallback) {
 
   // Gestion des plugins : le dialog Plugins s'empile au-dessus des Réglages
   // (modales imbriquées, native aux <dialog>).
-  document.getElementById("settings-plugins").addEventListener("click", openPlugins);
+  /** @type {HTMLElement} */ (document.getElementById("settings-plugins")).addEventListener("click", openPlugins);
 
-  document.getElementById("settings-reset").addEventListener("click", () => {
+  /** @type {HTMLElement} */ (document.getElementById("settings-reset")).addEventListener("click", () => {
     themeSelect.value = "auto";
     languageSelect.value = "auto";
     // Oublier les choix d'icônes : toutes repartent de leur défaut, et rien
@@ -169,14 +178,14 @@ export function initSettings(savedCallback) {
     syncIconBoxes();
     urlInput.value = "";
     serverEnabled.checked = true;
-    serverPort.value = 8442;
+    serverPort.value = "8442";
     updateCheck.checked = true;
     updateServerHint();
   });
-  document.getElementById("settings-cancel").addEventListener("click", () => {
+  /** @type {HTMLElement} */ (document.getElementById("settings-cancel")).addEventListener("click", () => {
     dialog.close();
   });
-  document.getElementById("settings-form").addEventListener("submit", async (e) => {
+  /** @type {HTMLElement} */ (document.getElementById("settings-form")).addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
       await invoke("set_settings", {

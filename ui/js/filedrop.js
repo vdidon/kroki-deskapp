@@ -1,14 +1,20 @@
+// @ts-check
+
 // Glisser-déposer de fichiers depuis l'Explorateur (drag & drop natif Tauri).
 
 import { invoke, listen } from "./app.js";
 import { isOpenableDocPath, isPluginArchivePath, isSessionFilePath } from "./plugins.js";
 import { requestPluginInstall } from "./plugins_ui.js";
 
-const overlay = document.getElementById("drop-overlay");
+const overlay = /** @type {HTMLElement} */ (document.getElementById("drop-overlay"));
 
 // Documents ouvrables (extensions natives + plugins actifs), archives de
 // plugins `.kdext` (routées vers le flux d'installation, spec §9.2) et
 // sessions `.kdws` (routées côté Rust par `open_mixed_paths`).
+/**
+ * @param {string[] | null | undefined} paths
+ * @returns {string[]}
+ */
 function accepted(paths) {
   return (paths ?? []).filter(
     (p) => isOpenableDocPath(p) || isPluginArchivePath(p) || isSessionFilePath(p),

@@ -1,3 +1,5 @@
+// @ts-check
+
 // Orchestration de la fenêtre : état des onglets, vues, raccourcis, liens.
 
 import { invoke, listen, currentLabel, state, isHtmlPath } from "./app.js";
@@ -51,14 +53,21 @@ import { initPluginsUi } from "./plugins_ui.js";
 import { applyIcons, iconEnabled } from "./icons.js";
 import { beginLoading, endLoading, beforeHeavyRender } from "./loading.js";
 
-const viewsEl = document.getElementById("views");
-const emptyEl = document.getElementById("empty-state");
+/** @typedef {import("../../types/ipc").Anchor} Anchor */
+/** @typedef {import("../../types/ipc").TabsPayload} TabsPayload */
+/** @typedef {import("../../types/app").View} View */
+/** @typedef {import("../../types/app").ViewMode} ViewMode */
+/** @typedef {ReturnType<typeof extractHeadings>[number]} Heading */
+
+const viewsEl = /** @type {HTMLElement} */ (document.getElementById("views"));
+const emptyEl = /** @type {HTMLElement} */ (document.getElementById("empty-state"));
 
 let zoom = 1; // zoom texte (Ctrl+molette) : l'échelle change, la colonne reflue
 let pageZoom = 1; // zoom de page (Maj+molette) : vrai zoom, sans reflux (cf. setPageZoom)
 let fitWidth = false; // préférence globale d'affichage : preview pleine largeur (cf. setFitWidth)
 let appVersion = ""; // version de l'app (tauri.conf.json), récupérée au boot
 
+/** @param {TabsPayload} payload */
 function applyTabs(payload) {
   state.tabs = payload.tabs;
   state.active = payload.active ?? null;
@@ -93,7 +102,8 @@ function syncViews() {
 }
 
 async function showActive() {
-  const id = state.active;
+  // Typé non nul : `null` (aucun onglet actif) n'a pas de vue, sortie au `if (!v)`.
+  const id = /** @type {number} */ (state.active);
   closeToc(); // le sommaire référence l'onglet précédent : on le ferme au changement
   for (const [vid, v] of state.views) {
     v.el.style.display = vid === id ? "" : "none";
@@ -118,9 +128,14 @@ async function showActive() {
 // Le fragment d'un lien relatif vers un autre document est mémorisé ici : le
 // backend (`open_link`) ouvre/active l'onglet, puis `showActive` scrolle vers
 // l'ancre une fois le document cible rendu.
+/** @type {{ path: string, fragment: string, expires: number } | null} */
 let pendingAnchor = null; // { path (normalisé), fragment, expires }
 
 // Chemin absolu normalisé pour comparaison Windows (séparateurs, `..`, casse).
+/**
+ * @param {string} dir
+ * @param {string} [rel]
+ */
 function normPath(dir, rel = "") {
   const parts = dir.split(/[\\/]+/).filter(Boolean);
   for (const seg of rel.split(/[\\/]+/)) {
@@ -134,12 +149,20 @@ function normPath(dir, rel = "") {
 // Fragment « numéro de ligne » à la GitHub / VS Code : `#L75`, plage `#L75-L80`
 // (seul le début compte). Renvoie la ligne 0-based (convention des
 // `data-line`/`data-source-line`), ou null si le fragment n'en est pas un.
+/**
+ * @param {string} fragment
+ * @returns {number | null}
+ */
 function lineFragment(fragment) {
   const m = /^L(\d+)(?:-L?\d+)?$/i.exec(fragment);
   return m ? Math.max(0, Number(m[1]) - 1) : null;
 }
 
 // Amène la ligne `line` du source réel en haut de la vue, quel que soit son mode.
+/**
+ * @param {View} v
+ * @param {number} line
+ */
 function scrollToSourceLine(v, line) {
   if (v.mode === "source") scrollToLine(v.el, "data-line", line);
   else if (v.mode === "derived")
@@ -149,6 +172,11 @@ function scrollToSourceLine(v, line) {
 
 // Saute vers un fragment dans la vue `v` : un `id` existant prime, sinon un
 // fragment `L<n>` vaut numéro de ligne. Renvoie false si rien ne correspond.
+/**
+ * @param {View} v
+ * @param {string} fragment
+ * @returns {boolean}
+ */
 function jumpToFragment(v, fragment) {
   const line = lineFragment(fragment);
   const target =
@@ -162,6 +190,7 @@ function jumpToFragment(v, fragment) {
   return true;
 }
 
+/** @param {View} v */
 function consumePendingAnchor(v) {
   if (!pendingAnchor) return;
   if (Date.now() > pendingAnchor.expires) {
@@ -193,11 +222,18 @@ async function drainPendingAnchors() {
   if (v && v.rendered && !v.rendering) consumePendingAnchor(v);
 }
 
-/** La vue rend-elle la preview (seul mode qui traverse markdown-it + KaTeX) ? */
+/**
+ * La vue rend-elle la preview (seul mode qui traverse markdown-it + KaTeX) ?
+ * @param {View} v
+ */
 function isPreview(v) {
   return v.mode !== "source" && v.mode !== "derived";
 }
 
+/**
+ * @param {View} v
+ * @param {number} id
+ */
 async function renderActive(v, id) {
   const seq = ++v.seq;
   v.rendering = true; // cf. drainPendingAnchors : pas de saut dans un DOM en chantier
@@ -210,6 +246,11 @@ async function renderActive(v, id) {
   }
 }
 
+/**
+ * @param {View} v
+ * @param {number} id
+ * @param {number} seq
+ */
 async function renderActiveInner(v, id, seq) {
   let doc;
   try {
@@ -262,7 +303,10 @@ async function renderActiveInner(v, id, seq) {
         gen.markdown += `\n\n> ⚠️ ${gen.warnings.map((w) => String(w)).join(" · ")}\n`;
       }
     } catch (err) {
-      gen = { markdown: degradedDocMarkdown(doc.title, err, doc.markdown), anchors: [[0, 0]] };
+      gen = {
+        markdown: degradedDocMarkdown(doc.title, err, doc.markdown),
+        anchors: /** @type {Anchor[]} */ ([[0, 0]]),
+      };
     }
     if (v.seq !== seq) return;
     doc = { ...doc, markdown: gen.markdown, lineMap: gen.anchors };
@@ -286,9 +330,10 @@ async function renderActiveInner(v, id, seq) {
 
 // Vue debug « markdown intermédiaire » : le markdown généré par le plugin
 // (document:markdown), affiché brut avec la mécanique de la vue source.
+/** @param {View} v */
 function renderDerived(v) {
   // Toujours du markdown, quel que soit le format du fichier d'origine.
-  renderSource(v.el, v.markdown, { lang: "markdown", plugin: null });
+  renderSource(v.el, /** @type {string} */ (v.markdown), { lang: "markdown", plugin: null });
   v.el.querySelector(".source-view")?.classList.add("derived-view");
 }
 
@@ -304,6 +349,8 @@ function renderDerived(v) {
  * Le cache est vidé par `renderActive`, seul endroit où le contenu change :
  * modification sur disque, changement de thème ou d'icônes y passent tous via
  * `state.stale`.
+ * @param {View} v
+ * @param {ViewMode | undefined} mode
  */
 async function renderMode(v, mode) {
   // Une vue neuve n'a pas encore de `mode` : partout ailleurs `undefined` se
@@ -316,21 +363,28 @@ async function renderMode(v, mode) {
     return;
   }
   // Phase synchrone : le voile doit être peint avant qu'elle démarre. Seule la
-  // preview le mérite (cf. renderActive).
+  // preview le mérite (cf. renderActive). `markdown`/`dir` sont posés : appelé
+  // par renderActiveInner après eux, ou par les bascules qui l'exigent non nul.
   await beforeHeavyRender(key === "preview" ? v.markdown : "");
-  if (key === "source") renderSource(v.el, v.sourceText ?? v.markdown, sourceHighlightFor(v.path));
+  if (key === "source")
+    renderSource(v.el, /** @type {string} */ (v.sourceText ?? v.markdown), sourceHighlightFor(v.path));
   else if (key === "derived") renderDerived(v);
-  else await renderDocument(v.el, { markdown: v.markdown, dir: v.dir, lineMap: v.lineMap });
+  else
+    await renderDocument(v.el, {
+      markdown: /** @type {string} */ (v.markdown),
+      dir: /** @type {string} */ (v.dir),
+      lineMap: v.lineMap,
+    });
   (v.domCache ??= {})[key] = v.el.firstElementChild;
 }
 
 // --- Actions de vue (sommaire + bascule code source) de l'onglet actif ---
-const viewActions = document.getElementById("view-actions");
-const sourceBtn = document.getElementById("btn-source-toggle");
-const derivedBtn = document.getElementById("btn-derived");
-const fitBtn = document.getElementById("btn-fit-width");
-const tocBtn = document.getElementById("btn-toc");
-const tocPanel = document.getElementById("toc-panel");
+const viewActions = /** @type {HTMLElement} */ (document.getElementById("view-actions"));
+const sourceBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-source-toggle"));
+const derivedBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-derived"));
+const fitBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-fit-width"));
+const tocBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-toc"));
+const tocPanel = /** @type {HTMLElement} */ (document.getElementById("toc-panel"));
 
 // Affiche/masque la pile de boutons selon qu'un onglet rendu est actif, et reflète
 // le mode courant sur le bouton source. Chaque bouton croise deux conditions : sa
@@ -342,7 +396,7 @@ function updateViewActions() {
   // ni export, ni pleine largeur) — toute la pile est masquée.
   const show = !!v && v.rendered && v.kind !== "html";
   let any = false;
-  for (const [id, relevant] of [
+  for (const [id, relevant] of /** @type {[string, boolean][]} */ ([
     ["btn-toc", true],
     ["btn-source-toggle", true],
     // Vue « markdown intermédiaire » : seulement pour un document passé par un
@@ -350,9 +404,9 @@ function updateViewActions() {
     ["btn-derived", !!v?.lineMap],
     ["btn-fit-width", true],
     ["btn-export", true],
-  ]) {
+  ])) {
     const on = show && relevant && iconEnabled(id);
-    document.getElementById(id).hidden = !on;
+    /** @type {HTMLElement} */ (document.getElementById(id)).hidden = !on;
     any = any || on;
   }
   viewActions.hidden = !any;
@@ -393,6 +447,7 @@ function closeToc() {
 
 // Va au titre cliqué : en preview, scroll vers l'élément par son id (comme les
 // ancres) ; en mode source, aligne la ligne du titre en haut (cf. scrollToLine).
+/** @param {Heading} h */
 function gotoHeading(h) {
   const v = state.views.get(state.active);
   if (!v) return;
@@ -406,6 +461,7 @@ function gotoHeading(h) {
   }
 }
 
+/** @param {Heading[]} headings */
 function buildToc(headings) {
   if (!headings.length) {
     const empty = document.createElement("div");
@@ -445,7 +501,7 @@ function toggleToc() {
   if (!v || !v.rendered || v.markdown == null) return;
   let headings = extractHeadings(v.markdown);
   // Document dérivé d'un plugin : réaccorde les lignes des titres sur le source réel.
-  if (v.lineMap) headings = headings.map((h) => ({ ...h, line: remapLine(v.lineMap, h.line) }));
+  if (v.lineMap) headings = headings.map((h) => ({ ...h, line: remapLine(/** @type {Anchor[]} */ (v.lineMap), h.line) }));
   buildToc(headings);
   tocPanel.hidden = false;
   tocBtn.classList.add("active");
@@ -482,6 +538,10 @@ async function toggleSource() {
 // Bascule preview/source ↔ markdown généré par le plugin. L'alignement de
 // position passe par les ancres : approximatif (granularité par section),
 // suffisant pour un outil de débogage.
+/**
+ * @param {Anchor[]} anchors
+ * @param {number} srcLine
+ */
 function mdLineForSource(anchors, srcLine) {
   let best = 0;
   for (const [mdLine, s] of anchors) {
@@ -552,19 +612,20 @@ function rerenderAll() {
 // largeur réelle de la colonne pour éviter un débordement au dézoom. On le fait via
 // relayout(width, height) en préservant le ratio d'aspect — surtout PAS via
 // Plots.resize, qui prend la hauteur du conteneur (sans hauteur CSS) et l'écrase.
+/** @param {HTMLElement | undefined} viewEl */
 function resizePlotlyFigures(viewEl) {
   const P = window.Plotly;
   if (!P || !viewEl) return;
   // Plotly pose la classe `js-plotly-plot` sur l'élément cible lui-même (= le
   // .kroki-diagram), pas sur un enfant : on filtre donc dessus directement.
-  for (const el of viewEl.querySelectorAll(
-    '.kroki-diagram[data-kroki-type="plotly"].js-plotly-plot',
+  for (const el of /** @type {NodeListOf<HTMLElement>} */ (
+    viewEl.querySelectorAll('.kroki-diagram[data-kroki-type="plotly"].js-plotly-plot')
   )) {
     // offsetParent null = vue masquée (onglet inactif) : mesure de largeur
     // invalide, on la rattrape à la réactivation (showActive).
     if (el.offsetParent === null) continue;
     const w = el.clientWidth;
-    const ratio = parseFloat(el.dataset.plotlyRatio);
+    const ratio = parseFloat(/** @type {string} */ (el.dataset.plotlyRatio)); // absent → NaN → ignoré
     if (w > 0 && ratio > 0) P.relayout(el, { width: w, height: Math.round(w * ratio) });
   }
 }
@@ -583,6 +644,7 @@ function applyZoom() {
   resizePlotlyFigures(state.views.get(state.active)?.el);
 }
 
+/** @param {number} z */
 function setZoom(z) {
   zoom = Math.min(3, Math.max(0.4, z));
   applyZoom();
@@ -595,6 +657,10 @@ function setZoom(z) {
 // défilement pour l'y ramener après le changement d'échelle. Sans ancre (Ctrl+0),
 // le coin haut-gauche reste en place. Borné à 1 : en deçà, Ctrl+molette fait
 // déjà tenir plus de contenu à l'écran.
+/**
+ * @param {number} p
+ * @param {{ view: HTMLElement, x: number, y: number } | null} [anchor]
+ */
 function setPageZoom(p, anchor = null) {
   const next = Math.min(8, Math.max(1, p));
   if (next === pageZoom) return;
@@ -619,6 +685,7 @@ function setPageZoom(p, anchor = null) {
 // mémorise la ligne source collée en haut AVANT, et on réaligne dessus APRÈS, comme la
 // bascule code source. Plotly, qui fige sa largeur au layout, est réaccordé avant le
 // scroll pour que les hauteurs soient stables au moment de mesurer la cible.
+/** @param {boolean} on */
 function setFitWidth(on) {
   fitWidth = on;
   const v = state.views.get(state.active);
@@ -634,6 +701,7 @@ function setFitWidth(on) {
   }
 }
 
+/** @param {number} dir */
 function cycleTab(dir) {
   if (state.tabs.length < 2) return;
   const idx = state.tabs.findIndex((t) => t.id === state.active);
@@ -643,10 +711,10 @@ function cycleTab(dir) {
 
 // --- Liens dans les documents : web → navigateur, .md relatif → onglet, ancre → scroll ---
 function initLinks() {
-  document.getElementById("content").addEventListener("click", (e) => {
+  /** @type {HTMLElement} */ (document.getElementById("content")).addEventListener("click", (e) => {
     // `closest("a")` (et non `a[href]`) : les SVG graphviz portent leurs liens
     // en `xlink:href` (nœuds de diagramme liés à un autre document, cliquables).
-    const a = e.target.closest("a");
+    const a = /** @type {Element} */ (e.target).closest("a");
     if (!a) return;
     e.preventDefault();
     const href = (a.getAttribute("href") || a.getAttribute("xlink:href") || "").trim();
@@ -729,7 +797,7 @@ function initShortcuts() {
       closeToc();
     }
   });
-  document.getElementById("content").addEventListener(
+  /** @type {HTMLElement} */ (document.getElementById("content")).addEventListener(
     "wheel",
     (e) => {
       if (e.ctrlKey) {
@@ -744,7 +812,10 @@ function initShortcuts() {
       const delta = e.deltaY || e.deltaX;
       if (!delta) return;
       e.preventDefault();
-      const view = e.target.closest?.(".doc-view") ?? state.views.get(state.active)?.el;
+      const view =
+        /** @type {HTMLElement | null | undefined} */ (/** @type {Element} */ (e.target).closest?.(".doc-view")) ??
+        state.views.get(state.active)?.el;
+      /** @type {{ view: HTMLElement, x: number, y: number } | null} */
       let anchor = null;
       if (view) {
         const box = view.getBoundingClientRect();
@@ -819,19 +890,19 @@ async function boot() {
   await initSession();
   initUpdates(); // non attendue : requête réseau, jusqu'à 10 s
 
-  document.getElementById("btn-open").addEventListener("click", () => invoke("open_file_dialog"));
+  /** @type {HTMLElement} */ (document.getElementById("btn-open")).addEventListener("click", () => invoke("open_file_dialog"));
   // Délégation : le lien est dans un texte traduit par innerHTML (`welcome.open_hint`),
   // recréé à chaque changement de langue — un écouteur direct serait perdu.
   emptyEl.addEventListener("click", (e) => {
-    if (e.target.closest("#btn-open-empty")) invoke("open_file_dialog");
+    if (/** @type {Element} */ (e.target).closest("#btn-open-empty")) invoke("open_file_dialog");
   });
-  document.getElementById("btn-refresh").addEventListener("click", rerenderAll);
-  document.getElementById("btn-new-window").addEventListener("click", () => invoke("new_window"));
-  document.getElementById("btn-settings").addEventListener("click", openSettings);
-  document.getElementById("btn-info").addEventListener("click", openInfo);
+  /** @type {HTMLElement} */ (document.getElementById("btn-refresh")).addEventListener("click", rerenderAll);
+  /** @type {HTMLElement} */ (document.getElementById("btn-new-window")).addEventListener("click", () => invoke("new_window"));
+  /** @type {HTMLElement} */ (document.getElementById("btn-settings")).addEventListener("click", openSettings);
+  /** @type {HTMLElement} */ (document.getElementById("btn-info")).addEventListener("click", openInfo);
   // Export du rendu de l'onglet actif : désarmé pendant l'opération (un
   // re-rendu hors écran peut prendre quelques secondes sur un gros document).
-  const exportBtn = document.getElementById("btn-export");
+  const exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-export"));
   exportBtn.addEventListener("click", async () => {
     exportBtn.disabled = true;
     try {
@@ -849,7 +920,11 @@ async function boot() {
   // Fermer le sommaire dès qu'on clique en dehors (panneau et bouton exclus).
   document.addEventListener("click", (e) => {
     if (tocPanel.hidden) return;
-    if (e.target.closest("#toc-panel") || e.target.closest("#btn-toc")) return;
+    if (
+      /** @type {Element} */ (e.target).closest("#toc-panel") ||
+      /** @type {Element} */ (e.target).closest("#btn-toc")
+    )
+      return;
     closeToc();
   });
 
