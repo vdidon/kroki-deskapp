@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
 use serde_json::json;
@@ -464,33 +464,80 @@ pub fn read_data_file(base_dir: String, rel: String) -> Result<String, String> {
     if !rel.to_ascii_lowercase().ends_with(".json") {
         return Err(tr!("error.data_file.json_only"));
     }
-    read_confined(&base_dir, &rel)
+    read_confined(&base_dir, &rel).map_err(|e| e.message)
+}
+
+/// Échec d'une lecture confinée. `not_found` n'est vrai que pour un chemin
+/// resté dans le dossier : hors du dossier, la réponse est la même que le
+/// fichier existe ou non (cf. `read_confined`).
+pub struct ConfinedError {
+    pub not_found: bool,
+    pub message: String,
+}
+
+impl ConfinedError {
+    fn denied(message: String) -> Self {
+        Self {
+            not_found: false,
+            message,
+        }
+    }
 }
 
 /// Lecture confinée au dossier `base_dir`. Le `rel` provient du contenu d'un
-/// document (potentiellement non fiable) : on rejette les chemins absolus et
-/// toute échappée hors du dossier (traversée `..`, symlink) en canonicalisant
-/// **les deux côtés** avant de comparer. Pas de réseau possible (la CSP borne
-/// `connect-src`), la lecture reste donc locale et bornée. L'allowlist
-/// d'extensions est la responsabilité de l'appelant.
-pub fn read_confined(base_dir: &str, rel: &str) -> Result<String, String> {
+/// document ou d'un plugin (non fiable) : on rejette d'abord, **sans toucher
+/// au disque**, tout chemin qui sort lexicalement du dossier (absolu, lecteur,
+/// `..` qui remonte au-dessus) — sinon la différence « introuvable » / « hors du
+/// dossier » dirait à l'appelant si un fichier existe ailleurs sur la machine.
+/// Puis on canonicalise **les deux côtés** avant de comparer, contre l'échappée
+/// par symlink. Pas de réseau possible (la CSP borne `connect-src`), la lecture
+/// reste donc locale et bornée. L'allowlist d'extensions est la responsabilité
+/// de l'appelant.
+pub fn read_confined(base_dir: &str, rel: &str) -> Result<String, ConfinedError> {
     let p = PathBuf::from(rel);
-    if p.is_absolute() || rel.contains('\0') {
-        return Err(tr!("error.path.not_allowed"));
+    if rel.contains('\0') {
+        return Err(ConfinedError::denied(tr!("error.path.not_allowed")));
     }
-    let base =
-        dunce::canonicalize(base_dir).map_err(|e| tr!("error.path.invalid_dir", error = e))?;
-    let abs =
-        dunce::canonicalize(base.join(&p)).map_err(|e| tr!("error.path.not_found", error = e))?;
+    if let Some(message) = lexical_escape(&p) {
+        return Err(ConfinedError::denied(message));
+    }
+    let base = dunce::canonicalize(base_dir)
+        .map_err(|e| ConfinedError::denied(tr!("error.path.invalid_dir", error = e)))?;
+    let abs = dunce::canonicalize(base.join(&p)).map_err(|e| ConfinedError {
+        not_found: e.kind() == std::io::ErrorKind::NotFound,
+        message: tr!("error.path.not_found", error = e),
+    })?;
     if !abs.starts_with(&base) {
-        return Err(tr!("error.path.outside_dir"));
+        return Err(ConfinedError::denied(tr!("error.path.outside_dir")));
     }
     if !abs.is_file() {
-        return Err(tr!("error.path.not_file"));
+        return Err(ConfinedError::denied(tr!("error.path.not_file")));
     }
-    let bytes =
-        std::fs::read(&abs).map_err(|e| tr!("error.file.read", path = abs.display(), error = e))?;
+    let bytes = std::fs::read(&abs).map_err(|e| {
+        ConfinedError::denied(tr!("error.file.read", path = abs.display(), error = e))
+    })?;
     Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// Message d'erreur si `rel` sort du dossier sans même consulter le disque :
+/// chemin absolu ou à lecteur (`C:x`, `\\srv\x`, `/x`), ou `..` qui remonte
+/// au-dessus du dossier. `sous/../x` reste admis.
+fn lexical_escape(rel: &Path) -> Option<String> {
+    let mut depth = 0usize;
+    for c in rel.components() {
+        match c {
+            Component::Prefix(_) | Component::RootDir => {
+                return Some(tr!("error.path.not_allowed"))
+            }
+            Component::ParentDir => match depth.checked_sub(1) {
+                Some(d) => depth = d,
+                None => return Some(tr!("error.path.outside_dir")),
+            },
+            Component::Normal(_) => depth += 1,
+            Component::CurDir => {}
+        }
+    }
+    None
 }
 
 // --------------------------------------------------------------------------- //
@@ -628,6 +675,51 @@ fn file_url(path: &str) -> String {
         }
     }
     format!("file:///{}", enc.trim_start_matches('/'))
+}
+
+#[cfg(test)]
+mod confined_tests {
+    use super::*;
+
+    /// Dossier temporaire propre au test : `<tmp>/<nom>/doc/` contient
+    /// `data.json` et `sub/`, `<tmp>/<nom>/secret.json` est hors du dossier.
+    fn fixture(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(name);
+        let doc = root.join("doc");
+        std::fs::create_dir_all(doc.join("sub")).unwrap();
+        std::fs::write(doc.join("data.json"), "{}").unwrap();
+        std::fs::write(root.join("secret.json"), "{}").unwrap();
+        doc
+    }
+
+    fn read(doc: &Path, rel: &str) -> Result<String, ConfinedError> {
+        read_confined(doc.to_str().unwrap(), rel)
+    }
+
+    #[test]
+    fn lecture_dans_le_dossier() {
+        let doc = fixture("kroki_confined_ok");
+        assert_eq!(read(&doc, "data.json").ok().as_deref(), Some("{}"));
+        assert_eq!(read(&doc, "sub/../data.json").ok().as_deref(), Some("{}"));
+    }
+
+    #[test]
+    fn fichier_absent_dans_le_dossier_est_not_found() {
+        let doc = fixture("kroki_confined_missing");
+        assert!(read(&doc, "absent.json").is_err_and(|e| e.not_found));
+    }
+
+    #[test]
+    fn hors_du_dossier_meme_reponse_que_le_fichier_existe_ou_non() {
+        let doc = fixture("kroki_confined_escape");
+        let present = read(&doc, "../secret.json").err().unwrap();
+        let absent = read(&doc, "../absent.json").err().unwrap();
+        assert!(!present.not_found && !absent.not_found);
+        assert_eq!(present.message, absent.message);
+        let abs = doc.parent().unwrap().join("secret.json");
+        assert!(read(&doc, abs.to_str().unwrap()).is_err_and(|e| !e.not_found));
+        assert!(read(&doc, "sub/../../secret.json").is_err_and(|e| !e.not_found));
+    }
 }
 
 #[cfg(test)]

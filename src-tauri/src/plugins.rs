@@ -880,14 +880,7 @@ pub fn plugin_read_sibling(
     base_dir: String,
     rel: String,
 ) -> Result<String, SiblingError> {
-    read_sibling(&plugin_id, &base_dir, &rel).map_err(|message| {
-        let missing = std::fs::metadata(Path::new(&base_dir).join(&rel))
-            .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound);
-        SiblingError {
-            code: if missing { "not-found" } else { "denied" },
-            message,
-        }
-    })
+    read_sibling(&plugin_id, &base_dir, &rel)
 }
 
 /// Erreur de `plugin_read_sibling`, telle que relayée au plugin (spec §6.5).
@@ -897,21 +890,32 @@ pub struct SiblingError {
     message: String,
 }
 
-fn read_sibling(plugin_id: &str, base_dir: &str, rel: &str) -> Result<String, String> {
+/// `not-found` seulement pour un fichier absent **dans** le dossier, une fois
+/// le plugin et l'extension admis : sinon `denied`, sans consulter le disque —
+/// un plugin ne doit pas pouvoir sonder l'existence de fichiers hors de son
+/// confinement (cf. `read_confined`).
+fn read_sibling(plugin_id: &str, base_dir: &str, rel: &str) -> Result<String, SiblingError> {
+    let denied = |message| SiblingError {
+        code: "denied",
+        message,
+    };
     let allowed: Vec<String> = registry()
         .read()
         .unwrap()
         .iter()
         .find(|p| p.id == plugin_id && p.status == "ok")
         .map(|p| p.sibling_extensions.clone())
-        .ok_or_else(|| tr!("pluginpkg.unknown_plugin"))?;
+        .ok_or_else(|| denied(tr!("pluginpkg.unknown_plugin")))?;
     let ext = Path::new(&rel)
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase())
         .unwrap_or_default();
     if !allowed.contains(&ext) {
-        return Err(tr!("pluginpkg.extension_not_allowed", ext = ext));
+        return Err(denied(tr!("pluginpkg.extension_not_allowed", ext = ext)));
     }
-    crate::commands::read_confined(base_dir, rel)
+    crate::commands::read_confined(base_dir, rel).map_err(|e| SiblingError {
+        code: if e.not_found { "not-found" } else { "denied" },
+        message: e.message,
+    })
 }
