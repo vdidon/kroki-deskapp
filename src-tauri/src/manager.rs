@@ -45,7 +45,9 @@ pub fn is_supported_doc(p: &Path) -> bool {
 ///
 /// Chaque chemin est canonicalisé (`dunce`) afin que la déduplication par
 /// `path_key` et le watcher restent cohérents avec les ouvertures par fichier.
-/// Partagé par le drag-drop Windows (Explorateur + Cursor, cf. `drop_target.rs`).
+/// Partagé par le drag-drop Windows (Explorateur + Cursor, cf. `drop_target.rs`),
+/// son seul appelant : d'où le `cfg`, sans quoi le build Linux le signale mort.
+#[cfg(windows)]
 pub fn expand_dropped_docs(paths: &[PathBuf]) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for p in paths {
@@ -68,6 +70,7 @@ pub fn expand_dropped_docs(paths: &[PathBuf]) -> Vec<PathBuf> {
 
 /// Fichiers documents directs d'un dossier (non récursif), triés par nom
 /// (insensible à la casse, comme l'Explorateur Windows).
+#[cfg(windows)]
 fn docs_in_dir(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
