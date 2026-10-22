@@ -490,13 +490,15 @@ export function highlightPluginFor(lang) {
 
 // Extensions natives dont la vue source a une grammaire hljs embarquée dans
 // l'hôte (`.txt` n'en a pas, `.html` n'a pas de vue source du tout).
+// Prototype nul : l'extension vient d'un nom de fichier, `x.constructor` ne
+// doit pas y trouver Object.prototype.constructor.
 /** @type {Record<string, string | undefined>} */
-const NATIVE_SOURCE_LANGS = {
+const NATIVE_SOURCE_LANGS = Object.assign(Object.create(null), {
   md: "markdown",
   markdown: "markdown",
   mdown: "markdown",
   mkd: "markdown",
-};
+});
 
 /**
  * Coloration de la **vue code source** d'un document : `{ lang, plugin }`, où
