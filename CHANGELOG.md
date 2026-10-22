@@ -5,6 +5,28 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.28.1] — 2026-10-22
+
+### Fixed
+- **Plugins reading a neighboring file** (`host/readFile`) can omit the
+  folder, as the plugin protocol allows: Kroki Desk then uses the folder of
+  the document being rendered. Such reads used to be refused — the example
+  `barchart` plugin could never load its `src=` file.
+- **Reading outside the document's folder** — by a plugin, or by a Plotly
+  block's `src=` — is now refused without looking at the disk, with the same
+  answer whether the file exists or not: a plugin could tell which files
+  existed elsewhere on the machine, although it could not read them.
+- A link whose fragment contains a stray `%` (`#100%`) did nothing when
+  clicked; it now jumps to that fragment.
+- Built-in `latex-doc` plugin 1.5.1: `lstlisting` and `alltt` blocks showed
+  `[object Object]` instead of their content, and are now code blocks
+  (the `language=` of a `lstlisting` colors it); a malformed preamble no
+  longer degrades the whole document.
+
+### Removed
+- An empty, broken vendor file (`graphviz.umd.js`, 81 bytes) that was
+  shipped in the executable without being used.
+
 ## [3.28.0] — 2026-10-20
 
 ### Added
@@ -924,6 +946,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
+[3.28.1]: #3281--2026-10-22
 [3.28.0]: #3280--2026-10-20
 [3.27.0]: #3270--2026-10-19
 [3.26.0]: #3260--2026-10-19

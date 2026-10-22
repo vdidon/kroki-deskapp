@@ -2249,7 +2249,7 @@ dependencies = [
 
 [[package]]
 name = "kroki_deskapp"
-version = "3.28.0"
+version = "3.28.1"
 dependencies = [
  "base64 0.22.1",
  "dunce",
