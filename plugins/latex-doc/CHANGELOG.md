@@ -4,6 +4,21 @@ All notable changes to this plugin are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 versioning follows [semver](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-10-22
+
+### Fixed
+
+- **`lstlisting` and `alltt` showed `[object Object]`** instead of their
+  content. Both now render as code blocks keeping line breaks and indentation
+  (`alltt` as its raw source); the `language=` option of a `lstlisting`
+  becomes the language of the block, colored by Kroki Desk.
+- A monospace box (`\fbox{\parbox{…}{\ttfamily …}}`) containing a command
+  named like a JavaScript built-in (`\constructor`, `\toString`…) showed the
+  source of a function; elsewhere such a command was silently dropped instead
+  of being reported as unknown.
+- A preamble ending with a lone `\` right before `\begin{document}` no longer
+  turns the whole document into the degraded rendering.
+
 ## [1.5.0] - 2026-10-16
 
 ### Added

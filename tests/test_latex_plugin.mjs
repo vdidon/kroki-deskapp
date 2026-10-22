@@ -567,6 +567,48 @@ group("Fidélité au PDF : tables, encadrés, TikZ", () => {
   check("ancres alignées", misalignedAnchors(markdown, anchors).length === 0, JSON.stringify(misalignedAnchors(markdown, anchors)));
 });
 
+group("Listings (lstlisting, alltt)", () => {
+  // Ni l'un ni l'autre n'est un nœud `verbatim` pour le parseur : leur contenu
+  // est une liste de nœuds (alltt en interprète même les macros), qui sortait
+  // en « [object Object] ».
+  const { markdown, anchors } = texToMarkdown(
+    doc(
+      "\\begin{lstlisting}[language=Python]\ndef f(x):\n    return {x: 1}  # 50% $y$\n\\end{lstlisting}\n\n" +
+        "\\begin{lstlisting}\nbrut\n\\end{lstlisting}\n\n" +
+        "\\begin{itemize}\n\\item un\n\\begin{alltt}\na \\textbf{b} {c}\n  d\n\\end{alltt}\n\\end{itemize}",
+    ),
+  );
+  check("aucun [object Object]", !markdown.includes("[object Object]"), markdown);
+  check(
+    "lstlisting : langage repris, indentation et caractères spéciaux intacts",
+    markdown.includes("```python\ndef f(x):\n    return {x: 1}  # 50% $y$\n```"),
+    markdown,
+  );
+  check("lstlisting sans langage : fence text", markdown.includes("```text\nbrut\n```"), markdown);
+  check("alltt dans une liste : source brut, retours à la ligne gardés", markdown.includes("  ```\n  a \\textbf{b} {c}\n    d\n  ```"), markdown);
+  check("ancres alignées", misalignedAnchors(markdown, anchors).length === 0, JSON.stringify(misalignedAnchors(markdown, anchors)));
+});
+
+group("Noms piégés et préambules malformés", () => {
+  // Les tables de symboles sont des objets : sans prototype nul, ces noms y
+  // trouvaient les membres d'Object.prototype — dans un encadré \ttfamily,
+  // « function Object() { [native code] } » sortait dans le rendu, et ailleurs
+  // la macro était avalée sans l'avertissement d'une commande inconnue.
+  const box = texToMarkdown(
+    doc("\\begin{center}\n\\fbox{\\parbox{0.86\\textwidth}{\\ttfamily\na \\constructor b \\toString c\n}}\n\\end{center}"),
+  ).markdown;
+  check("encadré \\ttfamily : pas de code de fonction", box.includes("```\na b c\n```"), box);
+  const { markdown, warnings } = texToMarkdown(doc("Avant \\constructor{} après."));
+  check("macro homonyme d'Object.prototype : ignorée", /^Avant +après\.$/m.test(markdown), markdown);
+  check("… et signalée comme toute commande inconnue", warnings.some((w) => w.includes("\\constructor")), warnings.join(" | "));
+  // `\newcommand\` collé à `\begin{document}` : déclaration tronquée, le reste
+  // du document se rend (avant : rendu dégradé de tout le document).
+  const tikz = texToMarkdown(
+    "\\documentclass{article}\n\\newcommand\\\\begin{document}\n\\begin{tikzpicture}\\draw (0,0) -- (1,1);\\end{tikzpicture}\n\\end{document}",
+  ).markdown;
+  check("préambule terminé par \\ : pas de rendu dégradé", !tikz.includes("⚠️") && /^```tikz$/m.test(tikz), tikz);
+});
+
 group("TikZ : document autonome compilable", () => {
   const preamble =
     "\\usepackage[utf8]{inputenc}\n\\usepackage[french]{babel}\n\\usepackage{geometry,amsmath}\n" +

@@ -66,7 +66,8 @@ contents, source view, global search, theme, HTML export) comes for free.
   does not know them.
 - **Lists** (`itemize`, `enumerate`, `description`, nested), **tables**
   (`tabular`, `array`, `longtable` — spec alignment preserved), `table`/`figure`
-  floats with numbered caption, `verbatim`/`lstlisting`, `quote`.
+  floats with numbered caption, `verbatim`/`lstlisting`/`alltt` (as code
+  blocks; the `language=` of a `lstlisting` colors it), `quote`.
 - **Text**: bold/italic/monospace, LaTeX accents (`\'e` → é), ligatures
   (`---` → —, ` `` ` → “), `textcomp` symbols (`\euro` → €), footnotes
   gathered at the end of the document, `\url`/`\href`, `\includegraphics`.

@@ -105,9 +105,11 @@ const SIZE_MACROS = new Set([
 // `\` followed by a line break is a control space, like `\ `.
 const SPACING_MACROS = new Set([",", ";", ":", "!", " ", "\n", "\t", "quad", "qquad", "thinspace", "enspace"]);
 
-// Text symbols (outside math mode).
+// Text symbols (outside math mode). This table, ACCENTS and INLINE_STYLES have a
+// null prototype: a macro named `constructor` or `toString` must not find
+// Object.prototype's members in them.
 /** @type {Record<string, string>} */
-const TEXT_SYMBOLS = {
+const TEXT_SYMBOLS = Object.assign(Object.create(null), {
   euro: "€", texteuro: "€", pounds: "£", textdollar: "$", S: "§", P: "¶",
   copyright: "©", textcopyright: "©", textregistered: "®", dag: "†", ddag: "‡",
   ldots: "…", dots: "…", textellipsis: "…", oe: "œ", OE: "Œ", ae: "æ", AE: "Æ",
@@ -120,13 +122,13 @@ const TEXT_SYMBOLS = {
   textquoteright: "’", LaTeX: "LaTeX", TeX: "TeX", LaTeXe: "LaTeX2ε",
   // reserved characters escaped in LaTeX: rendered literally
   "&": "&", "%": "%", "$": "$", "#": "#", "_": "_", "{": "{", "}": "}",
-};
+});
 
 // LaTeX accents → combining diacritics (recomposed to NFC on emission).
 // Written as Unicode escapes: these characters are invisible in an editor
 // and get lost on copy-paste.
 /** @type {Record<string, string>} */
-const ACCENTS = {
+const ACCENTS = Object.assign(Object.create(null), {
   "'": "\u0301", // combining acute accent
   "`": "\u0300", // combining grave accent
   "^": "\u0302", // combining circumflex accent
@@ -143,16 +145,16 @@ const ACCENTS = {
   r: "\u030A", // combining ring above
   k: "\u0328", // combining ogonek
   t: "\u0361", // combining double inverted breve
-};
+});
 
 // Inline markup: macro → markdown delimiter.
 /** @type {Record<string, string>} */
-const INLINE_STYLES = {
+const INLINE_STYLES = Object.assign(Object.create(null), {
   textbf: "**", bf: "**", strong: "**",
   emph: "*", textit: "*", it: "*", textsl: "*",
   texttt: "`", tt: "`", verb: "`",
   underline: "**", uline: "**", // no underline in markdown: bold by default
-};
+});
 
 // "Transparent" environments: no rendering of their own, their content is emitted.
 const TRANSPARENT_ENVS = new Set([
@@ -651,9 +653,10 @@ function tikzPreamble(source) {
         groups.push(pre.slice(j, end));
         i = end;
       } else if (pre[j] === "\\" && !groups.length && /command|Operator/.test(name)) {
-        // Null only if this `\` ends the preamble or precedes a line break
-        // (`\newcommand\\begin{document}`): TypeError, degraded rendering.
-        const cs = /** @type {RegExpExecArray} */ (/^\\([A-Za-z@]+|.)/.exec(pre.slice(j))); // `\newcommand\foo{…}`
+        // Null when this `\` ends the preamble or precedes a line break
+        // (`\newcommand\\begin{document}`): malformed declaration, cut short.
+        const cs = /^\\([A-Za-z@]+|.)/.exec(pre.slice(j)); // `\newcommand\foo{…}`
+        if (!cs) break;
         groups.push(`{${cs[0]}}`);
         i = j + cs[0].length;
       } else if (pre[j] === "=" && name === "tikzstyle") {
@@ -1788,6 +1791,40 @@ function generate(source, { title, fragment, M }) {
   };
 
   /**
+   * Fence language of a `lstlisting`: its `language=` option lowercased
+   * (`[language=Python]` → `python`, colored by the host), `text` otherwise.
+   * @param {Environment} n
+   * @returns {string}
+   */
+  const listingLanguage = (n) =>
+    /\blanguage\s*=\s*\{?([A-Za-z0-9+#-]+)/.exec(printRaw(n.args ?? []))?.[1].toLowerCase() ?? "text";
+
+  /**
+   * Raw text of a verbatim-like environment. `verbatim` arrives as a string;
+   * `lstlisting` and `alltt` are ordinary environments whose content is a node
+   * list — `alltt` even parses its macros. Their text is cut from the source
+   * between `\begin{…}` and `\end{…}`, which keeps line breaks and indentation
+   * (`printRaw` collapses whitespace); a subtree re-parsed in isolation has
+   * offsets into another string, hence the check on what the cut lands on, and
+   * `printRaw` as the fallback.
+   * @param {VerbatimEnvironment | Environment} n
+   * @returns {string}
+   */
+  const verbatimText = (n) => {
+    if (typeof n.content === "string") return n.content;
+    const env = envName(n);
+    const start = n.position?.start.offset;
+    const end = n.position?.end.offset;
+    if (start !== undefined && end !== undefined) {
+      const raw = source.slice(start, end);
+      const open = new RegExp(`^\\\\begin\\s*\\{${env}\\}(?:\\s*\\[[^\\]\\n]*\\])?`).exec(raw);
+      const close = `\\end{${env}}`;
+      if (open && raw.endsWith(close)) return raw.slice(open[0].length, raw.length - close.length);
+    }
+    return printRaw(n.content);
+  };
+
+  /**
    * @param {VerbatimEnvironment | Environment} n
    * @param {string} indent
    * @param {string} [lang] info string of the fence
@@ -1795,7 +1832,7 @@ function generate(source, { title, fragment, M }) {
   const emitVerbatim = (n, indent, lang = "") => {
     // The line end that follows `\begin{verbatim}` and the one that precedes
     // `\end{verbatim}` are not part of the content.
-    const text = String(n.content ?? "").replace(/\r\n?/g, "\n").replace(/^\n/, "").replace(/\n$/, "");
+    const text = verbatimText(n).replace(/\r\n?/g, "\n").replace(/^\n/, "").replace(/\n$/, "");
     blank();
     anchorAt(n);
     push(indent + "```" + lang);
@@ -1855,7 +1892,7 @@ function generate(source, { title, fragment, M }) {
         case "verbatim":
         case "lstlisting":
         case "alltt":
-          return emitVerbatim(n, indent, name === "lstlisting" ? "text" : "");
+          return emitVerbatim(n, indent, name === "lstlisting" ? listingLanguage(n) : "");
         case "quote":
         case "quotation": {
           const start = out.length;

@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "latex-doc",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "apiVersion": "1",
   "name": "LaTeX documents (.tex)",
   "description": "Rendering of standalone LaTeX documents: sections, numbered amsthm theorems, equations with \\tag, clickable cross-references, tables, expanded \\newcommand macros, TikZ figures handed to the host's TeX engine — math is passed as $…$ to the host's KaTeX; latex-source highlighting of the source code view",
