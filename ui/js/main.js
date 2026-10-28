@@ -21,6 +21,7 @@ import { initInfo, openInfo } from "./info.js";
 import { initUpdates } from "./updates.js";
 import { initChangelog } from "./changelog.js";
 import { initJournal } from "./journal.js";
+import { initNotices } from "./notices.js";
 import { exportActiveView } from "./export.js";
 import { applyTheme, initTheme } from "./theme.js";
 import { initI18n, loadLocale, onLocaleChange, t } from "./i18n.js";
@@ -991,6 +992,7 @@ async function boot() {
   initInfo();
   initChangelog();
   initJournal(); // non attendue : hors du chemin critique de l'affichage
+  initNotices();
   initFindWord();
   initGlobalSearch({
     beforeOpen: () => {

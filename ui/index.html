@@ -305,8 +305,22 @@
     <div class="settings-actions">
       <button type="button" id="info-changelog" class="secondary" title="Application changelog" data-i18n="changelog.title" data-i18n-title="info.changelog_title">What's new</button>
       <button type="button" id="info-journal" class="secondary" title="Diagnostic messages of the application and its plugins" data-i18n="journal.button" data-i18n-title="journal.button_title">Log</button>
+      <button type="button" id="info-notices" class="secondary" title="Licenses of the open-source components included in the application" data-i18n="notices.button" data-i18n-title="notices.button_title">Third-party licenses</button>
       <span class="spacer"></span>
       <button type="button" id="info-close" class="primary" data-i18n="common.close">Close</button>
+    </div>
+  </dialog>
+  <dialog id="notices-dialog">
+    <h2 data-i18n="notices.title">Third-party licenses</h2>
+    <p class="settings-hint" data-i18n="notices.hint">
+      Kroki Desk is distributed under the MIT License. It includes the
+      open-source components listed below, each under its own license; the
+      license texts follow the list.
+    </p>
+    <pre id="notices-body" tabindex="-1"></pre>
+    <div class="settings-actions">
+      <span class="spacer"></span>
+      <button type="button" id="notices-close" class="primary" data-i18n="common.close">Close</button>
     </div>
   </dialog>
   <dialog id="journal-dialog">

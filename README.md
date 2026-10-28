@@ -433,6 +433,9 @@ and can be turned off in the Settings.
 
 ## License
 
-[MIT](LICENSE). The bundled third-party engines and vendored libraries keep
-their own licenses (e.g. PlantUML under MIT, ditaa under LGPL v3 — see
-« Architecture »).
+[MIT](LICENSE). The bundled third-party engines, vendored libraries and Rust
+crates keep their own licenses: their notices and full license texts are in
+[`ui/third-party-notices.txt`](ui/third-party-notices.txt), also shown in the
+app (Information → Third-party licenses). Among them, ditaa (LGPL v3),
+Graphviz and bytefield-svg (EPL), d2 and a few crates (MPL 2.0) require their
+source to be available: the file gives the address of each.

@@ -658,8 +658,9 @@ source, options); a re-render therefore naturally retries errors.
   `render_diagram`), `tabs.js`, `teardrag.js` (tab detaching), `filedrop.js`,
   `settings.js` (settings + access to the Plugins dialog), `theme.js` (auto/light/dark
   override), `info.js` (« Informations » dialog: version, runtimes,
-  access to What's new and the log), `journal.js` (« Journal » dialog, see
-  `journal.rs`), `changelog.js` (« Nouveautés » dialog, dedicated markdown-it
+  access to What's new, the log and the third-party licenses), `journal.js` (« Journal » dialog, see
+  `journal.rs`), `notices.js` (« Licences tierces » dialog: `fetch` of
+  `ui/third-party-notices.txt`, see « Third-party notices » below), `changelog.js` (« Nouveautés » dialog, dedicated markdown-it
   without Kroki fence + DOMPurify), `export.js` (export of the active tab's
   rendering as standalone HTML: inlined CSS, local images as data-URI via the
   `export_html` command), `findword.js` (highlighting of occurrences of the selected
@@ -998,6 +999,23 @@ touching the host or writing a plugin. Operational summary:
   double-click would do nothing unless the application is already open.
   `drainPendingInstalls` (`plugins_ui.js`) empties the queue after the `listen` and
   chains the trust dialogs in sequence.
+
+## Third-party notices (3.30.0)
+
+`ui/third-party-notices.txt` (tracked, **generated**, ~1.3 MB) carries the
+license notices and texts of everything shipped without being written here:
+Rust crates (normal-dependency closure for Windows + Linux, from `cargo
+metadata`), JS vendors **with their whole npm dependency tree** (the vendored
+files are bundles), jars and code compiled into a bundle (Graphviz, Go
+runtime, ClojureScript). It lives in `ui/` so Tauri embeds it compressed;
+`notices.js` reads it by `fetch`. Regenerate with
+`uv run scripts/third_party_notices.py` (cargo + npm + network) **after any
+change to `Cargo.lock`, a vendor, a jar or the `latex-doc` bundle** — and when
+updating a vendor, bump its pinned version in the script's `NPM` list (the
+vendors carry no version record of their own; the script is it). A new
+embedded thing that npm and cargo cannot see goes into `EXTRAS`. The esbuild
+bundles strip legal comments (`--legal-comments=none`): this file is what
+satisfies the notice requirements, not the bundles.
 
 ## Security / CSP (do not break)
 

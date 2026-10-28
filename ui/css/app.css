@@ -1231,6 +1231,7 @@ body.tab-dragging * {
 #info-dialog,
 #changelog-dialog,
 #journal-dialog,
+#notices-dialog,
 #plugins-dialog,
 #plugin-trust-dialog {
   border: 1px solid var(--border);
@@ -1246,6 +1247,7 @@ body.tab-dragging * {
 #info-dialog::backdrop,
 #changelog-dialog::backdrop,
 #journal-dialog::backdrop,
+#notices-dialog::backdrop,
 #plugins-dialog::backdrop,
 #plugin-trust-dialog::backdrop {
   background: rgba(0, 0, 0, 0.35);
@@ -1255,6 +1257,7 @@ body.tab-dragging * {
 #info-dialog h2,
 #changelog-dialog h2,
 #journal-dialog h2,
+#notices-dialog h2,
 #plugins-dialog h2,
 #plugin-trust-dialog h2 {
   margin: 0 0 14px;
@@ -1588,6 +1591,29 @@ body.tab-dragging * {
 
 #changelog-body h3 {
   font-size: 13px;
+}
+
+/* ---------- Dialog Licences tierces ---------- */
+
+#notices-dialog {
+  width: min(760px, 94vw);
+}
+
+/* Texte brut généré (scripts/third_party_notices.py), mis en page pour
+   79 colonnes : monospace, retours à la ligne conservés. */
+#notices-body {
+  max-height: min(56vh, 480px);
+  overflow: auto;
+  scrollbar-width: thin;
+  margin: 10px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
 }
 
 /* ---------- Dialog Journal ---------- */

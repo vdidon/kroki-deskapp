@@ -12,6 +12,12 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   buttons (or `Alt+←` / `Alt+→`) return to where a link was clicked — same
   tab and scroll position, including a jump to an anchor in the same
   document — and redo the jump. A tab closed since is skipped.
+- **Third-party licenses** (« Licences tierces ») dialog, opened from the
+  Information dialog: the license notices of every component Kroki Desk
+  ships without having written it — the embedded diagram engines (PlantUML,
+  ditaa, Graphviz, d2…), the JavaScript libraries and their dependencies, the
+  Rust crates — with the full license texts, and where to get the source of
+  those whose license asks for it (MPL, EPL, LGPL).
 - **Duplicate in a new window** in the tab context menu: opens the same
   document in a new window while the tab stays where it is — also available
   on a window's only tab.
