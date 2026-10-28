@@ -7,6 +7,9 @@ isolated by its --*-only. Each artifact is published suffixed with the version
 (source of truth: src-tauri/Cargo.toml) and paired with an unversioned file
 pointing at the same content (hardlink, copy as a fallback — see publish_dist
 in xtask/src/main.rs):
+  - the Claude Code skill skills/kroki-desk/ as a .skill archive (zip, the
+    skill folder at the top level): kroki-desk-<version>.skill — the skill
+    has no version of its own, it follows the application's;
   - the .kdext of every plugin in plugins/ (any folder holding a
     manifest.json, junctions included), via pack_plugin.py: <id>-<version>.kdext;
   - the host's native binary (cargo build-app): kroki_deskapp-<version>.exe
@@ -32,8 +35,8 @@ each other in dist/; the distributable is the -debian12 (broad glibc
 compatibility).
 
 Steps run in order of increasing cost, so that a slow or broken step can
-neither delay nor prevent a cheap artifact: the plugins (a few hundred ms,
-neither cargo nor Docker), then the native binary, then the MSI, and only then
+neither delay nor prevent a cheap artifact: the skill and the plugins (a few
+hundred ms, neither cargo nor Docker), then the native binary, then the MSI, and only then
 the Docker steps.
 
 The MSI and the .deb embed the plugins' .kdext: their build fails if the
@@ -69,6 +72,7 @@ Examples:
                                                     # just the bare Linux binary
     python build_dist.py --native-only              # just the native binary (no Docker)
     python build_dist.py --plugins-only             # just the .kdext (neither cargo nor Docker)
+    python build_dist.py --skill-only               # just the .skill (neither cargo nor Docker)
     python build_dist.py --msi-only                 # just the .kdext + the MSI (no Docker)
     python build_dist.py --msi-only --skip-plugins  # just the MSI, .kdext from dist/ reused
     python build_dist.py --deb-only                 # just the .kdext + the .deb (Docker)
@@ -83,6 +87,7 @@ import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -98,12 +103,13 @@ COMMON_VOLUMES = [
 ]
 
 # The steps, in execution order. Each has a --skip-<step>.
-STEPS = ("plugins", "native", "msi", "appimage", "binary", "deb")
+STEPS = ("skill", "plugins", "native", "msi", "appimage", "binary", "deb")
 
 # Each --<x>-only: the step it isolates (the one whose --skip- would
 # contradict it) and the set of steps it keeps. --compile-only keeps none:
 # it produces no artifact.
 ONLY_MODES = {
+    "skill_only": ("skill", {"skill"}),
     "native_only": ("native", {"native"}),
     "plugins_only": ("plugins", {"plugins"}),
     "msi_only": ("msi", {"plugins", "msi"}),
@@ -171,6 +177,47 @@ def pack_plugins() -> None:
     for plugin_dir in plugin_dirs:
         run([sys.executable, str(REPO_ROOT / "pack_plugin.py"), str(plugin_dir)])
     say(f"== {len(plugin_dirs)} plugin(s) published to dist/ (versioned + twin) ==", "32")
+
+
+SKILL_DIR = REPO_ROOT / "skills" / "kroki-desk"
+
+
+def pack_skill(version: str) -> Path:
+    """Packs the Claude Code skill into dist/<name>-<version>.skill + twin.
+
+    A .skill is a zip holding the skill folder itself (<name>/SKILL.md…), the
+    format claude.ai imports; for Claude Code, extracting it into
+    ~/.claude/skills/ gives the installed folder. The shell scripts are stored
+    executable: the archive is built on Windows, whose mode bits do not say so.
+    """
+    if not (SKILL_DIR / "SKILL.md").is_file():
+        sys.exit(f"SKILL.md not found in {SKILL_DIR}")
+    name = SKILL_DIR.name
+    dist = REPO_ROOT / "dist"
+    archive = dist / f"{name}-{version}.skill"
+    twin = dist / f"{name}.skill"
+    archive.unlink(missing_ok=True)
+    twin.unlink(missing_ok=True)
+
+    say("== Packing the Claude Code skill ==")
+    packed = 0
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(SKILL_DIR.rglob("*")):
+            rel = path.relative_to(SKILL_DIR)
+            if not path.is_file() or any(p.startswith(".") or p == "__pycache__" for p in rel.parts):
+                continue
+            info = zipfile.ZipInfo.from_file(path, f"{name}/{rel.as_posix()}")
+            info.compress_type = zipfile.ZIP_DEFLATED
+            if path.suffix == ".sh":
+                info.external_attr = 0o100755 << 16
+            zf.writestr(info, path.read_bytes())
+            packed += 1
+    try:
+        twin.hardlink_to(archive)
+    except OSError:
+        shutil.copyfile(archive, twin)
+    say(f"== Skill published to dist/{archive.name} ({packed} files, versioned + twin) ==", "32")
+    return archive
 
 
 def channel_strategy(channel: str) -> Path:
@@ -247,6 +294,8 @@ def main() -> None:
     )
     parser.add_argument("--skip-image-build", action="store_true",
                         help="do not rebuild the Docker image (fast anyway thanks to the layer cache)")
+    parser.add_argument("--skip-skill", action="store_true",
+                        help="do not pack the Claude Code skill (.skill)")
     parser.add_argument("--skip-plugins", action="store_true",
                         help="do not (re)pack the plugins' .kdext; the MSI and the .deb then reuse those already in dist/")
     parser.add_argument("--skip-native", action="store_true",
@@ -259,6 +308,8 @@ def main() -> None:
                         help="do not extract the bare Linux binary into dist/")
     parser.add_argument("--skip-deb", action="store_true",
                         help="do not build the Debian/Ubuntu .deb package")
+    parser.add_argument("--skill-only", action="store_true",
+                        help="pack only the Claude Code skill (no cargo, no Docker)")
     parser.add_argument("--native-only", action="store_true",
                         help="build only the host's native binary (no Docker required)")
     parser.add_argument("--plugins-only", action="store_true",
@@ -343,7 +394,16 @@ def main() -> None:
                 say(f"== {label}: {name} channel ==")
             yield name, rel, ids, (release_dir if name == "public" else None)
 
-    # Plugins first: a few hundred ms, neither cargo nor Docker. Same logic as
+    # The skill first: a zip of a few markdown files. Channel-independent, like
+    # the binaries.
+    if args.skip_skill:
+        skipped("Skill", "skill")
+    else:
+        collect(pack_skill(version), release_dir)
+    if args.skill_only:
+        return
+
+    # Plugins next: a few hundred ms, neither cargo nor Docker. Same logic as
     # for the native binary below, only stronger — nothing that follows must be
     # able to delay or prevent an artifact this cheap.
     if args.skip_plugins:

@@ -341,7 +341,10 @@ The Linux tooling (Dockerfile, build and test scripts) lives in
 Linux) generates **all of the version's artifacts** in one command
 (Docker daemon started required for the Linux steps). **Everything is produced by
 default**, in order of increasing cost — nothing slow must be able to
-delay a cheap artifact: the `.kdext` of all the plugins in
+delay a cheap artifact: the Claude Code skill `skills/kroki-desk/` as
+`kroki-desk-<version>.skill` (zip with the skill folder at the top level —
+claude.ai's import format; no version of its own, it takes the app's), the
+`.kdext` of all the plugins in
 `plugins/` (via `pack_plugin.py` — a folder = a plugin as soon as it carries a
 `manifest.json`, junctions to other repos included), the host's native binary
 (`cargo build-app` — exe on Windows, Linux binary on Linux), the **MSI
@@ -349,9 +352,10 @@ installer**, then the Docker steps: build of the `kroki-linux-build` image, AppI
 bare Linux binary and **`.deb` package** → `dist/`, each versioned + unversioned
 twin.
 
-Each step is removed by its `--skip-…` (`--skip-plugins`, `--skip-native`,
-`--skip-msi`, `--skip-appimage`, `--skip-binary`, `--skip-deb`) or isolated by
-its `--…-only` (`--native-only`, `--plugins-only`, `--msi-only`, `--deb-only`,
+Each step is removed by its `--skip-…` (`--skip-skill`, `--skip-plugins`,
+`--skip-native`, `--skip-msi`, `--skip-appimage`, `--skip-binary`, `--skip-deb`)
+or isolated by its `--…-only` (`--skill-only`, `--native-only`, `--plugins-only`,
+`--msi-only`, `--deb-only`,
 mutually exclusive); added to these are `--skip-image-build`, `--compile-only`
 (Linux cargo build for verification only, no artifact) and `--test` (headless
 Xvfb runtime test via `scripts/linux_runtime_run.sh`, incompatible with the

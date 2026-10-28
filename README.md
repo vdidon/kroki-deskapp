@@ -349,8 +349,12 @@ Markdown documents intended for Kroki Desk: choice of engine among those the
 application actually renders (probing the local API's `/v1/health`), per-engine
 syntax, validation of diagrams against the local API, stable
 `file#fragment` links. It can also open a document in an installed Kroki Desk
-at a precise reference (`\label`, heading, line). To use it,
-copy the folder into `~/.claude/skills/`.
+at a precise reference (`\label`, heading, line). It is shipped with each
+release as `kroki-desk-<version>.skill` (a zip holding the `kroki-desk/`
+folder): import it into claude.ai, or for Claude Code extract it into
+`~/.claude/skills/` (`tar -xf kroki-desk.skill -C ~/.claude/skills` — also on
+Windows, where `Expand-Archive` refuses an extension other than `.zip`). From a
+clone, copying the folder into `~/.claude/skills/` does the same.
 
 ## Build
 
@@ -364,7 +368,7 @@ python build_dist.py     # all the version's artifacts → dist/
 ```
 
 `build_dist.py` (Python 3.10+, no dependencies) is the reference way to
-produce a release: plugins, native binary, MSI on Windows, then AppImage,
+produce a release: skill, plugins, native binary, MSI on Windows, then AppImage,
 Linux binary and `.deb` via Docker. Each step is removed with its `--skip-…`
 or isolated with its `--…-only`.
 
