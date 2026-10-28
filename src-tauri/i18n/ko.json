@@ -305,6 +305,7 @@
   "tabs.copy_failed": "경로를 복사할 수 없습니다.",
   "tabs.copy_path": "경로 복사",
   "tabs.detach": "새 창으로 분리",
+  "tabs.duplicate": "새 창에 복제",
   "tabs.menu_aria": "탭 작업",
   "tabs.path_copied": "경로를 복사했습니다.",
   "tabs.reveal": "파일 탐색기에서 표시",

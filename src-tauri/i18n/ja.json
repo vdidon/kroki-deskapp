@@ -305,6 +305,7 @@
   "tabs.copy_failed": "パスをコピーできませんでした。",
   "tabs.copy_path": "パスのコピー",
   "tabs.detach": "新しいウィンドウに切り離す",
+  "tabs.duplicate": "新しいウィンドウに複製",
   "tabs.menu_aria": "タブの操作",
   "tabs.path_copied": "パスをコピーしました。",
   "tabs.reveal": "エクスプローラーで表示",

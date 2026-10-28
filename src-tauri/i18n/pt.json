@@ -313,6 +313,7 @@
   "tabs.copy_failed": "Não foi possível copiar o caminho.",
   "tabs.copy_path": "Copiar caminho",
   "tabs.detach": "Destacar em uma nova janela",
+  "tabs.duplicate": "Duplicar em uma nova janela",
   "tabs.menu_aria": "Ações da guia",
   "tabs.path_copied": "Caminho copiado.",
   "tabs.reveal": "Mostrar no Explorador de Arquivos",

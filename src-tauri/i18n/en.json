@@ -313,6 +313,7 @@
   "tabs.copy_failed": "Could not copy the path.",
   "tabs.copy_path": "Copy path",
   "tabs.detach": "Detach into a new window",
+  "tabs.duplicate": "Duplicate in a new window",
   "tabs.menu_aria": "Tab actions",
   "tabs.path_copied": "Path copied.",
   "tabs.reveal": "Show in file explorer",

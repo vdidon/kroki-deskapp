@@ -127,6 +127,7 @@ fn main() {
             commands::close_tab,
             commands::close_tabs_around,
             commands::detach_tab,
+            commands::duplicate_tab,
             commands::reveal_tab_file,
             commands::reorder_tab,
             commands::new_window,

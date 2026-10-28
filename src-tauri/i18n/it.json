@@ -313,6 +313,7 @@
   "tabs.copy_failed": "Impossibile copiare il percorso.",
   "tabs.copy_path": "Copia percorso",
   "tabs.detach": "Sposta in una nuova finestra",
+  "tabs.duplicate": "Duplica in una nuova finestra",
   "tabs.menu_aria": "Azioni della scheda",
   "tabs.path_copied": "Percorso copiato.",
   "tabs.reveal": "Mostra in Esplora file",

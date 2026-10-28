@@ -226,6 +226,8 @@ function initTabMenu() {
       invoke("reveal_tab_file", { docId }).catch((err) => showToast(String(err), true));
     } else if (action === "detach") {
       invoke("detach_tab", { docId });
+    } else if (action === "duplicate") {
+      invoke("duplicate_tab", { docId });
     } else {
       invoke("close_tabs_around", { docId, side: action });
     }

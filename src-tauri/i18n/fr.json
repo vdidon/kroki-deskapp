@@ -313,6 +313,7 @@
   "tabs.copy_failed": "Impossible de copier le chemin.",
   "tabs.copy_path": "Copier le chemin",
   "tabs.detach": "Détacher dans une nouvelle fenêtre",
+  "tabs.duplicate": "Dupliquer dans une nouvelle fenêtre",
   "tabs.menu_aria": "Actions de l'onglet",
   "tabs.path_copied": "Chemin copié.",
   "tabs.reveal": "Afficher dans l'explorateur de fichiers",

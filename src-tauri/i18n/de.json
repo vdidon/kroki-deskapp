@@ -313,6 +313,7 @@
   "tabs.copy_failed": "Der Pfad konnte nicht kopiert werden.",
   "tabs.copy_path": "Pfad kopieren",
   "tabs.detach": "In neues Fenster verschieben",
+  "tabs.duplicate": "In neuem Fenster duplizieren",
   "tabs.menu_aria": "Registerkartenaktionen",
   "tabs.path_copied": "Pfad kopiert.",
   "tabs.reveal": "Im Datei-Explorer anzeigen",

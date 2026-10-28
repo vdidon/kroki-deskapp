@@ -424,13 +424,39 @@ pub fn detach_tab(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
     if !detachable {
         return;
     }
+    move_tab_to_new_window(app, source, doc_id, cascade_position(source));
+}
+
+/// Menu contextuel d'onglet : rouvre le document de l'onglet dans une nouvelle
+/// fenêtre (même taille, en cascade), l'onglet d'origine restant en place.
+/// Permis même sur un onglet seul. Le duplicata est un document à part entière
+/// (son propre `doc_id`) : le watcher est compté par chemin, fermer l'un ne
+/// coupe pas le rechargement de l'autre.
+pub fn duplicate_tab(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
+    let path = {
+        let st = app.state::<AppState>();
+        let st = st.0.lock().unwrap();
+        st.docs.get(&doc_id).map(|d| d.path.clone())
+    };
+    let Some(path) = path else {
+        return;
+    };
+    let size = source.inner_size().ok();
+    match create_window(app, Some(cascade_position(source)), size) {
+        Ok(label) => open_paths_in_window(app, &label, &[path]),
+        Err(e) => crate::journal::error("window", format!("cannot duplicate tab: {e}")),
+    }
+}
+
+/// Position d'une fenêtre ouverte depuis le menu d'onglet : décalée en cascade
+/// depuis la fenêtre source.
+fn cascade_position(source: &WebviewWindow) -> PhysicalPosition<f64> {
     let scale = source.scale_factor().unwrap_or(1.0);
     let origin = source.outer_position().unwrap_or_default();
-    let pos = PhysicalPosition::new(
+    PhysicalPosition::new(
         f64::from(origin.x) + 32.0 * scale,
         f64::from(origin.y) + 32.0 * scale,
-    );
-    move_tab_to_new_window(app, source, doc_id, pos);
+    )
 }
 
 /// Crée une fenêtre à `pos` (de la taille de la source) et y déplace l'onglet.

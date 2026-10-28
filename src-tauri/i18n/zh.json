@@ -305,6 +305,7 @@
   "tabs.copy_failed": "无法复制路径。",
   "tabs.copy_path": "复制路径",
   "tabs.detach": "拆分到新窗口",
+  "tabs.duplicate": "在新窗口中复制",
   "tabs.menu_aria": "选项卡操作",
   "tabs.path_copied": "路径已复制。",
   "tabs.reveal": "在文件资源管理器中显示",

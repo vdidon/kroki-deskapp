@@ -211,6 +211,13 @@ pub async fn detach_tab(app: AppHandle, window: WebviewWindow, doc_id: u64) {
     manager::detach_tab(&app, &window, doc_id);
 }
 
+/// Menu contextuel d'onglet : rouvre le document dans une nouvelle fenêtre,
+/// l'onglet restant en place. Async pour la même raison que `detach_tab`.
+#[tauri::command]
+pub async fn duplicate_tab(app: AppHandle, window: WebviewWindow, doc_id: u64) {
+    manager::duplicate_tab(&app, &window, doc_id);
+}
+
 /// Menu contextuel d'onglet : ouvre le dossier du document dans le gestionnaire
 /// de fichiers, fichier sélectionné. Le chemin est relu dans l'état, pas fourni
 /// par le frontend. Async : l'appel au shell ne bloque pas le main thread.

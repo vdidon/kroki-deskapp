@@ -313,6 +313,7 @@
   "tabs.copy_failed": "No se pudo copiar la ruta.",
   "tabs.copy_path": "Copiar ruta",
   "tabs.detach": "Separar en una ventana nueva",
+  "tabs.duplicate": "Duplicar en una ventana nueva",
   "tabs.menu_aria": "Acciones de la pestaña",
   "tabs.path_copied": "Ruta copiada.",
   "tabs.reveal": "Mostrar en el explorador de archivos",

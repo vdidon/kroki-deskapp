@@ -1,6 +1,6 @@
 [package]
 name = "kroki_deskapp"
-version = "3.29.0"
+version = "3.30.0"
 description = "Markdown viewer with Kroki diagram rendering"
 repository = "https://github.com/vdidon/kroki-deskapp"
 license = "MIT"

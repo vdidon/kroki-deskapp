@@ -5,6 +5,13 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.30.0] — 2026-10-28
+
+### Added
+- **Duplicate in a new window** in the tab context menu: opens the same
+  document in a new window while the tab stays where it is — also available
+  on a window's only tab.
+
 ## [3.29.0] — 2026-10-22
 
 ### Added
@@ -969,6 +976,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
+[3.30.0]: #3300--2026-10-28
 [3.29.0]: #3290--2026-10-22
 [3.28.1]: #3281--2026-10-22
 [3.28.0]: #3280--2026-10-20

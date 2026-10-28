@@ -167,6 +167,7 @@ export interface Commands {
   close_tab: { args: { docId: number }; ret: void };
   close_tabs_around: { args: { docId: number; side: string }; ret: void };
   detach_tab: { args: { docId: number }; ret: void };
+  duplicate_tab: { args: { docId: number }; ret: void };
   reveal_tab_file: { args: { docId: number }; ret: void };
   reorder_tab: { args: { docId: number; index: number }; ret: void };
   new_window: { args: NoArgs; ret: string };
