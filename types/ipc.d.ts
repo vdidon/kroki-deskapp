@@ -1,16 +1,16 @@
-// Contrat front ↔ back : arguments et retours des commandes Tauri, payloads des
-// événements. Recopié à la main des signatures Rust (`commands.rs`, `plugins.rs`,
-// `updates.rs`, `journal.rs`) et des structs serde ; `tests/test_ipc_types.mjs` vérifie que
-// commandes et noms d'arguments restent alignés sur le Rust.
+// Front ↔ back contract: arguments and return values of the Tauri commands,
+// event payloads. Hand-copied from the Rust signatures (`commands.rs`, `plugins.rs`,
+// `updates.rs`, `journal.rs`) and the serde structs; `tests/test_ipc_types.mjs` checks that
+// commands and argument names stay aligned with the Rust.
 //
-// Conventions de sérialisation à respecter en modifiant ce fichier :
-// - arguments : Tauri convertit les paramètres Rust snake_case en camelCase ;
-//   les paramètres `AppHandle`, `WebviewWindow`, `State<…>` ne sont pas passés ;
-// - retours : champs tels que serde les écrit — snake_case sauf
-//   `#[serde(rename_all = "camelCase")]` (PluginInfo, ManifestPreview) ;
-// - `Result<T, String>` : la promesse rejette avec la chaîne d'erreur.
+// Serialization conventions to respect when editing this file:
+// - arguments: Tauri converts the Rust snake_case parameters to camelCase;
+//   the `AppHandle`, `WebviewWindow`, `State<…>` parameters are not passed;
+// - return values: fields as serde writes them — snake_case except
+//   `#[serde(rename_all = "camelCase")]` (PluginInfo, ManifestPreview);
+// - `Result<T, String>`: the promise rejects with the error string.
 
-/** Ligne du markdown généré → ligne du source (§6.2 du protocole de plugins). */
+/** Generated markdown line → source line (§6.2 of the plugin protocol). */
 export type Anchor = [mdLine: number, srcLine: number];
 
 export interface TabInfo {
@@ -19,7 +19,7 @@ export interface TabInfo {
   path: string;
 }
 
-/** `state::TabsPayload` — retour de `get_window_state`, payload de `tabs-updated`. */
+/** `state::TabsPayload` — return value of `get_window_state`, payload of `tabs-updated`. */
 export interface TabsPayload {
   window: string;
   tabs: TabInfo[];
@@ -35,14 +35,14 @@ export interface DocPayload {
   markdown: string;
 }
 
-/** `state::SettingsData` (persisté dans settings.json). */
+/** `state::SettingsData` (persisted in settings.json). */
 export interface SettingsData {
   external_url: string;
   server_enabled: boolean;
   server_port: number;
   theme: string;
   language: string;
-  /** Partiel : seules les icônes explicitement (dé)cochées y figurent. */
+  /** Partial: only the explicitly checked/unchecked icons appear here. */
   icons: Record<string, boolean>;
   removed_plugins: string[];
   update_check: boolean;
@@ -126,30 +126,30 @@ export interface UpdateInfo {
   download_file: string | null;
 }
 
-/** `journal::JournalEntry` — retour de `get_journal`, payload de `journal-entry`. */
+/** `journal::JournalEntry` — return value of `get_journal`, payload of `journal-entry`. */
 export interface JournalEntry {
   seq: number;
-  /** Millisecondes depuis l'époque Unix. */
+  /** Milliseconds since the Unix epoch. */
   time: number;
   level: "debug" | "info" | "warn" | "error";
-  /** Module Rust (`server`, `watcher`…) ou id du plugin si `plugin`. */
+  /** Rust module (`server`, `watcher`…) or plugin id if `plugin`. */
   source: string;
   plugin: boolean;
   message: string;
 }
 
-/** Catalogue de langue complété par l'anglais (`get_i18n`). */
+/** Language catalog completed with English (`get_i18n`). */
 export interface I18nPayload {
   locale: string;
   setting: string;
-  /** Langues livrées ; `name` = endonyme (`language.name` du catalogue). */
+  /** Shipped languages; `name` = endonym (`language.name` of the catalog). */
   languages: { code: string; name: string }[];
   messages: Record<string, string | Record<string, string>>;
 }
 
 type NoArgs = Record<string, never>;
 
-/** Commande → { args, ret }. Clé = nom passé à `invoke`. */
+/** Command → { args, ret }. Key = name passed to `invoke`. */
 export interface Commands {
   // commands.rs
   get_window_state: { args: NoArgs; ret: TabsPayload };
@@ -215,12 +215,12 @@ export interface Commands {
   plugin_log: { args: { pluginId: string; level: string; message: string }; ret: void };
 }
 
-/** Diffusion entre fenêtres : `from` = label de la fenêtre émettrice. */
+/** Broadcast between windows: `from` = label of the emitting window. */
 interface Broadcast {
   from: string;
 }
 
-/** Événement → payload. */
+/** Event → payload. */
 export interface Events {
   "tabs-updated": TabsPayload;
   "anchor-request": null;
@@ -237,25 +237,25 @@ export interface Events {
     id: number;
     dtype: string;
     source: string;
-    /** Toujours présent (`serde_json::Map`, éventuellement vide) : valeurs chaîne. */
+    /** Always present (`serde_json::Map`, possibly empty): string values. */
     options: Record<string, string>;
   };
-  // Émis par Tauri lui-même (glisser-déposer natif de wry), pas par notre Rust :
-  // hors du périmètre de tests/test_ipc_types.mjs. Sous Windows, drop_target.rs
-  // remplace la cible de wry et émet `drop-overlay` à la place.
+  // Emitted by Tauri itself (wry's native drag-and-drop), not by our Rust:
+  // outside the scope of tests/test_ipc_types.mjs. On Windows, drop_target.rs
+  // replaces wry's target and emits `drop-overlay` instead.
   "tauri://drag-enter": TauriDragDrop;
   "tauri://drag-over": { position: PhysicalPosition };
   "tauri://drag-drop": TauriDragDrop;
   "tauri://drag-leave": null;
 }
 
-/** Position en pixels physiques (`tauri::PhysicalPosition<f64>`). */
+/** Position in physical pixels (`tauri::PhysicalPosition<f64>`). */
 export interface PhysicalPosition {
   x: number;
   y: number;
 }
 
-/** `DragDropEvent::Enter` / `Drop` sérialisé par Tauri. */
+/** `DragDropEvent::Enter` / `Drop` serialized by Tauri. */
 export interface TauriDragDrop {
   paths: string[];
   position: PhysicalPosition;

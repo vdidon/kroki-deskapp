@@ -1,24 +1,24 @@
 // @ts-check
 
-// Drag d'onglets : réordonnancement dans la barre, détachement hors de la barre
-// (nouvelle fenêtre) et dépôt sur une autre fenêtre de l'application (transfert).
+// Tab drag: reordering within the bar, detaching out of the bar (new window)
+// and dropping onto another window of the application (transfer).
 //
-// Tout repose sur la capture de pointeur : Chromium continue de délivrer les
-// pointermove/pointerup à l'élément capturé même hors de la fenêtre, tant que
-// le bouton reste enfoncé. La décision finale (transfert / détachement) est
-// prise côté Rust à partir de la position écran réelle du curseur.
+// Everything relies on pointer capture: Chromium keeps delivering
+// pointermove/pointerup to the captured element even outside the window, as
+// long as the button stays pressed. The final decision (transfer / detach) is
+// made on the Rust side from the cursor's real screen position.
 
 import { invoke } from "./app.js";
 
-const TEAR_MARGIN = 36; // sortie verticale de la barre au-delà de laquelle on détache
+const TEAR_MARGIN = 36; // vertical exit from the bar beyond which we detach
 const DRAG_THRESHOLD = 5;
 
 const tabbarEl = /** @type {HTMLElement} */ (document.getElementById("tabbar"));
 const hintEl = /** @type {HTMLElement} */ (document.getElementById("drag-hint"));
 
 /**
- * Drag en cours. Les champs de réordonnancement (`order` → `rowTops`) sont posés
- * par `beginReorder` et lus seulement en phases `reorder`/`tear`.
+ * Drag in progress. The reordering fields (`order` → `rowTops`) are set
+ * by `beginReorder` and only read in the `reorder`/`tear` phases.
  * @typedef {object} DragState
  * @property {number} docId
  * @property {HTMLElement} el
@@ -34,10 +34,10 @@ const hintEl = /** @type {HTMLElement} */ (document.getElementById("drag-hint"))
  * @property {number[]} rowTops
  */
 
-// `null` hors drag. Typé non nul : les fonctions ci-dessous ne sont appelées
-// que pendant un drag (gardes `if (!drag)` dans les écouteurs et
-// `cleanupVisuals`) ; un type `DragState | null` exigerait une assertion à
-// chacun de leurs accès, sans rien vérifier de plus.
+// `null` outside a drag. Typed non-null: the functions below are only called
+// during a drag (`if (!drag)` guards in the listeners and `cleanupVisuals`);
+// a `DragState | null` type would require an assertion at each of their
+// accesses, without checking anything more.
 /** @type {DragState} */
 let drag = /** @type {DragState} */ (/** @type {unknown} */ (null));
 
@@ -69,15 +69,15 @@ function beginReorder(tabsEl) {
   drag.rects = tabs.map((el) => el.getBoundingClientRect());
   drag.startIndex = tabs.indexOf(drag.el);
   drag.curIndex = drag.startIndex;
-  // Lignes de la barre (flex-wrap) : tops distincts des onglets, triés.
+  // Bar rows (flex-wrap): distinct tab tops, sorted.
   drag.rowTops = [...new Set(drag.rects.map((r) => Math.round(r.top)))].sort((a, b) => a - b);
   drag.phase = "reorder";
   drag.el.classList.add("dragging");
   document.body.classList.add("tab-dragging");
 }
 
-// Index de la ligne la plus proche d'une ordonnée (les onglets font tous la
-// même hauteur : la plus proche par le centre de ligne suffit).
+// Index of the row closest to a y coordinate (all tabs have the same height:
+// the closest by row center is enough).
 /** @param {number} y */
 function rowAt(y) {
   const h = drag.rects[0].height;
@@ -93,10 +93,9 @@ function rowAt(y) {
 /** @param {PointerEvent} e */
 function updateReorder(e) {
   if (drag.rowTops.length > 1) {
-    // Barre sur plusieurs lignes : l'onglet suit librement le curseur et la
-    // position cible est l'ordre de lecture (ligne, puis x) du pointeur —
-    // pas d'aperçu par décalage des voisins, faux dès qu'un onglet change
-    // de ligne.
+    // Multi-row bar: the tab follows the cursor freely and the target
+    // position is the pointer's reading order (row, then x) — no preview by
+    // shifting the neighbors, which is wrong as soon as a tab changes row.
     drag.el.style.transform = `translate(${e.clientX - drag.startX}px, ${e.clientY - drag.startY}px)`;
     const pRow = rowAt(e.clientY);
     let target = 0;
@@ -157,8 +156,8 @@ function exitTear() {
 
 /** @param {PointerEvent} e */
 function moveHint(e) {
-  // Le hint n'est visible que lorsque le curseur est dans la fenêtre source ;
-  // au-delà, seul le curseur système reste (limitation assumée).
+  // The hint is only visible while the cursor is inside the source window;
+  // beyond it, only the system cursor remains (accepted limitation).
   const inside =
     e.clientX >= 0 && e.clientX <= window.innerWidth &&
     e.clientY >= 0 && e.clientY <= window.innerHeight;
@@ -253,8 +252,8 @@ export function initTearDrag() {
     drag = /** @type {DragState} */ (/** @type {unknown} */ (null));
   };
   tabsEl.addEventListener("pointercancel", cancel);
-  // Un rebuild de la barre pendant un drag détache l'élément capturé :
-  // la capture est perdue, on annule proprement.
+  // A rebuild of the bar during a drag detaches the captured element:
+  // the capture is lost, so we cancel cleanly.
   tabsEl.addEventListener("lostpointercapture", (e) => {
     if (drag && e.pointerId === drag.pointerId) cancel();
   });

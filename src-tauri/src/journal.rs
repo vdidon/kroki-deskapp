@@ -1,17 +1,17 @@
-//! Journal de l'application : dernières entrées de diagnostic, en mémoire.
+//! Application log: the latest diagnostic entries, in memory.
 //!
-//! Le binaire de release n'a pas de console (`windows_subsystem = "windows"`) :
-//! sans ce journal, un `eprintln!` (port de l'API occupé, surveillance de
-//! fichiers en échec, plugin livré non installé…) ne s'affiche nulle part. Les
-//! modules Rust y écrivent par `info`/`warn`/`error` ; les fenêtres y versent les
-//! entrées de leurs plugins (`host/log`, échecs et mises en panne vus par
-//! l'hôte) par `plugin_log`. Un seul journal pour tout le processus, donc toutes
-//! les fenêtres : un worker de plugin vit dans une fenêtre, son journal non.
+//! The release binary has no console (`windows_subsystem = "windows"`):
+//! without this log, an `eprintln!` (API port busy, file watching failing,
+//! shipped plugin not installed…) shows up nowhere. The Rust modules write to
+//! it through `info`/`warn`/`error`; the windows pour in their plugins' entries
+//! (`host/log`, failures and breakdowns seen by the host) through `plugin_log`.
+//! A single log for the whole process, hence for all windows: a plugin worker
+//! lives in one window, its log does not.
 //!
-//! Global (comme la langue d'`i18n`) : les erreurs naissent au fond de modules
-//! qui n'ont pas d'`AppHandle`. Rien n'est écrit sur disque ; les messages des
-//! modules Rust restent en anglais, comme toute sortie de log (cf. CLAUDE.md).
-//! Les entrées gardent aussi leur sortie stderr, utile en `cargo run-app`.
+//! Global (like `i18n`'s language): errors are born deep in modules that have
+//! no `AppHandle`. Nothing is written to disk; the Rust modules' messages stay
+//! in English, like any log output (cf. CLAUDE.md). Entries also keep their
+//! stderr output, useful with `cargo run-app`.
 
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
@@ -20,9 +20,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-/// Entrées conservées (les plus anciennes sont évincées).
+/// Entries kept (the oldest are evicted).
 const CAPACITY: usize = 500;
-/// Longueur maximale d'un message, en caractères (le reste est tronqué).
+/// Maximum length of a message, in characters (the rest is truncated).
 const MAX_MESSAGE: usize = 2000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -35,7 +35,7 @@ pub enum Level {
 }
 
 impl Level {
-    /// Niveau envoyé par un plugin (§6.5) : toute valeur inconnue vaut `info`.
+    /// Level sent by a plugin (§6.5): any unknown value counts as `info`.
     fn parse(s: &str) -> Level {
         match s {
             "debug" => Level::Debug,
@@ -48,12 +48,12 @@ impl Level {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct JournalEntry {
-    /// Rang croissant, unique pour la durée du processus.
+    /// Increasing rank, unique for the lifetime of the process.
     pub seq: u64,
-    /// Horodatage, en millisecondes depuis l'époque Unix.
+    /// Timestamp, in milliseconds since the Unix epoch.
     pub time: u64,
     pub level: Level,
-    /// Module Rust (`server`, `watcher`…) ou id du plugin si `plugin`.
+    /// Rust module (`server`, `watcher`…) or plugin id if `plugin`.
     pub source: String,
     pub plugin: bool,
     pub message: String,
@@ -69,16 +69,16 @@ static JOURNAL: Mutex<Journal> = Mutex::new(Journal {
     next_seq: 1,
 });
 
-/// Pour `journal-entry` ; absent avant le `setup` (les entrées sont gardées).
+/// For `journal-entry`; absent before `setup` (entries are kept).
 static APP: OnceLock<AppHandle> = OnceLock::new();
 
-/// Branche l'émission de `journal-entry` vers les fenêtres.
+/// Wires the emission of `journal-entry` to the windows.
 pub fn attach(app: &AppHandle) {
     let _ = APP.set(app.clone());
 }
 
-/// URL sans identifiants (`https://user:pass@host` → `https://host/`) : le
-/// journal est fait pour être copié dans un rapport de bug.
+/// URL without credentials (`https://user:pass@host` → `https://host/`): the
+/// log is meant to be copied into a bug report.
 pub fn redact_url(url: &str) -> String {
     match reqwest::Url::parse(url) {
         Ok(mut u) => {
@@ -136,22 +136,22 @@ pub fn error(source: &str, message: impl AsRef<str>) {
     record(Level::Error, source, false, message.as_ref());
 }
 
-/// Efface les entrées d'un plugin (désinstallation : un plugin réinstallé
-/// repart d'un journal vide).
+/// Clears a plugin's entries (uninstall: a reinstalled plugin starts from an
+/// empty log).
 pub fn forget_plugin(id: &str) {
     let mut j = JOURNAL.lock().unwrap_or_else(|e| e.into_inner());
     j.entries.retain(|e| !(e.plugin && e.source == id));
 }
 
-/// Toutes les entrées, de la plus ancienne à la plus récente.
+/// All entries, from oldest to newest.
 #[tauri::command]
 pub fn get_journal() -> Vec<JournalEntry> {
     let j = JOURNAL.lock().unwrap_or_else(|e| e.into_inner());
     j.entries.iter().cloned().collect()
 }
 
-/// Entrée d'un plugin, versée par la fenêtre qui héberge son worker. `level`
-/// est ramené aux quatre niveaux du protocole ; un id invalide est ignoré.
+/// A plugin's entry, poured in by the window that hosts its worker. `level`
+/// is mapped to the protocol's four levels; an invalid id is ignored.
 #[tauri::command]
 pub fn plugin_log(plugin_id: String, level: String, message: String) {
     if crate::plugins::valid_id(&plugin_id) {

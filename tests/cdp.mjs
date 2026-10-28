@@ -1,11 +1,11 @@
-// Harnais de test : pilote la webview de Kroki Desk via le protocole CDP.
-// Usage : node cdp.mjs <port> <action> [filtre-titre-page]
-// Actions : report | reorder | tear-cancel | invoke-detach | shot
-// Prérequis : lancer l'app avec WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
+// Test harness: drives the Kroki Desk webview through the CDP protocol.
+// Usage: node cdp.mjs <port> <action> [page-title-filter]
+// Actions: report | reorder | tear-cancel | invoke-detach | shot
+// Prerequisite: launch the app with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
 
 const port = process.argv[2] ?? "9222";
 const action = process.argv[3] ?? "report";
-// invoke-detach-at : argv[4]=x argv[5]=y argv[6]=filtre ; sinon argv[4]=filtre
+// invoke-detach-at: argv[4]=x argv[5]=y argv[6]=filter; otherwise argv[4]=filter
 const isDetachAt = action === "invoke-detach-at";
 const dropX = isDetachAt ? Number(process.argv[4]) : 0;
 const dropY = isDetachAt ? Number(process.argv[5]) : 0;
@@ -19,7 +19,7 @@ const page = filter.startsWith("#")
     ? pages.find((t) => t.title.includes(filter))
     : pages[0];
 if (!page) {
-  console.error(`page introuvable (filtre="${filter}", pages=${pages.map((p) => p.title).join(" | ")})`);
+  console.error(`page not found (filter="${filter}", pages=${pages.map((p) => p.title).join(" | ")})`);
   process.exit(1);
 }
 
@@ -77,7 +77,7 @@ function tabsInfo() {
 if (action === "report") {
   console.log(JSON.stringify({ page: page.title, tabs: await tabsInfo() }, null, 1));
 } else if (action === "where") {
-  // Géométrie écran de la fenêtre + un point physique au milieu de sa barre d'onglets.
+  // Window screen geometry + a physical point in the middle of its tab bar.
   const w = await evaluate(
     `(() => ({ sx: window.screenX, sy: window.screenY, dpr: window.devicePixelRatio, iw: innerWidth, ih: innerHeight, title: document.title }))()`,
   );
@@ -86,7 +86,7 @@ if (action === "report") {
 } else if (action === "reorder") {
   const tabs = await tabsInfo();
   if (tabs.length < 2) {
-    console.log(JSON.stringify({ skip: "besoin de 2 onglets" }));
+    console.log(JSON.stringify({ skip: "needs 2 tabs" }));
     process.exit(0);
   }
   const src = tabs[tabs.length - 1];
@@ -152,21 +152,21 @@ if (action === "report") {
   await sleep(300);
   console.log(JSON.stringify({ page: page.title, focus: out }));
 } else if (action === "invoke-detach-at") {
-  // Déclenche la même logique que le pointerup d'un drag réel, avec une
-  // position de relâchement fournie (command debug, builds debug uniquement).
+  // Triggers the same logic as the pointerup of a real drag, with a supplied
+  // release position (debug command, debug builds only).
   const tabs = await tabsInfo();
   const src = tabs[tabs.length - 1];
-  // Si la fenêtre source se ferme (transfert de son dernier onglet), la réponse
-  // IPC ne revient jamais : on borne l'attente.
+  // If the source window closes (its last tab is transferred), the IPC
+  // response never comes back: the wait is bounded.
   const out = await Promise.race([
     evaluate(
       `window.__TAURI__.core.invoke('debug_finish_tab_drag_at', { docId: ${Number(src.id)}, x: ${dropX}, y: ${dropY} }).then(() => 'ok').catch(e => 'ERR:' + e)`,
     ),
-    sleep(1500).then(() => "ok (fenêtre source fermée)"),
+    sleep(1500).then(() => "ok (source window closed)"),
   ]);
   console.log(JSON.stringify({ from: page.title, tab: src.title, at: [dropX, dropY], result: out }));
 } else {
-  console.error(`action inconnue: ${action}`);
+  console.error(`unknown action: ${action}`);
   process.exit(1);
 }
 

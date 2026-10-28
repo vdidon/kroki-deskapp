@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Paquet shared-mime-info de Kroki Desk, posé par le .deb dans
-  /usr/share/mime/packages/ (bundle.linux.deb.files) et fondu dans la base MIME
-  par update-mime-database (déclenchement dpkg de shared-mime-info, doublé du
-  postinst — cf. linux/postinst.sh).
+  Kroki Desk's shared-mime-info package, laid down by the .deb in
+  /usr/share/mime/packages/ (bundle.linux.deb.files) and merged into the MIME
+  database by update-mime-database (dpkg trigger of shared-mime-info, backed up
+  by the postinst — cf. linux/postinst.sh).
 
-  Ce fichier ne porte que les formats natifs : le xtask en dérive
-  linux/kroki-desk.generated.xml (gitignoré), complété des types propres aux
-  plugins embarqués (cf. xtask/src/bundled.rs), et c'est celui-là que le
-  paquet installe.
+  This file only carries the native formats: the xtask derives
+  linux/kroki-desk.generated.xml from it (gitignored), completed with the types
+  specific to the embedded plugins (cf. xtask/src/bundled.rs), and that is the
+  one the package installs.
 
-  Il est indispensable : le MimeType= du .desktop ne fait que déclarer les types
-  que l'application sait ouvrir, il ne dit nulle part qu'un fichier `.kdws` EST
-  de ce type. Sans les <glob> ci-dessous, les formats propres à l'application
-  n'existent pas pour le système et le double-clic ne trouve aucun gestionnaire.
+  It is indispensable: the .desktop's MimeType= only declares the types the
+  application can open, it says nowhere that a `.kdws` file IS of that type.
+  Without the <glob>s below, the application's own formats do not exist for the
+  system and a double-click finds no handler.
 
-  Chaque type est <sub-class-of> de sa forme réelle (zip, json, texte) : c'est ce
-  qui garde les gestionnaires génériques disponibles, et c'est aussi ce qui fait
-  gagner le glob contre la détection par contenu — un `.kdext` est bel et bien un
-  zip, sans cette filiation le sniffing le classerait en application/zip.
+  Each type is a <sub-class-of> its real form (zip, json, text): this is what
+  keeps the generic handlers available, and also what makes the glob win
+  against content detection — a `.kdext` really is a zip, and without this
+  lineage sniffing would classify it as application/zip.
 -->
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
 
@@ -39,10 +39,10 @@
   </mime-type>
 
   <!--
-    text/markdown existe déjà en amont, mais avec *.md, *.mkd et *.markdown
-    seulement (vérifié dans freedesktop.org.xml.in) : *.mdown, que DOC_EXTENSIONS
-    accepte, n'y est pas. On n'ajoute que le glob manquant — pas de <comment>,
-    pour ne rien redéfinir de la définition standard.
+    text/markdown already exists upstream, but with *.md, *.mkd and *.markdown
+    only (checked in freedesktop.org.xml.in): *.mdown, which DOC_EXTENSIONS
+    accepts, is not there. Only the missing glob is added — no <comment>, so
+    as not to redefine anything of the standard definition.
   -->
   <mime-type type="text/markdown">
     <glob pattern="*.mdown"/>

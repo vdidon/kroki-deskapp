@@ -1,9 +1,9 @@
 // @ts-check
 
-// Sessions `.kdws` : bouton « Enregistrer la session » et retours utilisateur.
-// L'ouverture d'une session est entièrement côté Rust (session.rs, routée par
-// `manager::open_mixed_paths` quel que soit le canal : CLI, drop, dialog) ;
-// ici on ne gère que la sauvegarde et l'affichage des rapports (toast).
+// `.kdws` sessions: "Save session" (« Enregistrer la session ») button and user feedback.
+// Opening a session is entirely on the Rust side (session.rs, routed by
+// `manager::open_mixed_paths` whatever the channel: CLI, drop, dialog);
+// here we only handle saving and displaying reports (toast).
 
 import { invoke, listen } from "./app.js";
 import { t } from "./i18n.js";
@@ -12,9 +12,9 @@ const toastEl = /** @type {HTMLElement} */ (document.getElementById("toast"));
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let toastTimer;
 
-/** Toast transitoire en bas de fenêtre. Les erreurs restent plus longtemps.
- *  `actions` (`[{ label, run, title?, secondary? }]`) ajoute des boutons : le
- *  toast devient cliquable et reste le temps de le lire.
+/** Transient toast at the bottom of the window. Errors stay longer.
+ *  `actions` (`[{ label, run, title?, secondary? }]`) adds buttons: the
+ *  toast becomes clickable and stays long enough to be read.
  * @typedef {object} ToastAction
  * @property {string} label
  * @property {() => void} run
@@ -39,7 +39,7 @@ export function showToast(message, error = false, actions = []) {
     });
     toastEl.append(btn);
   }
-  // Un toast cliquable reste 15 s : la croix permet de l'écarter tout de suite.
+  // A clickable toast stays 15 s: the cross dismisses it right away.
   if (actions.length) {
     const close = document.createElement("button");
     close.type = "button";
@@ -67,7 +67,7 @@ export async function initSession() {
   btn.addEventListener("click", async () => {
     btn.disabled = true;
     try {
-      // `false` = dialogue annulé : pas de toast.
+      // `false` = dialog cancelled: no toast.
       if (await invoke("save_session")) showToast(t("session.saved"));
     } catch (err) {
       showToast(String(err), true);
@@ -75,8 +75,8 @@ export async function initSession() {
       btn.disabled = false;
     }
   });
-  // Rapport d'ouverture d'une session (fichiers ignorés, `.kdws` illisible…),
-  // émis par le backend vers cette fenêtre uniquement (`emit_to`).
+  // Session opening report (skipped files, unreadable `.kdws`…), emitted by
+  // the backend to this window only (`emit_to`).
   await listen("session-report", (e) => {
     showToast(e.payload.message, e.payload.error);
   });

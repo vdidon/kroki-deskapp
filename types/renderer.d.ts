@@ -1,25 +1,25 @@
-// Globales et modules de la webview de rendu cachée (`ui/renderer/`) : vendors
-// chargés à la demande par `renderer.js` (`loadScript` → globale, `import()` →
-// module), plus les ponts posés entre ses propres scripts. Seule la surface
-// réellement appelée par `renderer.js` est décrite, relevée dans les bundles de
-// `ui/renderer/vendor/`. Aucune de ces globales n'existe dans la fenêtre
-// principale (cf. `vendor.d.ts`) : n'en déclarer ici aucune qui y soit aussi.
+// Globals and modules of the hidden render webview (`ui/renderer/`): vendors
+// loaded on demand by `renderer.js` (`loadScript` → global, `import()` →
+// module), plus the bridges set up between its own scripts. Only the surface
+// actually called by `renderer.js` is described, as found in the bundles of
+// `ui/renderer/vendor/`. None of these globals exists in the main
+// window (cf. `vendor.d.ts`): do not declare here any that is also there.
 
-/** `t()` de `ui/renderer/i18n.js`, exposé à `erd.js` (script classique). */
+/** `t()` of `ui/renderer/i18n.js`, exposed to `erd.js` (classic script). */
 export type RendererT = (key: string, params?: Record<string, unknown>) => string;
 
-// ---------- vendors importés dynamiquement ----------
+// ---------- dynamically imported vendors ----------
 
 /** `vendor/graphviz.es.js` (@hpcc-js/wasm-graphviz). */
 export interface GraphvizModule {
   Graphviz: { load(): Promise<Graphviz> };
 }
 export interface Graphviz {
-  /** Source DOT → sortie au format demandé (`"svg"`) avec le moteur de layout. */
+  /** DOT source → output in the requested format (`"svg"`) with the layout engine. */
   layout(source: string, format?: string, engine?: string): string;
 }
 
-/** `vendor/d2.esm.js` (@terrastruct/d2) : wrapper d'un worker WASM. */
+/** `vendor/d2.esm.js` (@terrastruct/d2) : wrapper around a WASM worker. */
 export interface D2Module {
   D2: new () => D2;
 }
@@ -28,18 +28,18 @@ export interface D2CompileOptions {
   themeID?: number;
   sketch?: boolean;
 }
-/** Résultat de `compile` (champs relayés tels quels à `render`). */
+/** Result of `compile` (fields passed through as-is to `render`). */
 export interface D2CompileResult {
   diagram: unknown;
   renderOptions: unknown;
 }
 export interface D2 {
   compile(source: string, options?: D2CompileOptions): Promise<D2CompileResult>;
-  /** SVG sérialisé. */
+  /** Serialized SVG. */
   render(diagram: unknown, options?: unknown): Promise<string>;
 }
 
-/** `vendor/excalidraw.esm.js` : bundle réduit à `exportToSvg` + `restore`. */
+/** `vendor/excalidraw.esm.js` : bundle reduced to `exportToSvg` + `restore`. */
 export interface ExcalidrawScene {
   elements: unknown[];
   appState: Record<string, unknown>;
@@ -50,14 +50,14 @@ export interface ExcalidrawModule {
   exportToSvg(opts: ExcalidrawScene & { exportPadding?: number }): Promise<SVGSVGElement>;
 }
 
-// ---------- vendors chargés en <script> classique ----------
+// ---------- vendors loaded as classic <script>s ----------
 
 export interface Mermaid {
   initialize(config: { startOnLoad: boolean; securityLevel: string; theme: string }): void;
   render(id: string, source: string): Promise<{ svg: string }>;
 }
 
-/** Spec Vega compilée (`vega.parse`) : opaque, seulement relayée à `View`. */
+/** Compiled Vega spec (`vega.parse`): opaque, only passed on to `View`. */
 export type VegaRuntime = { readonly __vegaRuntime: unique symbol };
 export interface VegaView {
   toSVG(): Promise<string>;
@@ -66,7 +66,7 @@ export interface VegaView {
 export interface Vega {
   parse(spec: unknown, config: null, options: { ast: boolean }): VegaRuntime;
   View: new (runtime: VegaRuntime, options: { renderer: string; expr?: unknown }) => VegaView;
-  /** Ajouté à `window.vega` par `vendor/vega-interpreter.min.js`. */
+  /** Added to `window.vega` by `vendor/vega-interpreter.min.js`. */
   expressionInterpreter?: unknown;
 }
 export interface VegaLite {
@@ -74,7 +74,7 @@ export interface VegaLite {
 }
 
 export interface WaveDrom {
-  /** Seule forme exposée par `vendor/wavedrom.min.js` (cf. `renderWaveForm`). */
+  /** Only form exposed by `vendor/wavedrom.min.js` (cf. `renderWaveForm`). */
   RenderWaveForm?(index: number, source: unknown, outputPrefix: string): void;
   renderWaveForm?(index: number, source: unknown, outputPrefix: string): void;
 }
@@ -92,33 +92,33 @@ export interface BpmnViewer {
 
 declare global {
   interface Window {
-    /** Pont i18n : posé par `renderer.js` avant tout chargement d'`erd.js`. */
+    /** i18n bridge: set by `renderer.js` before any loading of `erd.js`. */
     rendererT: RendererT;
-    /** Posé par `erd.js` à son exécution. */
+    /** Set by `erd.js` when it runs. */
     erdToDot?: (source: string) => string;
 
-    // Globales définies une fois leur `loadScript` résolu (jamais appelées avant).
+    // Globals defined once their `loadScript` has resolved (never called before).
     mermaid: Mermaid;
     vega: Vega;
     vegaLite: VegaLite;
     /**
-     * Repli de `exprInterpreter()` : le bundle vendoré n'expose PAS cette
-     * globale (il étend `window.vega`), la branche n'est jamais prise.
+     * Fallback of `exprInterpreter()`: the vendored bundle does NOT expose this
+     * global (it extends `window.vega`), the branch is never taken.
      */
     vegaInterpreter?: { expressionInterpreter?: unknown };
     WaveDrom: WaveDrom;
     nomnoml: Nomnoml;
-    /** Vérifiées par `typeof` après chargement (`dbml.js`, `bpmn-viewer.min.js`). */
+    /** Checked with `typeof` after loading (`dbml.js`, `bpmn-viewer.min.js`). */
     dbmlToDot?: (source: string) => string;
     BpmnJS?: new (options: { container: HTMLElement }) => BpmnViewer;
-    /** Lu par excalidraw à l'import pour localiser ses assets (polices). */
+    /** Read by excalidraw at import time to locate its assets (fonts). */
     EXCALIDRAW_ASSET_PATH?: string;
 
-    // Pseudo-environnement Node de bytefield-svg (`shim-pre.js` / `shim-post.js`).
+    // Pseudo Node environment of bytefield-svg (`shim-pre.js` / `shim-post.js`).
     module?: { exports: unknown };
     global?: typeof globalThis;
     process?: { env: Record<string, string> };
-    /** Export CommonJS récupéré par `shim-post.js` : forme non garantie. */
+    /** CommonJS export picked up by `shim-post.js`: shape not guaranteed. */
     __bytefield?: unknown;
   }
 }

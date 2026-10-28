@@ -1,36 +1,36 @@
 // @ts-check
-// Recherche d'occurrences dans une vue, en `Range` pour la CSS Custom Highlight
-// API (findword.js, docsearch.js et globalsearch.js). Le motif arrive déjà
-// compilé en RegExp globale (cf. searchopts.js : casse, mot entier, regex).
+// Search for occurrences in a view, as `Range`s for the CSS Custom Highlight
+// API (findword.js, docsearch.js and globalsearch.js). The pattern arrives
+// already compiled as a global RegExp (cf. searchopts.js: case, whole word,
+// regex).
 //
-// Un simple parcours des nœuds texte ne suffit plus depuis que la vue source est
-// colorée : la coloration éclate une ligne en plusieurs nœuds texte
-// (`fetch<span>(</span>…`), et une occurrence à cheval sur deux d'entre eux
-// serait perdue. On concatène donc les nœuds texte d'une **même ligne source**
-// (`.src-line`) avant de chercher, puis on remappe les positions.
+// A plain walk over the text nodes is no longer enough now that the source view
+// is colorized: the coloring splits a line into several text nodes
+// (`fetch<span>(</span>…`), and an occurrence straddling two of them would be
+// lost. So we concatenate the text nodes of a **single source line**
+// (`.src-line`) before searching, then remap the positions.
 //
-// Hors vue source, chaque nœud reste isolé — coller les nœuds voisins créerait
-// des occurrences fantômes entre deux blocs du preview (fin d'un paragraphe +
-// début du suivant).
+// Outside the source view, each node stays isolated — gluing neighboring nodes
+// would create phantom occurrences between two preview blocks (end of one
+// paragraph + start of the next).
 //
-// Le contenu replié n'est pas cherché : corps d'un `<details>` fermé (les
-// accordéons `kd-fold` des plugins, les sources repliées sous une figure
-// TikZ…) et éléments `hidden`. Une occurrence qu'on ne voit pas ferait sauter
-// la navigation vers un endroit où le mot n'apparaît pas. Le test est
-// structurel, pas `checkVisibility()` : celle-ci rejetterait aussi les
-// éléments `display: contents`, qui n'ont pas de boîte mais dont le texte
-// s'affiche.
+// Folded content is not searched: body of a closed `<details>` (the plugins'
+// `kd-fold` accordions, the sources folded under a TikZ figure…) and `hidden`
+// elements. An occurrence nobody can see would make navigation jump to a place
+// where the word does not appear. The test is structural, not
+// `checkVisibility()`: that one would also reject `display: contents`
+// elements, which have no box but whose text is displayed.
 
 import { iterMatches } from "./searchopts.js";
 
-// Plafond de sécurité : au-delà, le surlignage n'apporte plus rien et le coût
-// (un Range par occurrence) devient sensible — `.` ou `\s` en mode regex.
+// Safety cap: beyond it, highlighting adds nothing and the cost (one Range per
+// occurrence) becomes noticeable — `.` or `\s` in regex mode.
 const MAX_RANGES = 5000;
 
-/** @typedef {{ node: Text, start: number }} Part  nœud texte et son offset dans le texte concaténé */
+/** @typedef {{ node: Text, start: number }} Part  text node and its offset in the concatenated text */
 
 /**
- * Corps d'un `<details>` fermé : tout sauf son `<summary>`.
+ * Body of a closed `<details>`: everything except its `<summary>`.
  * @param {Node} node
  * @returns {boolean}
  */
@@ -39,9 +39,9 @@ function inClosedDetails(node) {
   return p?.tagName === "DETAILS" && !(/** @type {HTMLDetailsElement} */ (p).open) && node.nodeName !== "SUMMARY";
 }
 
-// Filtre du parcours : un sous-arbre replié est écarté d'un bloc (REJECT), les
-// autres éléments sont traversés sans être rendus (SKIP) — seuls les nœuds
-// texte visibles sortent du walker.
+// Walk filter: a folded subtree is dropped as a whole (REJECT), other elements
+// are traversed without being emitted (SKIP) — only visible text nodes come
+// out of the walker.
 /**
  * @param {Node} node
  * @returns {number}
@@ -50,14 +50,14 @@ function visibleText(node) {
   if (node.nodeType === Node.TEXT_NODE) {
     return inClosedDetails(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
   }
-  // `hidden` : HTMLElement seulement — undefined sur un élément SVG/MathML.
+  // `hidden`: HTMLElement only — undefined on an SVG/MathML element.
   return /** @type {HTMLElement} */ (node).hidden === true || inClosedDetails(node)
     ? NodeFilter.FILTER_REJECT
     : NodeFilter.FILTER_SKIP;
 }
 
 /**
- * Positionne un offset du texte concaténé sur le nœud texte qui le porte.
+ * Maps an offset in the concatenated text onto the text node that holds it.
  * @param {Part[]} parts
  * @param {number} offset
  * @returns {[Text, number]}
@@ -85,8 +85,8 @@ function matchGroup(parts, text, re, ranges) {
 }
 
 /**
- * Tous les `Range` couvrant les occurrences de `re` (RegExp globale) dans
- * `root`, dans l'ordre du document — contenu replié exclu.
+ * All the `Range`s covering the occurrences of `re` (global RegExp) in
+ * `root`, in document order — folded content excluded.
  * @param {Node} root
  * @param {RegExp | null} re
  * @returns {Range[]}
@@ -101,7 +101,7 @@ export function collectMatchRanges(root, re) {
     visibleText,
   );
   /** @type {Node | null} */
-  let key = null; // ligne source courante, ou le nœud lui-même hors vue source
+  let key = null; // current source line, or the node itself outside the source view
   /** @type {Part[]} */
   let parts = [];
   let text = "";
@@ -110,7 +110,7 @@ export function collectMatchRanges(root, re) {
     parts = [];
     text = "";
   };
-  /** @type {Text | null} — le filtre n'accepte que des nœuds texte */
+  /** @type {Text | null} — the filter only accepts text nodes */
   let node;
   while ((node = /** @type {Text | null} */ (walker.nextNode()))) {
     const value = node.nodeValue;

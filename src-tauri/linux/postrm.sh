@@ -1,19 +1,20 @@
 #!/bin/sh
-# postrm du paquet .deb (bundle.linux.deb.postRemoveScript).
+# postrm of the .deb package (bundle.linux.deb.postRemoveScript).
 #
-# Symétrique du postinst : les fichiers viennent d'être retirés, les mêmes caches
-# désignent donc encore un .desktop et des types MIME qui n'existent plus. Sans ce
-# passage, Kroki Desk resterait proposé dans « Ouvrir avec » jusqu'au prochain
-# paquet qui déclenche la reconstruction.
+# Mirror of the postinst: the files have just been removed, so the same caches
+# still point to a .desktop and MIME types that no longer exist. Without this
+# pass, Kroki Desk would stay offered in "Open with" (« Ouvrir avec ») until the
+# next package that triggers a rebuild.
 #
-# Rien n'est purgé au-delà : les plugins, réglages et sessions vivent dans le
-# profil de chaque utilisateur (~/.config/kroki-deskapp), hors de portée d'un
-# paquet installé par machine — les y laisser est ce qui permet de réinstaller
-# sans rien reperdre.
+# Nothing is purged beyond that: plugins, settings and sessions live in each
+# user's profile (~/.config/kroki-deskapp), out of reach of a per-machine
+# package — leaving them there is what allows reinstalling without losing
+# anything again.
 #
-# Seul nettoyage dans /usr/lib : le dossier bundled-plugins créé par le postinst,
-# que dpkg ignore quand aucun fichier du paquet n'y vit — puis son parent, que
-# dpkg a laissé faute de pouvoir le vider. rmdir ne retire que du vide.
+# The only cleanup in /usr/lib: the bundled-plugins folder created by the
+# postinst, which dpkg ignores when no package file lives in it — then its
+# parent, which dpkg left behind because it could not empty it. rmdir only
+# removes empty directories.
 set -e
 
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then

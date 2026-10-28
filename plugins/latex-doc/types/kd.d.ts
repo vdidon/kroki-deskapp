@@ -1,9 +1,9 @@
-// Global `kd` injecté par le runtime de l'hôte (`ui/js/kd_runtime.js`) avant
-// l'entry `main.js`, typé par les messages du protocole v1 que décrit l'hôte.
+// Global `kd` injected by the host runtime (`ui/js/kd_runtime.js`) before
+// the `main.js` entry, typed by the protocol v1 messages the host describes.
 //
-// Chemin relatif au dépôt de l'application : le jour où le plugin en sort,
-// copier `types/plugin-protocol.d.ts` (et l'`Anchor` qu'il importe de
-// `types/ipc.d.ts`) ici et pointer l'import dessus.
+// Path relative to the application repo: the day the plugin moves out of it,
+// copy `types/plugin-protocol.d.ts` (and the `Anchor` it imports from
+// `types/ipc.d.ts`) here and point the import at it.
 import type { KdApi } from "../../../types/plugin-protocol";
 
 declare global {

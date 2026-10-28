@@ -1,56 +1,56 @@
 // @ts-check
 
-// erd : parseur maison de la DSL « erd » (BurntSushi/erd, écrite en Haskell, sans
-// portage JS) → Graphviz DOT. Le DOT est ensuite rendu par le graphviz WASM déjà
-// chargé (cf. renderDbml dans renderer.js). Expose window.erdToDot.
+// erd: in-house parser for the "erd" DSL (BurntSushi/erd, written in Haskell, no
+// JS port) → Graphviz DOT. The DOT is then rendered by the already-loaded
+// graphviz WASM (cf. renderDbml in renderer.js). Exposes window.erdToDot.
 //
-// Sous-ensemble couvert :
-//   - commentaire pleine ligne `# ...`
+// Supported subset:
+//   - full-line comment `# ...`
 //   - `title { label: "..." }`
-//   - en-tête d'entité `[Name]` (+ bloc d'options `{ bgcolor: "...", ... }`)
-//   - attributs : marqueurs en tête `*` (PK), `+` (FK), `*+`/`+*` (PK+FK), puis le
-//     nom ; bloc `{ ... }` optionnel ignoré
-//   - relations `A <c1>--<c2> B`, cardinalités ∈ { ? 1 * + } ; `{ label: "..." }` optionnel
-// Non couvert (documenté) : `#` en milieu de ligne, blocs multi-lignes, pass-through
-// d'attributs Graphviz arbitraires, patte d'oie (cardinalités rendues en libellé texte).
+//   - entity header `[Name]` (+ options block `{ bgcolor: "...", ... }`)
+//   - attributes: leading markers `*` (PK), `+` (FK), `*+`/`+*` (PK+FK), then the
+//     name; optional `{ ... }` block ignored
+//   - relations `A <c1>--<c2> B`, cardinalities in { ? 1 * + }; optional `{ label: "..." }`
+// Not supported (documented): mid-line `#`, multi-line blocks, pass-through of
+// arbitrary Graphviz attributes, crow's foot (cardinalities rendered as a text label).
 
-// AST interne (script classique : ces typedefs sont globaux, d'où le préfixe Erd).
+// Internal AST (classic script: these typedefs are global, hence the Erd prefix).
 /**
- * Bloc d'options `{ clé: valeur }` : clés en minuscules, valeurs déquotées.
+ * Options block `{ key: value }`: lowercase keys, unquoted values.
  * @typedef {Record<string, string>} ErdOpts
  */
 /**
  * @typedef {object} ErdAttr
  * @property {string} name
- * @property {boolean} pk clé primaire (marqueur `*`)
- * @property {boolean} fk clé étrangère (marqueur `+`)
+ * @property {boolean} pk primary key (`*` marker)
+ * @property {boolean} fk foreign key (`+` marker)
  */
 /**
  * @typedef {object} ErdEntity
  * @property {string} name
- * @property {ErdOpts} opts lu : `bgcolor`
+ * @property {ErdOpts} opts read: `bgcolor`
  * @property {ErdAttr[]} attrs
  */
 /**
- * Cardinalité erd brute (`?`, `1`, `*`, `+`).
+ * Raw erd cardinality (`?`, `1`, `*`, `+`).
  * @typedef {"?" | "1" | "*" | "+"} ErdCard
  */
 /**
  * @typedef {object} ErdRel
  * @property {string} from
- * @property {ErdCard} c1 côté `from`
- * @property {ErdCard} c2 côté `to`
+ * @property {ErdCard} c1 `from` side
+ * @property {ErdCard} c2 `to` side
  * @property {string} to
- * @property {ErdOpts} opts lu : `label`
+ * @property {ErdOpts} opts read: `label`
  */
 
 (function () {
-  // `rendererT` est posé par renderer.js (module, ui/renderer/i18n.js) avant tout
-  // chargement de ce script.
+  // `rendererT` is set by renderer.js (module, ui/renderer/i18n.js) before this
+  // script is loaded.
   /** @type {import("../../types/renderer").RendererT} */
   const t = (key, params) => window.rendererT(key, params);
 
-  // Cardinalité erd → libellé porté par l'arête.
+  // erd cardinality → label carried by the edge.
   /** @type {Record<ErdCard, string>} */
   const CARD = { "?": "0,1", "1": "1", "*": "0,N", "+": "1,N" };
   const HEADER_BG = "#ececff";
@@ -64,15 +64,15 @@
       .replace(/"/g, "&quot;");
   }
 
-  // Identifiant de nœud : nom d'entité DOT-quoté (Graphviz accepte toute chaîne
-  // entre guillemets), guillemets internes échappés. Pas de sanitisation requise.
+  // Node identifier: DOT-quoted entity name (Graphviz accepts any quoted
+  // string), inner quotes escaped. No sanitization required.
   /** @param {string} name */
   function dotId(name) {
     return `"${String(name).replace(/"/g, '\\"')}"`;
   }
 
-  // Extrait un éventuel bloc d'options `{ ... }` en fin de chaîne.
-  // Retourne { head, opts } où opts est un objet clé→valeur (valeurs déquotées).
+  // Extracts an optional `{ ... }` options block at the end of the string.
+  // Returns { head, opts } where opts is a key→value object (unquoted values).
   /**
    * @param {string} text
    * @returns {{ head: string, opts: ErdOpts }}
@@ -163,14 +163,14 @@
         continue;
       }
 
-      // relation : contient `--` encadré de deux cardinalités
+      // relation: contains `--` flanked by two cardinalities
       if (line.includes("--")) {
         const { head, opts } = splitOptions(line);
         const rm = /^(.+?)\s*([?1*+])--([?1*+])\s*(.+?)$/.exec(head);
         if (rm) {
           rels.push({
             from: rm[1].trim().replace(/^["'`]|["'`]$/g, ""),
-            // La regex ne capture que `[?1*+]`.
+            // The regex only captures `[?1*+]`.
             c1: /** @type {ErdCard} */ (rm[2]),
             c2: /** @type {ErdCard} */ (rm[3]),
             to: rm[4].trim().replace(/^["'`]|["'`]$/g, ""),
@@ -180,7 +180,7 @@
         }
       }
 
-      // en-tête d'entité [Name] { ... }
+      // entity header [Name] { ... }
       const hm = /^\[([^\]]+)\]\s*(\{.*\})?\s*$/.exec(line);
       if (hm) {
         const name = hm[1].trim();
@@ -191,7 +191,7 @@
         continue;
       }
 
-      // attribut de l'entité courante
+      // attribute of the current entity
       const { head } = splitOptions(line);
       const am = /^([*+]{0,2})\s*(.+?)$/.exec(head);
       if (!am) continue;

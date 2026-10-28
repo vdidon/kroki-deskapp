@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-/// Un document ouvert (= un onglet). Deux onglets sur le même fichier = deux documents.
+/// An open document (= a tab). Two tabs on the same file = two documents.
 pub struct Document {
     pub path: PathBuf,
     pub title: String,
@@ -17,7 +17,7 @@ pub struct TabInfo {
     pub path: String,
 }
 
-/// État complet des onglets d'une fenêtre, poussé au frontend via l'event `tabs-updated`.
+/// Full state of a window's tabs, pushed to the frontend via the `tabs-updated` event.
 #[derive(Serialize, Clone)]
 pub struct TabsPayload {
     pub window: String,
@@ -28,12 +28,12 @@ pub struct TabsPayload {
 #[derive(Default)]
 pub struct AppStateInner {
     pub docs: HashMap<u64, Document>,
-    /// Labels des fenêtres vivantes, dans l'ordre de création. La première est la
-    /// cible par défaut des ouvertures CLI / seconde instance.
+    /// Labels of the live windows, in creation order. The first is the default
+    /// target of CLI / second-instance opens.
     pub window_order: Vec<String>,
-    /// label de fenêtre -> ids de documents, dans l'ordre des onglets.
+    /// window label -> document ids, in tab order.
     pub tabs: HashMap<String, Vec<u64>>,
-    /// label de fenêtre -> onglet actif.
+    /// window label -> active tab.
     pub active: HashMap<String, u64>,
     pub next_doc_id: u64,
     pub next_win_id: u64,
@@ -70,35 +70,36 @@ impl AppStateInner {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct SettingsData {
-    /// URL d'un serveur Kroki externe. Vide = rendu intégré (défaut).
+    /// URL of an external Kroki server. Empty = built-in rendering (default).
     pub external_url: String,
-    /// Exposer l'API Kroki locale (pour d'autres outils : VS Code, scripts…).
+    /// Expose the local Kroki API (for other tools: VS Code, scripts…).
     pub server_enabled: bool,
     pub server_port: u16,
-    /// Thème de l'interface : `"auto"` (suit le système), `"light"` ou `"dark"`.
+    /// Interface theme: `"auto"` (follows the system), `"light"` or `"dark"`.
     pub theme: String,
-    /// Langue de l'interface : `"auto"` (suit le système) ou un code livré
-    /// (`"en"`, `"fr"`), résolu par `i18n::resolve`.
+    /// Interface language: `"auto"` (follows the system) or a shipped code
+    /// (`"en"`, `"fr"`), resolved by `i18n::resolve`.
     pub language: String,
-    /// Visibilité des icônes des barres d'outils, **volontairement partielle** :
-    /// seules les icônes que l'utilisateur a explicitement cochées ou décochées y
-    /// figurent. Une icône absente suit le défaut du registre frontend
-    /// (`ui/js/icons.js`) — changer un défaut dans une version ultérieure touche
-    /// donc les postes qui n'y ont jamais touché, sans écraser les choix faits.
-    /// `BTreeMap` et non `HashMap` : ordre stable dans `settings.json`.
+    /// Visibility of the toolbar icons, **deliberately partial**:
+    /// only the icons the user has explicitly checked or unchecked appear
+    /// here. An absent icon follows the frontend registry's default
+    /// (`ui/js/icons.js`) — changing a default in a later version therefore
+    /// affects the workstations that never touched it, without overwriting the
+    /// choices already made.
+    /// `BTreeMap` and not `HashMap`: stable order in `settings.json`.
     pub icons: BTreeMap<String, bool>,
-    /// Plugins que l'utilisateur a **explicitement supprimés** (dialog Plugins).
-    /// Seul signal de refus dont on dispose pour les plugins livrés avec
-    /// l'installeur, qui s'installent sinon silencieusement au démarrage
-    /// (`plugins::seed_bundled`) : sans cette liste, « Supprimer » serait
-    /// annulé au lancement suivant. Réinstaller le plugin à la main l'en
-    /// retire — l'utilisateur reprend alors les mises à jour automatiques.
+    /// Plugins the user has **explicitly deleted** (Plugins dialog).
+    /// The only refusal signal we have for plugins shipped with the
+    /// installer, which otherwise install silently at startup
+    /// (`plugins::seed_bundled`): without this list, "Delete" (« Supprimer »)
+    /// would be undone at the next launch. Reinstalling the plugin by hand
+    /// removes it from here — the user then gets automatic updates again.
     pub removed_plugins: Vec<String>,
-    /// Vérifier au démarrage, au plus une fois par jour, si une version plus
-    /// récente est publiée sur GitHub (`updates.rs`, notification seule).
+    /// Check at startup, at most once a day, whether a newer version is
+    /// published on GitHub (`updates.rs`, notification only).
     pub update_check: bool,
-    /// Horodatage (secondes Unix) de la dernière vérification automatique.
-    /// Non exposé au dialog Réglages.
+    /// Timestamp (Unix seconds) of the last automatic check.
+    /// Not exposed in the Settings (« Réglages ») dialog.
     pub update_checked_at: u64,
 }
 
@@ -121,7 +122,7 @@ impl Default for SettingsData {
 #[derive(Default)]
 pub struct SettingsState(pub Mutex<SettingsData>);
 
-/// Clé de comparaison de chemins insensible à la casse (système de fichiers Windows).
+/// Case-insensitive path comparison key (Windows file system).
 pub fn path_key(p: &Path) -> String {
     p.to_string_lossy().to_lowercase()
 }

@@ -1,4 +1,4 @@
-// Mini-client CDP pour produire les médias du README (pilotage sans souris globale).
+// Mini CDP client to produce the README media (driving without global mouse input).
 import { writeFileSync, mkdirSync } from "node:fs";
 
 export const PORT = process.env.KD_CDP_PORT ?? "9333";
@@ -7,7 +7,7 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function connect(match = (t) => t.url === "http://tauri.localhost/") {
   const targets = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
   const page = targets.find((t) => t.type === "page" && match(t));
-  if (!page) throw new Error("page introuvable : " + targets.map((t) => t.title).join(" | "));
+  if (!page) throw new Error("page not found: " + targets.map((t) => t.title).join(" | "));
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => ((ws.onopen = res), (ws.onerror = rej)));
   let nextId = 1;
@@ -50,7 +50,7 @@ export async function shot(c, file, clip) {
   writeFileSync(file, Buffer.from(r.data, "base64"));
 }
 
-// Enregistre via screencast : frames PNG + durées -> fichier concat ffmpeg.
+// Records via screencast: PNG frames + durations -> ffmpeg concat file.
 export async function record(c, dir, fn, { maxWidth = 1600, maxHeight = 1000 } = {}) {
   mkdirSync(dir, { recursive: true });
   const frames = [];
@@ -63,7 +63,7 @@ export async function record(c, dir, fn, { maxWidth = 1600, maxHeight = 1000 } =
   await fn();
   await sleep(400);
   await c.send("Page.stopScreencast");
-  frames.push({ data: frames.at(-1).data, t: frames.at(-1).t + 1.5 }); // tenue finale
+  frames.push({ data: frames.at(-1).data, t: frames.at(-1).t + 1.5 }); // final hold
   let concat = "";
   frames.forEach((f, i) => {
     const name = `f${String(i).padStart(4, "0")}.png`;
@@ -76,7 +76,7 @@ export async function record(c, dir, fn, { maxWidth = 1600, maxHeight = 1000 } =
   return frames.length;
 }
 
-// Souris CDP (coordonnées CSS du viewport) avec trajectoire interpolée.
+// CDP mouse (viewport CSS coordinates) with an interpolated path.
 export async function mouseMove(c, x0, y0, x1, y1, steps = 20, ms = 15, extra = {}) {
   for (let i = 1; i <= steps; i++) {
     const x = x0 + ((x1 - x0) * i) / steps, y = y0 + ((y1 - y0) * i) / steps;

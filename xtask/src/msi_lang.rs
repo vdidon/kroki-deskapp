@@ -1,35 +1,34 @@
-//! MSI multilingue : **un seul** `.msi` qui s'affiche dans la langue de
-//! l'interface Windows.
+//! Multilingual MSI: **a single** `.msi` that displays in the Windows
+//! display language.
 //!
-//! Tauri sait produire un MSI par langue (`wix.language` de
-//! tauri.msi.conf.json, un passage de `light` par langue avec son `.wxl`).
-//! On garde l'anglais comme base et on y **embarque** la différence vers
-//! chaque autre langue :
+//! Tauri can produce one MSI per language (`wix.language` in
+//! tauri.msi.conf.json, one `light` pass per language with its `.wxl`).
+//! We keep English as the base and **embed** the difference to every other
+//! language into it:
 //!
-//! 1. `torch -t language base.msi fr.msi` → transform `.mst` ;
-//! 2. la transform entre dans la table `_Storages` du MSI de base, sous le nom
-//!    décimal de son LCID (`1036`) — la base reçoit aussi la sienne (`1033`,
-//!    quasi vide), cible explicite du choix de l'anglais ;
-//! 3. la propriété *Template* du résumé liste toutes les langues
+//! 1. `torch -t language base.msi fr.msi` → `.mst` transform;
+//! 2. the transform goes into the base MSI's `_Storages` table, under the
+//!    decimal name of its LCID (`1036`) — the base also gets its own (`1033`,
+//!    nearly empty), the explicit target of the English choice;
+//! 3. the summary's *Template* property lists all the languages
 //!    (`x64;1033,1036`).
 //!
-//! Au lancement, Windows Installer applique de lui-même la transform dont le
-//! LCID correspond à la langue d'**interface** de l'utilisateur (pas aux formats
-//! régionaux) ; `msiexec /i … ProductLanguage=1033` impose un autre choix.
-//! `TRANSFORMS=:1033` ne le fait **pas** : la transform choisie par Windows est
-//! appliquée d'abord, celles de TRANSFORMS par-dessus. Le mécanisme n'est
-//! pas documenté formellement par Microsoft, mais il est stable et largement
-//! employé.
+//! At launch, Windows Installer applies by itself the transform whose LCID
+//! matches the user's **display** language (not the regional formats);
+//! `msiexec /i … ProductLanguage=1033` forces another choice.
+//! `TRANSFORMS=:1033` does **not**: the transform chosen by Windows is
+//! applied first, those of TRANSFORMS on top. The mechanism is not formally
+//! documented by Microsoft, but it is stable and widely used.
 //!
-//! Prérequis vérifié ici : les MSI d'un même build partagent leur ProductCode.
-//! Ce n'est pas acquis : `light`, qui résout `Product Id="*"`, tourne une fois
-//! par langue — d'où `TAURI_KROKI_DESK_PRODUCT_CODE`, tiré par `build_msi` et lu par
-//! src-tauri/wix/main.wxs. Une transform qui changerait le ProductCode ferait
-//! de chaque langue un produit distinct et casserait la mise à jour.
+//! Prerequisite checked here: the MSIs of one build share their ProductCode.
+//! This is not a given: `light`, which resolves `Product Id="*"`, runs once
+//! per language — hence `TAURI_KROKI_DESK_PRODUCT_CODE`, drawn by `build_msi`
+//! and read by src-tauri/wix/main.wxs. A transform that changed the ProductCode
+//! would make each language a distinct product and break the upgrade.
 //!
-//! `msi.dll` est appelée directement (crate `windows`) : les scripts du SDK
-//! (`WiSubStg.vbs`, `WiLangId.vbs`) sont rarement installés, et VBScript est en
-//! voie de retrait de Windows.
+//! `msi.dll` is called directly (`windows` crate): the SDK scripts
+//! (`WiSubStg.vbs`, `WiLangId.vbs`) are rarely installed, and VBScript is being
+//! removed from Windows.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -45,24 +44,25 @@ use windows::Win32::System::ApplicationInstallationAndServicing::{
 
 use crate::die;
 
-/// Langue d'un MSI produit par Tauri : suffixe du fichier et LCID.
+/// Language of an MSI produced by Tauri: file suffix and LCID.
 pub struct Lang {
     pub tag: &'static str,
     pub lcid: u32,
 }
 
-/// Base du MSI final : la langue de repli, appliquée quand aucune transform ne
-/// correspond à l'interface de l'utilisateur.
+/// Base of the final MSI: the fallback language, applied when no transform
+/// matches the user's display language.
 pub const BASE: Lang = Lang {
     tag: "en-US",
     lcid: 1033,
 };
 
-/// Langues embarquées en transforms — miroir des clés de `wix.language` dans
-/// tauri.msi.conf.json, hors base. Les langues CJK changent le codepage de la
-/// base (932, 936, 949) : `torch -t language` marque leur transform comme
-/// supprimant l'erreur `ChangeCodepage`, ce qui suffit à Windows Installer
-/// (prototype validé le 2026-10-19 — textes relus identiques au MSI natif).
+/// Languages embedded as transforms — mirror of the `wix.language` keys in
+/// tauri.msi.conf.json, base excluded. The CJK languages change the database
+/// codepage (932, 936, 949): `torch -t language` marks their transform as
+/// suppressing the `ChangeCodepage` error, which is enough for Windows
+/// Installer (prototype validated on 2026-10-19 — texts re-read identical to
+/// the native MSI).
 pub const OTHERS: &[Lang] = &[
     Lang {
         tag: "de-DE",
@@ -102,8 +102,8 @@ const PID_TEMPLATE: u32 = 7;
 const VT_LPSTR: u32 = 30;
 const ERROR_SUCCESS: u32 = 0;
 
-/// Fusionne les MSI par langue de `bundle_dir` (version `version`) en un MSI
-/// multilingue, écrit à côté, dont le chemin est renvoyé.
+/// Merges the per-language MSIs of `bundle_dir` (version `version`) into a
+/// multilingual MSI, written alongside, whose path is returned.
 pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -> PathBuf {
     let base = find(&format!("_{}.msi", BASE.tag));
     let base_code = product_code(&base);
@@ -127,11 +127,11 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
         let _ = std::fs::remove_file(&mst);
     };
 
-    // La base aussi a sa transform : le choix `ProductLanguage=1033` désigne
-    // ainsi une transform existante, comme celui de chaque autre langue (vérifié
-    // à la main : il force l'anglais sur un Windows français). torch refuse deux bases
-    // identiques : la copie porte une propriété de plus, inerte, qui est toute
-    // la différence.
+    // The base has its transform too: the `ProductLanguage=1033` choice thus
+    // names an existing transform, like that of every other language (checked
+    // by hand: it forces English on a French Windows). torch refuses two
+    // identical databases: the copy carries one extra, inert property, which is
+    // the whole difference.
     let tagged = bundle_dir.join(format!("{}.msi", BASE.lcid));
     std::fs::copy(&base, &tagged)
         .unwrap_or_else(|e| die(&format!("build-msi: cannot copy {}: {e}", base.display())));
@@ -171,7 +171,7 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
     out
 }
 
-/// `torch.exe` du WiX 3 que Tauri télécharge (`%LOCALAPPDATA%\tauri\WixTools314`).
+/// `torch.exe` of the WiX 3 that Tauri downloads (`%LOCALAPPDATA%\tauri\WixTools314`).
 fn torch_exe() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
@@ -186,7 +186,7 @@ fn torch_exe() -> PathBuf {
     torch
 }
 
-/// Poignée MSI fermée à la sortie de portée.
+/// MSI handle closed when it goes out of scope.
 struct Handle(MSIHANDLE);
 
 impl Drop for Handle {
@@ -221,11 +221,11 @@ fn view(db: &Handle, query: &str) -> Handle {
     Handle(h)
 }
 
-/// Lit le champ texte `field` d'un enregistrement.
+/// Reads the text field `field` of a record.
 fn record_string(rec: &Handle, field: u32) -> String {
     let mut len = 0u32;
     let mut empty = [0u16; 1];
-    // Premier appel : longueur (ERROR_MORE_DATA attendu), sans le zéro final.
+    // First call: length (ERROR_MORE_DATA expected), without the trailing zero.
     unsafe {
         MsiRecordGetStringW(
             rec.0,
@@ -254,7 +254,7 @@ fn product_code(msi: &Path) -> String {
     record_string(&Handle(rec), 1)
 }
 
-/// Ajoute la propriété `name` = `value` à la table `Property` de `msi`.
+/// Adds the property `name` = `value` to the `Property` table of `msi`.
 fn add_property(msi: &Path, name: &str, value: &str) {
     let db = open(msi, MSIDBOPEN_TRANSACT);
     {
@@ -276,7 +276,7 @@ fn add_property(msi: &Path, name: &str, value: &str) {
     check(unsafe { MsiDatabaseCommit(db.0) }, "property commit");
 }
 
-/// Ajoute `mst` à la table `_Storages` de `msi` sous le nom `name`.
+/// Adds `mst` to the `_Storages` table of `msi` under the name `name`.
 fn embed_transform(msi: &Path, name: &str, mst: &Path) {
     let db = open(msi, MSIDBOPEN_TRANSACT);
     {
@@ -298,7 +298,7 @@ fn embed_transform(msi: &Path, name: &str, mst: &Path) {
     check(unsafe { MsiDatabaseCommit(db.0) }, "transform commit");
 }
 
-/// *Template* du résumé : plateforme d'origine conservée, langues remplacées
+/// Summary *Template*: original platform kept, languages replaced
 /// (`x64;1033,1036`).
 fn set_languages(msi: &Path, lcids: &[String]) {
     let db = open(msi, MSIDBOPEN_TRANSACT);

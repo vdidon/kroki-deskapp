@@ -1,12 +1,12 @@
-//! En plus de `tauri_build`, empaquette le plugin `latex-doc` (`plugins/latex-doc/`)
-//! en `.kdext` dans `OUT_DIR`, que `plugins.rs` embarque dans le binaire : c'est
-//! la source de `plugins::seed_bundled` quand aucun installeur n'a posé de
-//! dossier `bundled-plugins/` (portable, AppImage, debug).
+//! In addition to `tauri_build`, packs the `latex-doc` plugin (`plugins/latex-doc/`)
+//! into a `.kdext` in `OUT_DIR`, which `plugins.rs` embeds in the binary: it is
+//! the source for `plugins::seed_bundled` when no installer has laid down a
+//! `bundled-plugins/` folder (portable, AppImage, debug).
 //!
-//! L'empaquetage vit ici, et non dans xtask ou `build_dist.py`, pour que tous les
-//! chemins de compilation (`cargo run-app`, `build-app`, le `tauri build` des
-//! installeurs, `cargo build` brut, conteneur Linux) produisent le même binaire,
-//! sans étape préalable à respecter.
+//! The packing lives here, and not in xtask or `build_dist.py`, so that every
+//! build path (`cargo run-app`, `build-app`, the installers' `tauri build`, a bare
+//! `cargo build`, the Linux container) produces the same binary, with no
+//! prerequisite step to remember.
 
 use std::collections::HashSet;
 use std::io::Write;
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 use zip::write::SimpleFileOptions;
 
-/// Plugin embarqué ; son archive est `OUT_DIR/<id>.kdext`.
+/// Embedded plugin; its archive is `OUT_DIR/<id>.kdext`.
 const EMBEDDED: &str = "latex-doc";
 
 fn main() {
@@ -22,10 +22,10 @@ fn main() {
     tauri_build::build()
 }
 
-/// Même sélection que `pack_plugin.py` avec `packInclude` : `manifest.json` et
-/// l'entry en tête, puis la liste, dédoublonnée. Seule cette branche est
-/// reproduite — sans `packInclude`, le build échoue plutôt que de recopier les
-/// exclusions du script Python, deux règles qui finiraient par diverger.
+/// Same selection as `pack_plugin.py` with `packInclude`: `manifest.json` and
+/// the entry first, then the list, deduplicated. Only this branch is
+/// reproduced — without `packInclude`, the build fails rather than copying the
+/// Python script's exclusions, two rules that would end up diverging.
 fn pack_embedded_plugin() {
     let src = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
         .join("../plugins")
@@ -55,7 +55,7 @@ fn pack_embedded_plugin() {
     let mut seen = HashSet::new();
     files.retain(|f| seen.insert(f.clone()));
 
-    // Date fixe : l'archive ne change que si son contenu change.
+    // Fixed date: the archive only changes when its content does.
     let opts = SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated)
         .last_modified_time(zip::DateTime::default());

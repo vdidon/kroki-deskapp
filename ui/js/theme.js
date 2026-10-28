@@ -1,14 +1,14 @@
 // @ts-check
-// Thème de l'interface : « auto » (suit le système) | « light » | « dark ».
+// Interface theme: "auto" (follows the system) | "light" | "dark".
 //
-// Stratégie : en mode « auto » on ne pose AUCUN attribut sur <html> — la palette,
-// le surlignage de code et la carte des diagrammes suivent alors `@media
-// (prefers-color-scheme)` en pur CSS (premier rendu sans flash + suivi automatique
-// des bascules système). Seuls « light »/« dark » forcent un override via
-// [data-theme], qui neutralise les media-queries (cf. app.css). La CSP interdisant
-// tout <script> inline, on ne peut pas appliquer l'override avant le premier paint :
-// un utilisateur qui force un thème contraire à son système verra un bref flash —
-// accepté, car le cas par défaut (auto) reste sans flash.
+// Strategy: in "auto" mode NO attribute is set on <html> — the palette, the code
+// highlighting and the diagram map then follow `@media (prefers-color-scheme)`
+// in pure CSS (first render without flash + automatic tracking of system
+// switches). Only "light"/"dark" force an override via [data-theme], which
+// neutralizes the media queries (cf. app.css). Since the CSP forbids any inline
+// <script>, the override cannot be applied before the first paint: a user who
+// forces a theme opposite to their system will see a brief flash — accepted,
+// because the default case (auto) stays flash-free.
 
 const root = document.documentElement;
 const mql = window.matchMedia?.("(prefers-color-scheme: dark)");
@@ -20,8 +20,8 @@ let currentMode = "auto";
 /** @type {(() => void) | null} */
 let onSystemChange = null;
 
-// highlight.js : deux feuilles gouvernées par media-query en « auto », forcées via
-// l'attribut `media` en override explicite.
+// highlight.js: two stylesheets driven by media query in "auto", forced via the
+// `media` attribute on an explicit override.
 /** @param {ThemeMode} mode */
 function applyHljs(mode) {
   const light = /** @type {HTMLLinkElement | null} */ (document.getElementById("hljs-light"));
@@ -36,7 +36,7 @@ function applyHljs(mode) {
   }
 }
 
-/** @param {string} mode Réglage persisté ; toute valeur inconnue vaut « auto ». */
+/** @param {string} mode Persisted setting; any unknown value means "auto". */
 export function applyTheme(mode) {
   currentMode = mode === "light" || mode === "dark" ? mode : "auto";
   if (currentMode === "auto") root.removeAttribute("data-theme");
@@ -44,8 +44,8 @@ export function applyTheme(mode) {
   applyHljs(currentMode);
 }
 
-// Thème effectif courant (résout « auto » via la préférence système). Utilisé par
-// render.js pour figer la couleur de texte/grilles d'une figure Plotly au rendu.
+// Current effective theme (resolves "auto" via the system preference). Used by
+// render.js to freeze the text/grid color of a Plotly figure at render time.
 export function docIsDark() {
   const explicit = root.dataset.theme;
   if (explicit === "dark") return true;
@@ -53,9 +53,9 @@ export function docIsDark() {
   return mql?.matches ?? false;
 }
 
-// À appeler une fois au boot : suit les bascules système, mais seulement en mode
-// « auto » (sinon l'override prime). Le callback sert à réaccorder les figures
-// Plotly — leurs couleurs sont figées au rendu, alors que la palette CSS suit seule.
+// Call once at boot: follows system switches, but only in "auto" mode
+// (otherwise the override wins). The callback re-tunes the Plotly figures —
+// their colors are frozen at render time, whereas the CSS palette follows on its own.
 /** @param {() => void} systemChangeCallback */
 export function initTheme(systemChangeCallback) {
   onSystemChange = systemChangeCallback;

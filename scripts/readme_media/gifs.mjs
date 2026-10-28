@@ -1,4 +1,4 @@
-// GIF du README : screencast CDP (curseur factice injecté, CDP n'en dessine pas).
+// README GIFs: CDP screencast (fake cursor injected, CDP does not draw one).
 import { readFileSync, writeFileSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -99,7 +99,7 @@ if (what === "live") {
 }
 
 if (what === "plotly") {
-  // Le binaire 3.28.0 n'embarque pas vendor/plotly.min.js : injection depuis le dépôt.
+  // The 3.28.0 binary does not embed vendor/plotly.min.js: inject it from the repo.
   const has = await c.evaluate(`typeof window.Plotly`);
   if (has === "undefined") {
     const code = readFileSync("../../ui/vendor/plotly.min.js", "utf8");
@@ -116,7 +116,7 @@ if (what === "plotly") {
   await record(c, TMP, async () => {
     await sleep(800);
     await moveTo({ x: g.x, y: g.y - 40 });
-    await sleep(1200); // survol : infobulle
+    await sleep(1200); // hover: tooltip
     await moveTo({ x: g.x + 60, y: g.y + 60 }, 15);
     await sleep(1200);
     const start = { x: g.x - 160, y: g.y + 80 };

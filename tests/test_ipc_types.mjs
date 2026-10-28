@@ -1,16 +1,16 @@
-// Cohérence du contrat IPC typé (types/ipc.d.ts) avec le Rust et le frontend.
+// Consistency of the typed IPC contract (types/ipc.d.ts) with the Rust and the frontend.
 //
-// Autonome : ni application, ni npm. Vérifie que
-//   1. les commandes de `Commands` sont exactement celles de `generate_handler!`
-//      (src-tauri/src/main.rs) ;
-//   2. leurs arguments sont ceux de la fonction Rust, en camelCase, hors
-//      paramètres injectés par Tauri (AppHandle, WebviewWindow, Window, State) ;
-//      un `Option<…>` Rust doit être optionnel (`?`) côté TypeScript, et
-//      réciproquement ;
-//   3. toute commande `invoke("…")` du frontend (ui/, hors vendor) existe —
-//      `tsc` ne le vérifie que dans les fichiers `// @ts-check`.
-// Les types de retour, eux, ne sont pas comparés : relire la struct Rust en
-// modifiant une entrée.
+// Standalone: no application, no npm. Checks that
+//   1. the commands of `Commands` are exactly those of `generate_handler!`
+//      (src-tauri/src/main.rs);
+//   2. their arguments are those of the Rust function, in camelCase, excluding
+//      parameters injected by Tauri (AppHandle, WebviewWindow, Window, State);
+//      a Rust `Option<…>` must be optional (`?`) on the TypeScript side, and
+//      vice versa;
+//   3. every frontend `invoke("…")` command (ui/, excluding vendor) exists —
+//      `tsc` only checks that in `// @ts-check` files.
+// Return types, on the other hand, are not compared: re-read the Rust struct
+// when changing an entry.
 //
 //   node tests/test_ipc_types.mjs
 
@@ -42,16 +42,16 @@ function listFiles(dir, ext) {
 const camel = (s) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 const INJECTED = /^(AppHandle|WebviewWindow|Window|State\b)/;
 
-// --- Rust : commandes enregistrées et leurs paramètres -----------------------
+// --- Rust: registered commands and their parameters -------------------------
 
 const mainRs = readFileSync(join(SRC, "main.rs"), "utf8");
 const handler = mainRs.match(/generate_handler!\[([\s\S]*?)\]/);
-if (!handler) throw new Error("generate_handler! introuvable dans main.rs");
+if (!handler) throw new Error("generate_handler! not found in main.rs");
 const registered = new Set(
   [...handler[1].replace(/\/\/[^\n]*/g, "").matchAll(/\b\w+::(\w+)/g)].map((m) => m[1]),
 );
 
-/** nom → Map(argCamel → optionnel) */
+/** name → Map(argCamel → optional) */
 const rust = new Map();
 for (const file of listFiles(SRC, ".rs")) {
   const src = readFileSync(file, "utf8");
@@ -67,14 +67,14 @@ for (const file of listFiles(SRC, ".rs")) {
   }
 }
 
-// --- TypeScript : interface Commands ----------------------------------------
+// --- TypeScript: Commands interface ------------------------------------------
 
 const ipc = readFileSync(join(ROOT, "types", "ipc.d.ts"), "utf8");
 const body = ipc.match(/export interface Commands \{([\s\S]*?)\n\}/);
-if (!body) throw new Error("interface Commands introuvable dans types/ipc.d.ts");
-/** nom → Map(arg → optionnel) */
+if (!body) throw new Error("interface Commands not found in types/ipc.d.ts");
+/** name → Map(arg → optional) */
 const ts = new Map();
-// Une entrée : `nom: { args: NoArgs | { … }; ret: … };`, éventuellement sur plusieurs lignes.
+// One entry: `name: { args: NoArgs | { … }; ret: … };`, possibly spanning several lines.
 for (const m of body[1].replace(/\/\/[^\n]*/g, "").matchAll(/(\w+):\s*\{\s*args:\s*(NoArgs|\{([\s\S]*?)\})\s*;\s*ret:/g)) {
   const args = new Map();
   if (m[2] !== "NoArgs") {
@@ -83,13 +83,13 @@ for (const m of body[1].replace(/\/\/[^\n]*/g, "").matchAll(/(\w+):\s*\{\s*args:
   ts.set(m[1], args);
 }
 
-console.log("Commandes enregistrées");
+console.log("Registered commands");
 for (const name of registered) {
-  if (!rust.has(name)) fail(`${name} : enregistrée mais aucune fonction #[tauri::command] trouvée`);
-  if (!ts.has(name)) fail(`${name} : absente de Commands (types/ipc.d.ts)`);
+  if (!rust.has(name)) fail(`${name}: registered but no #[tauri::command] function found`);
+  if (!ts.has(name)) fail(`${name}: missing from Commands (types/ipc.d.ts)`);
 }
 for (const name of ts.keys()) {
-  if (!registered.has(name)) fail(`${name} : dans Commands mais pas dans generate_handler!`);
+  if (!registered.has(name)) fail(`${name}: in Commands but not in generate_handler!`);
 }
 
 console.log("Arguments");
@@ -97,23 +97,23 @@ for (const [name, tsArgs] of ts) {
   const rsArgs = rust.get(name);
   if (!rsArgs) continue;
   for (const [arg, optional] of rsArgs) {
-    if (!tsArgs.has(arg)) fail(`${name} : argument « ${arg} » absent côté TypeScript`);
+    if (!tsArgs.has(arg)) fail(`${name}: argument "${arg}" missing on the TypeScript side`);
     else if (tsArgs.get(arg) !== optional)
-      fail(`${name} : « ${arg} » ${optional ? "est un Option<…> Rust, doit être optionnel" : "est requis côté Rust, pas optionnel"}`);
+      fail(`${name}: "${arg}" ${optional ? "is a Rust Option<…>, must be optional" : "is required on the Rust side, not optional"}`);
   }
   for (const arg of tsArgs.keys()) {
-    if (!rsArgs.has(arg)) fail(`${name} : argument « ${arg} » inconnu du Rust`);
+    if (!rsArgs.has(arg)) fail(`${name}: argument "${arg}" unknown to Rust`);
   }
 }
 
-console.log("Appels du frontend");
+console.log("Frontend calls");
 let calls = 0;
 for (const file of listFiles(join(ROOT, "ui"), ".js")) {
   for (const m of readFileSync(file, "utf8").matchAll(/\binvoke\(\s*["'](\w+)["']/g)) {
     calls++;
-    if (!ts.has(m[1])) fail(`${relative(ROOT, file)} : invoke("${m[1]}") hors de Commands`);
+    if (!ts.has(m[1])) fail(`${relative(ROOT, file)}: invoke("${m[1]}") not in Commands`);
   }
 }
 
-console.log(failures ? `\n${failures} échec(s)` : `\nOK — ${ts.size} commandes, ${calls} appels invoke`);
+console.log(failures ? `\n${failures} failure(s)` : `\nOK — ${ts.size} commands, ${calls} invoke calls`);
 process.exit(failures ? 1 : 0);

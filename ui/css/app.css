@@ -11,23 +11,23 @@
   --error: #d1242f;
   --ok: #1a7f37;
   --warn: #9a6700;
-  --word-hl: rgba(255, 165, 0, 0.42); /* surlignage des occurrences du mot sélectionné */
-  --search-hl: rgba(88, 86, 214, 0.28); /* surlignage des résultats de la recherche globale */
-  --find-cur: rgba(255, 166, 0, 0.62); /* occurrence courante de la recherche dans le document */
+  --word-hl: rgba(255, 165, 0, 0.42); /* highlighting of occurrences of the selected word */
+  --search-hl: rgba(88, 86, 214, 0.28); /* highlighting of global search results */
+  --find-cur: rgba(255, 166, 0, 0.62); /* current occurrence of the in-document search */
   color-scheme: light;
 }
 
-/* Langue : fenêtre masquée jusqu'à la traduction du HTML statique (initI18n,
-   i18n.js), pour ne pas montrer le repli anglais d'index.html. */
+/* Language: window hidden until the static HTML is translated (initI18n,
+   i18n.js), so the English fallback of index.html is not shown. */
 :root[data-i18n-pending] body {
   visibility: hidden;
 }
 
-/* Thème : « auto » = AUCUN attribut [data-theme] → la palette sombre suit le système
-   en pur CSS (premier rendu sans flash, suivi automatique des bascules système).
-   Les overrides « clair »/« sombre » (Réglages → Thème) posent [data-theme] et
-   neutralisent la media-query. Les deux blocs sombres ci-dessous DOIVENT rester
-   synchronisés (CSS sans mixin). */
+/* Theme: "auto" = NO [data-theme] attribute → the dark palette follows the system
+   in pure CSS (first paint without flash, automatic tracking of system switches).
+   The "light"/"dark" overrides (Settings (« Réglages ») → Theme) set [data-theme] and
+   neutralize the media query. The two dark blocks below MUST be kept
+   in sync (CSS has no mixins). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --bg: #0d1117;
@@ -66,24 +66,24 @@
   color-scheme: dark;
 }
 
-/* Surlignage « toutes les occurrences du mot sélectionné » (cf. js/findword.js).
-   Custom Highlight API : peint SOUS la sélection native → le mot sélectionné garde
-   son bleu de sélection. Seules background-color / color / text-decoration sont
-   honorées sur ::highlight() ; on se limite au fond translucide pour préserver la
-   lisibilité du texte par-dessous. */
+/* Highlighting of "all occurrences of the selected word" (cf. js/findword.js).
+   Custom Highlight API: painted UNDER the native selection → the selected word keeps
+   its selection blue. Only background-color / color / text-decoration are
+   honored on ::highlight(); we stick to a translucent background to preserve the
+   readability of the text underneath. */
 ::highlight(word-occurrences) {
   background-color: var(--word-hl);
 }
 
-/* Surlignage des occurrences de la recherche globale (cf. js/globalsearch.js) :
-   même API, nom distinct — coexiste avec le surlignage du mot sélectionné. */
+/* Highlighting of global search occurrences (cf. js/globalsearch.js):
+   same API, distinct name — coexists with the selected-word highlighting. */
 ::highlight(search-occurrences) {
   background-color: var(--search-hl);
 }
 
-/* Recherche dans le document (Ctrl+F, cf. js/docsearch.js) : toutes les
-   occurrences dans la teinte de la recherche, la courante par-dessus (priority
-   plus élevée côté JS) dans une teinte contrastée. */
+/* In-document search (Ctrl+F, cf. js/docsearch.js): all occurrences in the
+   search tint, the current one on top (higher priority set on the JS side) in
+   a contrasting tint. */
 ::highlight(find-occurrences) {
   background-color: var(--search-hl);
 }
@@ -115,7 +115,7 @@ body {
   display: none !important;
 }
 
-/* ---------- Barre d'onglets ---------- */
+/* ---------- Tab bar ---------- */
 
 #tabbar {
   min-height: 38px;
@@ -126,22 +126,22 @@ body {
   padding: 0 4px;
 }
 
-/* Les onglets gardent leur largeur naturelle et débordent sur une 2ᵉ ligne
-   quand la 1ʳᵉ est pleine (la barre grandit) ; au-delà de 2 lignes, tabs.js
-   pose --tab-max pour les compresser uniformément sur exactement 2 lignes.
-   Layout inline (onglets inline-flex) et non flex-wrap : seules les line
-   boxes inline contournent le float des boutons d'action — la 1ʳᵉ ligne
-   s'arrête avant eux, les suivantes occupent toute la largeur. Ni overflow
-   ni autre créateur de BFC ici, sinon le contournement du float est perdu. */
+/* Tabs keep their natural width and wrap onto a 2nd line
+   when the 1st is full (the bar grows); beyond 2 lines, tabs.js
+   sets --tab-max to compress them uniformly onto exactly 2 lines.
+   Inline layout (inline-flex tabs) rather than flex-wrap: only inline line
+   boxes flow around the action buttons' float — the 1st line
+   stops before them, the following ones take the full width. No overflow
+   nor any other BFC creator here, otherwise the float wrapping is lost. */
 #tabs {
   padding-top: 1px;
-  line-height: 0; /* pas de strut : la hauteur de ligne = celle des onglets */
+  line-height: 0; /* no strut: line height = tab height */
 }
 
 .tab {
   display: inline-flex;
   vertical-align: bottom;
-  margin: 4px 1px 0 0; /* ex-gap 4px 1px de #tabs (le padding-top complète à 5px) */
+  margin: 4px 1px 0 0; /* former gap 4px 1px of #tabs (the padding-top makes up the 5px) */
   line-height: normal;
   align-items: center;
   gap: 4px;
@@ -213,7 +213,7 @@ body.tab-dragging * {
   opacity: 1;
 }
 
-/* Menu contextuel d'onglet (clic droit), positionné par tabs.js. */
+/* Tab context menu (right-click), positioned by tabs.js. */
 #tab-menu {
   position: fixed;
   z-index: 30;
@@ -262,7 +262,7 @@ body.tab-dragging * {
 }
 
 #tabbar-actions {
-  float: right; /* la 1ʳᵉ ligne d'onglets le contourne, les suivantes passent dessous */
+  float: right; /* the 1st line of tabs flows around it, the following ones go underneath */
   display: flex;
   align-items: center;
   gap: 2px;
@@ -293,7 +293,7 @@ body.tab-dragging * {
   color: #fff;
 }
 
-/* ---------- Contenu ---------- */
+/* ---------- Content ---------- */
 
 #content {
   flex: 1;
@@ -306,9 +306,9 @@ body.tab-dragging * {
   inset: 0;
 }
 
-/* Voile de chargement (cf. js/loading.js). `pointer-events: none` : pendant un
-   re-render (fichier modifié sur disque) le contenu précédent reste affiché
-   dessous et doit rester défilable. */
+/* Loading overlay (cf. js/loading.js). `pointer-events: none`: during a
+   re-render (file modified on disk) the previous content stays displayed
+   underneath and must remain scrollable. */
 #loading-overlay {
   position: absolute;
   inset: 0;
@@ -317,8 +317,8 @@ body.tab-dragging * {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  /* Repli opaque pour les WebKitGTK sans `color-mix` (Linux) : le voile masque
-     alors le contenu au lieu de le laisser transparaître, sans autre effet. */
+  /* Opaque fallback for WebKitGTK builds without `color-mix` (Linux): the overlay
+     then hides the content instead of letting it show through, with no other effect. */
   background: var(--bg);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
 }
@@ -339,9 +339,9 @@ body.tab-dragging * {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
 }
 
-/* L'animation ne porte que sur `transform` : elle tourne sur le compositeur et
-   survit donc au blocage du thread principal par la phase de rendu synchrone.
-   Une animation de `border-color`, `width` ou `background` se figerait. */
+/* The animation only targets `transform`: it runs on the compositor and
+   therefore survives the main thread being blocked by the synchronous render phase.
+   An animation of `border-color`, `width` or `background` would freeze. */
 .loading-spinner {
   width: 26px;
   height: 26px;
@@ -360,8 +360,8 @@ body.tab-dragging * {
   to { transform: rotate(360deg); }
 }
 
-/* Mouvement réduit : la rotation cède la place à une pulsation d'opacité —
-   également compositée, donc toujours visible pendant le blocage. */
+/* Reduced motion: the rotation gives way to an opacity pulse —
+   also composited, hence still visible during the blocking. */
 @media (prefers-reduced-motion: reduce) {
   .loading-spinner {
     animation: loading-pulse 1.4s ease-in-out infinite;
@@ -375,20 +375,20 @@ body.tab-dragging * {
   }
 }
 
-/* Deux zooms se composent sur #views (cf. setZoom/setPageZoom, main.js), tous
-   deux par la propriété `zoom` : le zoom texte (Ctrl+molette) et le zoom de
-   page (Maj+molette). Le `zoom` CSS seul ne fait qu'un zoom texte : la colonne
-   logique rétrécit d'autant que l'échelle grandit, si bien qu'une figure en
-   `max-width: 100%` garde exactement sa taille à l'écran et que seul le texte
-   grossit (en refluant). Le zoom de page corrige cela en mettant les enfants de
-   la vue en page à la largeur qu'ils auraient à l'échelle 1 : `--page-w` est la
-   largeur de la colonne de lecture *avant* zoom de page, exprimée dans le repère
-   logique courant (100 % de la colonne rétrécie × p, plus le padding horizontal
-   qui a lui aussi été divisé par p). La mise en page est alors identique à
-   toutes les échelles — aucun reflux — et le contenu, p fois plus large que la
-   vue, déborde en défilement horizontal : c'est ce qui permet de parcourir une
-   figure trop dense pour tenir en un écran. `--page-zoom` vaut 1 par défaut
-   (export HTML, tests hors app) : `--page-w` se réduit alors à 100 %. */
+/* Two zooms compose on #views (cf. setZoom/setPageZoom, main.js), both
+   through the `zoom` property: the text zoom (Ctrl+wheel) and the page
+   zoom (Shift+wheel). CSS `zoom` alone is only a text zoom: the logical
+   column shrinks as much as the scale grows, so a figure at
+   `max-width: 100%` keeps exactly its on-screen size and only the text
+   grows (while reflowing). The page zoom fixes this by giving the children of
+   the view the width they would have at scale 1: `--page-w` is the
+   width of the reading column *before* page zoom, expressed in the current
+   logical coordinate space (100% of the shrunken column × p, plus the horizontal
+   padding, which was also divided by p). The layout is then identical at
+   every scale — no reflow — and the content, p times wider than the
+   view, overflows into horizontal scrolling: this is what lets you browse a
+   figure too dense to fit on one screen. `--page-zoom` defaults to 1
+   (HTML export, tests outside the app): `--page-w` then reduces to 100%. */
 .doc-view {
   --pad-x: 38px;
   --page-w: calc(100% * var(--page-zoom, 1) + 2 * var(--pad-x) * (var(--page-zoom, 1) - 1));
@@ -400,40 +400,41 @@ body.tab-dragging * {
   outline: none;
 }
 
-/* Colonne de lecture : `min(920px, --page-w)` centrée dans la page à l'échelle
-   1 — l'équivalent exact de `max-width: 920px; margin: 0 auto` tant que
-   --page-zoom vaut 1, mais qui reste centré dans la *page* (et non dans la vue
-   rétrécie) sous zoom de page. Un `max-width` ne suffirait pas : la marge
-   `auto` d'un bloc plus large que son conteneur tombe à zéro. */
+/* Reading column: `min(920px, --page-w)` centered in the page at scale
+   1 — the exact equivalent of `max-width: 920px; margin: 0 auto` as long as
+   --page-zoom is 1, but it stays centered in the *page* (not in the shrunken
+   view) under page zoom. A `max-width` would not be enough: the `auto` margin
+   of a block wider than its container falls to zero. */
 .doc-view > .markdown-body {
   width: min(920px, var(--page-w));
   margin: 0 max(0px, calc((var(--page-w) - 920px) / 2));
 }
 
-/* Vue source : pleine largeur de la page à l'échelle 1 (le <pre> ne reflue pas
-   de toute façon, ses longues lignes débordent déjà). */
+/* Source view: full page width at scale 1 (the <pre> does not reflow
+   anyway, its long lines already overflow). */
 .doc-view > .source-view {
   min-width: var(--page-w);
 }
 
-/* Vue code source : le padding de lecture est taillé pour le preview centré ;
-   sur du code pleine largeur il ne fait qu'éloigner la 1ʳᵉ ligne du haut et la
-   gouttière des numéros du bord gauche (l'écart est amplifié par le zoom de
-   page). On le ramène à une simple respiration. */
+/* Source code view: the reading padding is tailored to the centered preview;
+   on full-width code it only pushes the 1st line away from the top and the
+   line-number gutter away from the left edge (the gap is amplified by page
+   zoom). We bring it down to a bit of breathing room. */
 .doc-view:has(> .source-view) {
   --pad-x: 12px;
   padding: 8px var(--pad-x) 60px;
 }
 
-/* Vue HTML (page statique dans une iframe sandboxée, cf. renderHtmlDocument) :
-   l'iframe couvre la vue bord à bord (position absolue : elle ignore le padding
-   de lecture, la page exportée porte déjà le sien) et défile en interne. Fond
-   blanc : un HTML tiers sans fond resterait sinon transparent sur le thème
-   sombre de l'app (texte noir illisible). Sous zoom de page, l'iframe garde la
-   largeur de la vue à l'échelle 1 (son contenu ne reflue pas et déborde en
-   défilement horizontal dans la vue) mais la hauteur de la vue : le défilement
-   vertical reste interne à l'iframe, comme sans zoom. Le conteneur est en
-   position absolue : 100 % vise la boîte de padding, sans terme de padding. */
+/* HTML view (static page in a sandboxed iframe, cf. renderHtmlDocument):
+   the iframe covers the view edge to edge (absolute position: it ignores the
+   reading padding, the exported page already carries its own) and scrolls
+   internally. White background: a third-party HTML with no background would
+   otherwise stay transparent on the app's dark theme (unreadable black text).
+   Under page zoom, the iframe keeps the view's width at scale 1 (its content
+   does not reflow and overflows into horizontal scrolling within the view)
+   but the view's height: vertical scrolling stays internal to the iframe, as
+   without zoom. The container is absolutely positioned: 100% targets the
+   padding box, with no padding term. */
 .doc-view > iframe.html-view {
   position: absolute;
   inset: 0;
@@ -443,20 +444,20 @@ body.tab-dragging * {
   background: #fff;
 }
 
-/* Mode « pleine largeur » (bouton Étendre) : le preview abandonne son plafond de
-   lecture pour occuper toute la colonne. Utile au dézoom, où la largeur logique
-   grandit (zoom CSS sur #views) et laisse sinon de larges marges. La vue source est
-   déjà pleine largeur (.source-view), donc non concernée. La largeur est celle
-   de la page à l'échelle 1 (cf. --page-w) : sous zoom de page, la colonne
-   étendue s'agrandit comme le reste. */
+/* "Full width" mode (Expand button): the preview drops its reading cap
+   to fill the whole column. Useful when zooming out, where the logical width
+   grows (CSS zoom on #views) and would otherwise leave wide margins. The source
+   view is already full width (.source-view), so unaffected. The width is that
+   of the page at scale 1 (cf. --page-w): under page zoom, the expanded
+   column grows like everything else. */
 #views.fit-width .doc-view > .markdown-body {
   width: var(--page-w);
   margin: 0;
 }
 
-/* Actions de vue : pile de boutons flottants dans le coin haut-droit de la zone de
-   rendu (sommaire au-dessus, bascule code source en dessous). Hors de #views (non
-   zoomée), donc insensible au zoom de page. */
+/* View actions: stack of floating buttons in the top-right corner of the
+   render area (table of contents above, source code toggle below). Outside #views (not
+   zoomed), hence insensitive to page zoom. */
 #view-actions {
   position: absolute;
   top: 10px;
@@ -493,7 +494,7 @@ body.tab-dragging * {
   opacity: 1;
 }
 
-/* Panneau du sommaire : déroulé à GAUCHE des boutons (ancré à droite), défilable. */
+/* Table of contents panel: unrolled to the LEFT of the buttons (right-anchored), scrollable. */
 #toc-panel {
   position: absolute;
   top: 10px;
@@ -542,8 +543,8 @@ body.tab-dragging * {
   font-size: 13px;
 }
 
-/* ---------- Recherche dans les documents ouverts (cf. js/globalsearch.js) ----------
-   Panneau flottant à la même ancre que le sommaire (exclusifs l'un de l'autre). */
+/* ---------- Search across open documents (cf. js/globalsearch.js) ----------
+   Floating panel at the same anchor as the table of contents (mutually exclusive). */
 #search-panel {
   position: absolute;
   top: 10px;
@@ -561,9 +562,9 @@ body.tab-dragging * {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
 
-/* Champ de recherche : socle commun aux deux recherches (celle-ci et la barre
-   Ctrl+F). La bordure est portée par l'enveloppe, pas par l'input : les options
-   `Aa` `ab` `.*` sont à l'INTÉRIEUR du champ, collées à droite. */
+/* Search field: common base for both searches (this one and the Ctrl+F bar).
+   The border is carried by the wrapper, not the input: the `Aa` `ab` `.*`
+   options sit INSIDE the field, flush right. */
 .search-row {
   display: flex;
   align-items: center;
@@ -587,8 +588,8 @@ body.tab-dragging * {
   border-color: var(--accent);
 }
 
-/* Motif invalide (expression régulière) : le champ vire au rouge, comme le
-   message de statut. */
+/* Invalid pattern (regular expression): the field turns red, like the
+   status message. */
 .search-field:has(input.invalid) {
   border-color: var(--error);
 }
@@ -639,14 +640,14 @@ body.tab-dragging * {
   color: #fff;
 }
 
-/* « Mot entier » : le soulignement est l'icône (même convention que VS Code). */
+/* "Whole word" (« Mot entier »): the underline is the icon (same convention as VS Code). */
 .opt-word {
   border-bottom: 1px solid currentColor;
   line-height: 1;
 }
 
-/* Boutons carrés d'une barre de recherche (fermer, occurrence précédente /
-   suivante) — même gabarit que les options, hors du champ. */
+/* Square buttons of a search bar (close, previous /
+   next occurrence) — same size as the options, outside the field. */
 .search-btn {
   display: flex;
   align-items: center;
@@ -765,9 +766,9 @@ body.tab-dragging * {
   font-style: italic;
 }
 
-/* ---------- Recherche dans le document affiché (cf. js/docsearch.js) ----------
-   Barre compacte à la même ancre que le sommaire et la recherche multi-documents
-   (les trois sont exclusifs) — elle remplace la barre native de la webview. */
+/* ---------- Search in the displayed document (cf. js/docsearch.js) ----------
+   Compact bar at the same anchor as the table of contents and the multi-document search
+   (the three are mutually exclusive) — it replaces the webview's native bar. */
 #find-bar {
   position: absolute;
   top: 10px;
@@ -801,11 +802,11 @@ body.tab-dragging * {
   color: var(--error);
 }
 
-/* Repères des occurrences sur la barre de défilement de la vue (cf.
-   drawRuler, js/docsearch.js) : position et taille posées en JS sur la piste
-   mesurée. Au-dessus de la vue mais sous la barre de recherche, et transparent
-   aux clics — le pouce se saisit au travers. L'occurrence courante reprend la
-   teinte de son surlignage, opaque pour rester lisible sur le pouce. */
+/* Occurrence ticks on the view's scrollbar (cf.
+   drawRuler, js/docsearch.js): position and size set in JS on the measured
+   track. Above the view but below the search bar, and transparent to
+   clicks — the thumb can be grabbed through it. The current occurrence reuses
+   the tint of its highlight, opaque to stay readable over the thumb. */
 #find-ruler {
   position: absolute;
   z-index: 5;
@@ -830,11 +831,11 @@ body.tab-dragging * {
   opacity: 1;
 }
 
-/* Vue code source : monospace, une ligne logique = une ligne visuelle (pre, pas de
-   retour à la ligne) pour un alignement fiable avec le preview. Lecture seule. */
+/* Source code view: monospace, one logical line = one visual line (pre, no
+   line wrapping) for reliable alignment with the preview. Read-only. */
 .source-view {
-  /* Pleine largeur, aligné à gauche : le preview est centré (max-width 920px),
-     mais le code source profite de toute la largeur pour les longues lignes. */
+  /* Full width, left-aligned: the preview is centered (max-width 920px),
+     but the source code makes use of the full width for long lines. */
   font-family: "Cascadia Code", "Consolas", ui-monospace, monospace;
   font-size: 13px;
   line-height: 1.5;
@@ -842,17 +843,17 @@ body.tab-dragging * {
   tab-size: 4;
   color: var(--fg);
   counter-reset: srcline;
-  margin: 0; /* le <pre> hérite sinon d'une marge verticale du user-agent */
+  margin: 0; /* the <pre> would otherwise inherit a vertical user-agent margin */
 }
 
 .source-view .src-line {
   counter-increment: srcline;
 }
 
-/* Gouttière des numéros : largeur fixe (alignement des lignes de code entre
-   elles) mais dimensionnée sur le nombre de chiffres réel du document —
-   `--src-gutter` est posée par renderSource. Un document de 36 lignes ne réserve
-   donc pas la place de 5 chiffres. */
+/* Line-number gutter: fixed width (so code lines align with each other)
+   but sized on the document's actual digit count —
+   `--src-gutter` is set by renderSource. A 36-line document therefore does not
+   reserve room for 5 digits. */
 .source-view .src-line::before {
   content: counter(srcline);
   display: inline-block;
@@ -864,8 +865,8 @@ body.tab-dragging * {
   user-select: none;
 }
 
-/* Vue debug « markdown intermédiaire » (builds debug uniquement) : liseré
-   d'accent pour la distinguer de la vraie vue source du fichier. */
+/* "Intermediate markdown" debug view (debug builds only): accent
+   border to tell it apart from the file's real source view. */
 .source-view.derived-view {
   border-left: 3px solid var(--accent);
   padding-left: 6px;
@@ -875,7 +876,7 @@ body.tab-dragging * {
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
-/* ---------- Diagrammes Kroki ---------- */
+/* ---------- Kroki diagrams ---------- */
 
 .kroki-diagram {
   margin: 16px 0;
@@ -888,29 +889,29 @@ body.tab-dragging * {
   height: auto;
 }
 
-/* Fence rendue en markdown par un plugin (`fence:markdown`) : c'est du
-   document, pas une figure — alignement normal, et pas de carte blanche en
-   thème sombre (les diagrammes imbriqués gardent la leur). */
+/* Fence rendered as markdown by a plugin (`fence:markdown`): it is
+   document content, not a figure — normal alignment, and no white card in
+   dark theme (nested diagrams keep theirs). */
 .kroki-diagram.kroki-markdown {
   text-align: initial;
 }
 
-/* Plotly ne compense pas le `zoom` CSS d'un ancêtre : sous zoom de page, son
-   hit-testing (hover) se décale car il dessine son plan en pixels logiques mais
-   localise le curseur en pixels visuels. On annule l'échelle héritée sur la figure
-   (effective = 1, coordonnées 1:1) ; main.js redimensionne ensuite le tracé via
-   relayout(width, height) pour qu'il suive quand même le zoom. --plotly-inv-zoom
-   est posée sur #views par applyZoom (défaut 1 = aucun effet) et vaut l'inverse
-   du produit zoom texte × zoom de page : sous zoom de page, la figure est donc
-   re-tracée plus grande (vectorielle, nette) plutôt qu'agrandie. */
+/* Plotly does not compensate for an ancestor's CSS `zoom`: under page zoom, its
+   hit-testing (hover) drifts because it draws its plot in logical pixels but
+   locates the cursor in visual pixels. We cancel the inherited scale on the figure
+   (effective = 1, 1:1 coordinates); main.js then resizes the plot via
+   relayout(width, height) so that it still follows the zoom. --plotly-inv-zoom
+   is set on #views by applyZoom (default 1 = no effect) and equals the inverse
+   of the text zoom × page zoom product: under page zoom, the figure is thus
+   redrawn larger (vector, crisp) rather than magnified. */
 .kroki-diagram[data-kroki-type="plotly"] {
   zoom: var(--plotly-inv-zoom, 1);
 }
 
-/* La plupart des diagrammes Kroki sont des SVG figés conçus pour un fond clair :
-   en thème sombre on les pose sur une carte blanche. Plotly est EXCLU — c'est nous
-   qui construisons son layout (cf. render.js), donc on le rend nativement sombre et
-   il se fond dans la page. Même logique de double bloc que la palette (auto + override). */
+/* Most Kroki diagrams are fixed SVGs designed for a light background:
+   in dark theme we place them on a white card. Plotly is EXCLUDED — we are the
+   ones building its layout (cf. render.js), so we make it natively dark and
+   it blends into the page. Same double-block logic as the palette (auto + override). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .kroki-diagram.ok:not([data-kroki-type="plotly"]):not(.kroki-markdown) {
     background: #ffffff;
@@ -925,8 +926,8 @@ body.tab-dragging * {
   padding: 14px;
 }
 
-/* ---------- Vocabulaire de style offert aux plugins (doc/plugin-protocol.md §6.7) ----------
-   .kd-fold : <details> dépliable encadré (définitions, sections repliées). */
+/* ---------- Style vocabulary offered to plugins (doc/plugin-protocol.md §6.7) ----------
+   .kd-fold: framed collapsible <details> (definitions, folded sections). */
 
 .markdown-body details.kd-fold {
   margin: 0 0 8px;
@@ -940,7 +941,7 @@ body.tab-dragging * {
   margin: 0 -12px;
   padding: 7px 12px;
   user-select: none;
-  background: rgba(127, 127, 127, 0.07); /* translucide : lisible en clair comme en sombre */
+  background: rgba(127, 127, 127, 0.07); /* translucent: readable in both light and dark */
   border-radius: 6px;
 }
 
@@ -954,12 +955,12 @@ body.tab-dragging * {
   background: rgba(127, 127, 127, 0.14);
 }
 
-/* Accordéons imbriqués : léger retrait. */
+/* Nested accordions: slight indent. */
 .markdown-body details.kd-fold details.kd-fold {
   margin-left: 12px;
 }
 
-/* .kd-note : encart de documentation en retrait, liseré gauche. */
+/* .kd-note: indented documentation callout, left border. */
 
 .markdown-body .kd-note {
   margin: 0 0 16px;
@@ -1000,7 +1001,7 @@ body.tab-dragging * {
   font-size: 12px;
 }
 
-/* ---------- État vide ---------- */
+/* ---------- Empty state ---------- */
 
 #empty-state {
   position: absolute;
@@ -1009,8 +1010,8 @@ body.tab-dragging * {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* `safe` : sans lui, un contenu plus haut que la zone serait rogné EN HAUT et
-     le scroll ne pourrait pas l'atteindre (flex centré + overflow). */
+  /* `safe`: without it, content taller than the area would be clipped AT THE TOP and
+     scrolling could not reach it (centered flex + overflow). */
   justify-content: safe center;
   gap: 12px;
   color: var(--fg-muted);
@@ -1028,8 +1029,8 @@ body.tab-dragging * {
   font-size: 14px;
 }
 
-/* Aide-mémoire des raccourcis. `auto-fit` replie les trois colonnes en une
-   seule dans une fenêtre étroite ; #empty-state défile alors au lieu de rogner. */
+/* Shortcut cheat sheet. `auto-fit` folds the three columns into a
+   single one in a narrow window; #empty-state then scrolls instead of clipping. */
 .empty-shortcuts {
   display: flex;
   flex-wrap: wrap;
@@ -1041,10 +1042,10 @@ body.tab-dragging * {
   text-align: left;
 }
 
-/* Largeur naturelle par groupe (et non trois colonnes égales) : la colonne des
-   touches varie du simple au double d’un groupe à l’autre, et l’égaliser hachait
-   les libellés du plus large en deux lignes. Les groupes se replient au lieu de
-   se comprimer. */
+/* Natural width per group (rather than three equal columns): the key column
+   varies from single to double between groups, and equalizing it chopped the
+   widest group's labels into two lines. Groups wrap instead of being
+   compressed. */
 .empty-shortcuts section {
   min-width: 0;
   max-width: 100%;
@@ -1116,7 +1117,7 @@ body.tab-dragging * {
   text-decoration: underline;
 }
 
-/* ---------- Overlay de dépôt & hint de drag ---------- */
+/* ---------- Drop overlay & drag hint ---------- */
 
 #drop-overlay {
   position: fixed;
@@ -1140,7 +1141,7 @@ body.tab-dragging * {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
 }
 
-/* Toast transitoire (rapports de session .kdws, cf. session.js). */
+/* Transient toast (.kdws session reports, cf. session.js). */
 #toast {
   position: fixed;
   left: 50%;
@@ -1163,7 +1164,7 @@ body.tab-dragging * {
   color: #d1242f;
 }
 
-/* Toast porteur d'une action (mise à jour disponible, cf. updates.js). */
+/* Toast carrying an action (update available, cf. updates.js). */
 #toast.actionable {
   pointer-events: auto;
 }
@@ -1225,7 +1226,7 @@ body.tab-dragging * {
   white-space: nowrap;
 }
 
-/* ---------- Réglages ---------- */
+/* ---------- Settings (« Réglages ») ---------- */
 
 #settings-dialog,
 #info-dialog,
@@ -1328,9 +1329,9 @@ body.tab-dragging * {
   accent-color: var(--accent);
 }
 
-/* Icônes affichées : une case par bouton des barres d'outils, avec un aperçu
-   cloné du bouton réel (cf. settings.js). Deux colonnes pour que les douze
-   entrées tiennent sans allonger démesurément le dialog. */
+/* Displayed icons (« Icônes affichées »): one checkbox per toolbar button, with a preview
+   cloned from the real button (cf. settings.js). Two columns so that the twelve
+   entries fit without making the dialog excessively tall. */
 #icons-config {
   display: flex;
   flex-direction: column;
@@ -1366,7 +1367,7 @@ body.tab-dragging * {
   background: rgba(128, 128, 128, 0.14);
 }
 
-/* Icône verrouillée (Réglages) : lisible mais non actionnable. */
+/* Locked icon (Settings): readable but not actionable. */
 .icon-toggle:has(input:disabled) {
   cursor: default;
   opacity: 0.7;
@@ -1385,8 +1386,8 @@ body.tab-dragging * {
   white-space: nowrap;
 }
 
-/* Bouton « Gérer les plugins… » des Réglages (hors ligne d'actions du bas,
-   donc stylé ici — même vocabulaire que les boutons secondaires). */
+/* "Manage plugins…" (« Gérer les plugins… ») button of the Settings (outside the bottom
+   action row, hence styled here — same vocabulary as the secondary buttons). */
 .settings-plugins {
   padding: 7px 14px;
   border-radius: 7px;
@@ -1401,7 +1402,7 @@ body.tab-dragging * {
   filter: brightness(1.08);
 }
 
-/* Sous-titre de section du dialog Informations. */
+/* Section subtitle of the Info (« Informations ») dialog. */
 .info-subtitle {
   margin: 16px 0 0;
   font-size: 13.5px;
@@ -1440,7 +1441,7 @@ body.tab-dragging * {
   color: #fff;
 }
 
-/* ---------- Plugins (dialog de gestion + dialog de confiance) ---------- */
+/* ---------- Plugins (management dialog + trust dialog) ---------- */
 
 #plugins-list {
   margin-top: 14px;
@@ -1499,8 +1500,8 @@ body.tab-dragging * {
   margin-top: 10px;
 }
 
-/* Boutons « Nouveautés » (changelog du plugin) et « Journal » : même gabarit
-   que Supprimer, couleur neutre. */
+/* "What's new" (« Nouveautés », plugin changelog) and "Log" (« Journal ») buttons: same
+   size as Delete (« Supprimer »), neutral color. */
 .plugin-changelog,
 .plugin-journal {
   padding: 4px 10px;
@@ -1528,7 +1529,7 @@ body.tab-dragging * {
   color: #fff;
 }
 
-/* Gros bouton d'ajout, pleine largeur, sous la liste (spec §9.4). */
+/* Big full-width add button, below the list (spec §9.4). */
 .plugins-add {
   display: block;
   width: 100%;
@@ -1563,14 +1564,14 @@ body.tab-dragging * {
   filter: brightness(1.08);
 }
 
-/* ---------- Dialog Nouveautés (changelog) ---------- */
+/* ---------- What's new (« Nouveautés ») dialog (changelog) ---------- */
 
 #changelog-dialog {
   width: min(640px, 92vw);
 }
 
-/* Le corps réutilise .markdown-body (typo GitHub, thème clair/sombre déjà
-   accordé au forçage [data-theme]) mais en plus compact, fond du dialog. */
+/* The body reuses .markdown-body (GitHub typography, light/dark theme already
+   aligned with the [data-theme] override) but more compact, on the dialog background. */
 #changelog-body {
   max-height: min(62vh, 540px);
   overflow-y: auto;
@@ -1579,8 +1580,8 @@ body.tab-dragging * {
   padding-right: 10px;
   background: transparent;
   font-size: 13px;
-  /* Scroller focusable : showModal() lui donne le focus (défilement clavier
-     immédiat), sans anneau — même convention que .doc-view. */
+  /* Focusable scroller: showModal() focuses it (immediate keyboard
+     scrolling), with no ring — same convention as .doc-view. */
   outline: none;
 }
 
@@ -1593,14 +1594,14 @@ body.tab-dragging * {
   font-size: 13px;
 }
 
-/* ---------- Dialog Licences tierces ---------- */
+/* ---------- Third-party licenses (« Licences tierces ») dialog ---------- */
 
 #notices-dialog {
   width: min(760px, 94vw);
 }
 
-/* Texte brut généré (scripts/third_party_notices.py), mis en page pour
-   79 colonnes : monospace, retours à la ligne conservés. */
+/* Generated plain text (scripts/third_party_notices.py), laid out for
+   79 columns: monospace, line breaks preserved. */
 #notices-body {
   max-height: min(56vh, 480px);
   overflow: auto;
@@ -1616,7 +1617,7 @@ body.tab-dragging * {
   outline: none;
 }
 
-/* ---------- Dialog Journal ---------- */
+/* ---------- Log (« Journal ») dialog ---------- */
 
 #journal-dialog {
   width: min(760px, 94vw);
@@ -1685,13 +1686,13 @@ body.tab-dragging * {
   color: var(--error);
 }
 
-/* ---------- Fenêtre d'information (runtimes) ---------- */
+/* ---------- Info window (« Informations », runtimes) ---------- */
 
 #info-dialog {
   width: min(560px, 92vw);
 }
 
-/* Vérification des mises à jour, sous la version. */
+/* Update check, below the version. */
 .settings-actions.info-update {
   margin-top: 10px;
 }
@@ -1830,7 +1831,7 @@ body.tab-dragging * {
   color: var(--fg-muted);
 }
 
-/* ---------- Divers ---------- */
+/* ---------- Misc ---------- */
 
 .task-list-item {
   list-style-type: none;

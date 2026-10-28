@@ -1,26 +1,26 @@
-# Alias Cargo pour piloter le crate `src-tauri/` depuis la racine du dépôt, sans
-# `cd src-tauri`. On cible le manifeste via --manifest-path : le crate reste un
-# package standalone (ses [profile.release] et son dossier target/ inchangés).
+# Cargo aliases to drive the `src-tauri/` crate from the repository root, without
+# `cd src-tauri`. The manifest is targeted via --manifest-path: the crate stays a
+# standalone package (its [profile.release] and its target/ folder unchanged).
 #
-#   cargo run-app         → lance l'app en debug (développement)
-#   cargo build-app       → build release + publication dans dist/ (via xtask/)
-#   cargo build-appimage  → AppImage Linux (auto-installe tauri-cli si absent, via xtask/)
-#   cargo build-msi       → installeur MSI Windows (WiX v3, même tauri-cli, via xtask/)
-#   cargo build-deb       → paquet Debian/Ubuntu (Linux uniquement, même tauri-cli, via xtask/)
+#   cargo run-app         → launches the app in debug (development)
+#   cargo build-app       → release build + publication into dist/ (via xtask/)
+#   cargo build-appimage  → Linux AppImage (auto-installs tauri-cli if missing, via xtask/)
+#   cargo build-msi       → Windows MSI installer (WiX v3, same tauri-cli, via xtask/)
+#   cargo build-deb       → Debian/Ubuntu package (Linux only, same tauri-cli, via xtask/)
 #   cargo lint-app        → clippy
 #   cargo fmt-app         → rustfmt
 #
-# Un alias = une seule sous-commande (pas de `clippy && fmt`), d'où lint/fmt séparés.
-# Les arguments supplémentaires sont transmis (ex. `cargo run-app -- --flag`).
-# build-app et build-appimage passent par le crate xtask/ : après le build,
-# l'artefact est publié dans dist/ sous un nom postfixé de la version
-# (ex. kroki_deskapp-1.2.3.exe) doublé d'un fichier non versionné (hardlink,
-# copie en repli — cf. xtask/src/main.rs). build-appimage bootstrappe en plus
-# tauri-cli en local (xtask/target/tools/, one-shot) s'il n'est ni là ni sur le
-# PATH, puis lance `tauri build --config src-tauri/tauri.<cible>.conf.json` —
-# l'overlay active le bundling sans toucher tauri.conf.json (cf. CLAUDE.md
-# §§ « Builds Linux » et « Installeur Windows (MSI) »). build-msi et build-deb
-# exigent les archives de plugins livrées dans dist/ — ils les embarquent
+# One alias = a single subcommand (no `clippy && fmt`), hence separate lint/fmt.
+# Extra arguments are forwarded (e.g. `cargo run-app -- --flag`).
+# build-app and build-appimage go through the xtask/ crate: after the build,
+# the artifact is published into dist/ under a version-suffixed name
+# (e.g. kroki_deskapp-1.2.3.exe) paired with an unversioned file (hardlink,
+# copy as a fallback — see xtask/src/main.rs). build-appimage also bootstraps
+# tauri-cli locally (xtask/target/tools/, one-shot) if it is neither there nor
+# on the PATH, then runs `tauri build --config src-tauri/tauri.<target>.conf.json` —
+# the overlay enables bundling without touching tauri.conf.json (see CLAUDE.md
+# §§ "Linux builds" and "Windows installer (MSI)"). build-msi and build-deb
+# require the plugin archives shipped in dist/ — they embed them
 # (python build_dist.py --plugins-only).
 [alias]
 run-app = "run --manifest-path src-tauri/Cargo.toml"

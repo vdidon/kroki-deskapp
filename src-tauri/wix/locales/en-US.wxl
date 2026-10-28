@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Textes de l'installeur, langue de référence (cf. CLAUDE.md, § « Windows
-     installer (MSI) »). Même jeu d'Id dans chaque langue. Les chaînes de Tauri
-     (TauriLanguage, TauriCodepage) sont ajoutées par le bundler ; les autres
-     (LaunchApp…) sont redéfinies ici pour être traduites. Aucun Id maison ne
-     doit contenir un Id de Tauri : le bundler le teste par sous-chaîne. -->
+<!-- Installer texts, reference language (cf. CLAUDE.md, § "Windows
+     installer (MSI)"). Same set of Ids in every language. Tauri's strings
+     (TauriLanguage, TauriCodepage) are added by the bundler; the others
+     (LaunchApp…) are redefined here so they get translated. No in-house Id
+     may contain a Tauri Id: the bundler tests this by substring. -->
 <WixLocalization Culture="en-us" Codepage="1252" xmlns="http://schemas.microsoft.com/wix/2006/localization">
   <String Id="LaunchApp">Launch Kroki Desk</String>
   <String Id="DowngradeErrorMessage">A newer version of Kroki Desk is already installed.</String>

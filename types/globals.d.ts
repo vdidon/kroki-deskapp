@@ -1,11 +1,11 @@
-// Globales des webviews de l'application (fenêtres et webview de rendu) :
-// l'API Tauri injectée par `withGlobalTauri: true`, typée sur le contrat
-// `ipc.d.ts`. Les globales des vendors chargés en `<script>` classique sont
-// déclarées dans `vendor.d.ts` (fenêtre) et `renderer.d.ts` (webview de rendu).
+// Globals of the application's webviews (windows and render webview):
+// the Tauri API injected by `withGlobalTauri: true`, typed on the `ipc.d.ts`
+// contract. The globals of vendors loaded as classic `<script>`s are
+// declared in `vendor.d.ts` (window) and `renderer.d.ts` (render webview).
 
 import type { Commands, Events } from "./ipc";
 
-/** `invoke` sans second argument quand la commande n'en attend aucun. */
+/** `invoke` without a second argument when the command expects none. */
 type InvokeArgs<K extends keyof Commands> = {} extends Commands[K]["args"]
   ? [args?: Commands[K]["args"]]
   : [args: Commands[K]["args"]];

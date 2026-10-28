@@ -18,7 +18,7 @@
 </head>
 <body>
   <header id="tabbar">
-    <!-- Avant #tabs dans le DOM : le float ne raccourcit que les lignes qui le suivent. -->
+    <!-- Before #tabs in the DOM: the float only shortens the lines that follow it. -->
     <div id="tabbar-actions">
       <button id="btn-open" title="Open a file (Ctrl+O)" data-i18n-title="toolbar.open">
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.25a.25.25 0 0 0-.25-.25H8.06a1.75 1.75 0 0 1-1.237-.513L5.298 2.973a.25.25 0 0 0-.177-.073ZM0 2.75C0 1.784.784 1 1.75 1h3.371c.464 0 .91.184 1.238.513l1.525 1.514a.25.25 0 0 0 .176.073h6.19c.966 0 1.75.784 1.75 1.75v8.4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 13.25Z"/></svg>
@@ -107,8 +107,8 @@
       <div id="search-status"></div>
       <div id="search-results"></div>
     </div>
-    <!-- Recherche dans le document affiché (Ctrl+F, cf. js/docsearch.js) :
-         remplace la barre de recherche native de la webview. -->
+    <!-- Search in the displayed document (Ctrl+F, cf. js/docsearch.js):
+         replaces the webview's native search bar. -->
     <div id="find-bar" hidden role="search" aria-label="Search in document"
          data-i18n-aria-label="findbar.aria_label">
       <div class="search-field">
@@ -132,16 +132,16 @@
               title="Close (Esc)" data-i18n-title="findbar.close"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg></button>
     </div>
     <div id="views"></div>
-    <!-- Repères des occurrences de Ctrl+F sur la barre de défilement (cf.
-         js/docsearch.js) : hors de #views, donc hors de ses zooms. -->
+    <!-- Ctrl+F occurrence ticks on the scrollbar (cf.
+         js/docsearch.js): outside #views, hence outside its zooms. -->
     <div id="find-ruler" hidden aria-hidden="true"></div>
     <div id="empty-state">
       <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="6" cy="6" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="12" cy="18" r="2.6"/><path d="M8.4 6.8 15.6 6.8M7.2 8.2 10.9 15.9M16.8 8.2 13.1 15.9"/></svg>
       <div class="empty-title" data-i18n="welcome.title">Drag and drop a Markdown file</div>
       <div class="empty-hint" data-i18n-html="welcome.open_hint">or <button id="btn-open-empty" class="linklike">open a file</button></div>
-      <!-- Aide-mémoire des raccourcis : le miroir de `initShortcuts` (js/main.js),
-           du clic molette de js/tabs.js et de la molette Ctrl de #content.
-           Tout raccourci ajouté là-bas se déclare ici. -->
+      <!-- Shortcut cheat sheet: a mirror of `initShortcuts` (js/main.js),
+           of the middle-click in js/tabs.js and of the Ctrl+wheel on #content.
+           Any shortcut added there must be declared here. -->
       <div class="empty-shortcuts">
         <section>
           <h3 data-i18n="welcome.section_files">Files and windows</h3>
@@ -177,9 +177,9 @@
       </div>
       <div class="empty-mouse" data-i18n-html="welcome.mouse">Mouse: <kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+wheel to zoom · middle-click a tab to close it · drag a tab out of the bar to detach it</div>
     </div>
-    <!-- Voile de chargement (cf. js/loading.js) : posé au-delà de 180 ms de
-         rendu. Le spinner s'anime en `transform`, seule propriété que le
-         compositeur continue d'animer pendant la phase de rendu synchrone. -->
+    <!-- Loading overlay (cf. js/loading.js): shown once a render exceeds 180 ms.
+         The spinner is animated with `transform`, the only property the
+         compositor keeps animating during the synchronous render phase. -->
     <div id="loading-overlay" hidden role="status" aria-live="polite">
       <div class="loading-box">
         <div class="loading-spinner" aria-hidden="true"></div>
@@ -244,7 +244,7 @@
     </form>
   </dialog>
   <dialog id="changelog-dialog">
-    <!-- Titre et indication pilotés par changelog.js (le dialog sert aussi aux plugins). -->
+    <!-- Title and hint driven by changelog.js (the dialog is also used by plugins). -->
     <h2 id="changelog-title">What's new</h2>
     <p class="settings-hint" id="changelog-hint">
       Kroki Desk changelog, from the most recent to the oldest.
@@ -271,7 +271,7 @@
     </div>
   </dialog>
   <dialog id="plugin-trust-dialog">
-    <!-- Titre piloté par plugins_ui.js (installation, mise à jour ou refus). -->
+    <!-- Title driven by plugins_ui.js (install, update or refusal). -->
     <h2 id="plugin-trust-title">Install a plugin</h2>
     <div id="plugin-trust-body"></div>
     <p id="plugin-trust-error" class="settings-error" hidden></p>

@@ -1,6 +1,6 @@
 // @ts-check
 
-// Barre d'onglets : rendu (diff minimal pour ne pas casser un drag en cours) et actions.
+// Tab bar: rendering (minimal diff so as not to break a drag in progress) and actions.
 
 import { invoke, state } from "./app.js";
 import { showToast } from "./session.js";
@@ -21,12 +21,12 @@ function buildTab(tab) {
 
   const title = document.createElement("span");
   title.className = "tab-title";
-  title.textContent = tab.title; // noms de fichiers = contenu non fiable : jamais d'innerHTML
+  title.textContent = tab.title; // file names = untrusted content: never innerHTML
   el.appendChild(title);
 
   const close = document.createElement("button");
   close.className = "tab-close";
-  close.dataset.i18nTitle = "tabs.close"; // retraduit par applyLocale(tabsEl) au changement de langue
+  close.dataset.i18nTitle = "tabs.close"; // re-translated by applyLocale(tabsEl) on language change
   close.title = t("tabs.close");
   close.textContent = "×";
   el.appendChild(close);
@@ -35,9 +35,9 @@ function buildTab(tab) {
 }
 
 /**
- * Synchronise le DOM avec `state.tabs`. Si la liste d'ids n'a pas changé,
- * met à jour classes et titres sur place : un rebuild détacherait l'onglet
- * en cours de drag (perte de la capture du pointeur).
+ * Syncs the DOM with `state.tabs`. If the list of ids has not changed,
+ * updates classes and titles in place: a rebuild would detach the tab being
+ * dragged (losing the pointer capture).
  */
 export function renderTabbar() {
   const current = /** @type {HTMLElement[]} */ ([...tabsEl.children]).map((el) => el.dataset.id);
@@ -60,19 +60,18 @@ export function renderTabbar() {
 }
 
 /**
- * Les onglets gardent leur largeur naturelle et débordent en 2ᵉ ligne via le
- * layout inline de `#tabs` (CSS) : la 1ʳᵉ ligne contourne le float des
- * boutons d'action, les suivantes occupent toute la largeur. Ici on ne gère
- * que la saturation : si les largeurs naturelles — titres entiers, plafonnés
- * par le max-width CSS — demanderaient plus de 2 lignes, on pose `--tab-max`
- * (la plus grande largeur uniforme qui fait tenir tous les onglets en glouton
- * sur les 2 lignes, à largeurs inégales) et la troncature des titres reprend,
- * sur exactement 2 lignes. Les mesures partent toujours des largeurs
- * naturelles (cap retiré d'abord) : le seuil ne dépend pas de l'état courant,
- * pas d'oscillation.
+ * Tabs keep their natural width and overflow onto a 2nd line via the inline
+ * layout of `#tabs` (CSS): the 1st line wraps around the float of the action
+ * buttons, the following ones take the full width. Here we only handle
+ * saturation: if the natural widths — full titles, capped by the CSS
+ * max-width — would need more than 2 lines, we set `--tab-max` (the largest
+ * uniform width that makes all the tabs fit greedily on the 2 lines, with
+ * unequal widths) and title truncation kicks in, on exactly 2 lines.
+ * Measurements always start from the natural widths (cap removed first): the
+ * threshold does not depend on the current state, so no oscillation.
  */
 export function updateTabbarWrap() {
-  if (document.body.classList.contains("tab-dragging")) return; // géométrie figée pendant un drag
+  if (document.body.classList.contains("tab-dragging")) return; // geometry frozen during a drag
   tabsEl.style.removeProperty("--tab-max");
   const tabs = /** @type {HTMLElement[]} */ ([...tabsEl.children]);
   if (!tabs.length) return;
@@ -81,18 +80,18 @@ export function updateTabbarWrap() {
   const gap = parseFloat(getComputedStyle(tabs[0]).marginRight) || 0;
   const naturals = tabs.map((el) => {
     const title = /** @type {HTMLElement} */ (el.querySelector(".tab-title"));
-    // Largeur hors-titre (paddings + croix) : constante que l'onglet soit
-    // compressé ou non, le titre absorbant seul la compression (flex: 1).
+    // Non-title width (paddings + cross): constant whether the tab is
+    // compressed or not, the title alone absorbing the compression (flex: 1).
     const chrome = el.getBoundingClientRect().width - title.getBoundingClientRect().width;
-    return Math.min(maxTab, chrome + title.scrollWidth + 1); // +1 : scrollWidth tronqué à l'entier
+    return Math.min(maxTab, chrome + title.scrollWidth + 1); // +1: scrollWidth is truncated to an integer
   });
 
-  // Largeurs de ligne : la 1ʳᵉ est amputée du float des boutons, les autres pleines.
+  // Line widths: the 1st is reduced by the buttons' float, the others are full.
   const fullW = tabsEl.clientWidth;
   const firstW = fullW - actionsEl.getBoundingClientRect().width;
 
-  // Nombre de lignes qu'occuperait le placement inline (glouton). Un onglet
-  // trop large pour l'espace restant à côté du float passe sous lui.
+  // Number of lines the inline (greedy) placement would take. A tab too wide
+  // for the space left next to the float goes below it.
   let lines = 1;
   let x = 0;
   for (const w of naturals) {
@@ -106,12 +105,11 @@ export function updateTabbarWrap() {
   }
   if (lines <= 2) return;
 
-  // Plus grand cap uniforme qui tient en 2 lignes : pour chaque répartition
-  // (k onglets en ligne 1, n−k en ligne 2), le cap est borné par la ligne la
-  // plus serrée ; on garde le meilleur. Le glouton respecte ensuite ces
-  // bornes : la ligne 1 accueille au moins k onglets (cap ≤ sa borne), le
-  // reste — au plus n−k — tient en ligne 2 ; les onglets plus courts que le
-  // cap laissent seulement plus de place.
+  // Largest uniform cap that fits in 2 lines: for each split (k tabs on
+  // line 1, n−k on line 2), the cap is bounded by the tightest line; we keep
+  // the best. The greedy placement then respects these bounds: line 1 takes
+  // at least k tabs (cap ≤ its bound), the rest — at most n−k — fits on
+  // line 2; tabs shorter than the cap only leave more room.
   const n = naturals.length;
   let cap = 0;
   for (let k = 1; k < n; k++) {
@@ -122,7 +120,7 @@ export function updateTabbarWrap() {
 }
 
 export function initTabbar() {
-  // Redimensionnement de la fenêtre (et retour d'un drag) : réévaluer le wrap.
+  // Window resize (and end of a drag): re-evaluate the wrap.
   new ResizeObserver(updateTabbarWrap).observe(tabbarEl);
   tabsEl.addEventListener("click", (e) => {
     const tabEl = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".tab"));
@@ -131,28 +129,28 @@ export function initTabbar() {
     if (/** @type {Element} */ (e.target).closest(".tab-close")) {
       invoke("close_tab", { docId });
     }
-    // L'activation se fait au pointerdown (voir teardrag.js), comme Chrome.
+    // Activation happens on pointerdown (see teardrag.js), like Chrome.
   });
-  // Clic molette : fermer.
+  // Middle click: close.
   tabsEl.addEventListener("auxclick", (e) => {
     if (e.button !== 1) return;
     const tabEl = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".tab"));
     if (tabEl) invoke("close_tab", { docId: Number(tabEl.dataset.id) });
   });
   initTabMenu();
-  // Les croix des onglets sont construites par le JS : le HTML statique n'est
-  // pas concerné par applyLocale(document), on leur applique donc à part.
+  // The tabs' close buttons are built by JS: they are not covered by
+  // applyLocale(document) on the static HTML, so we apply it to them separately.
   onLocaleChange(() => applyLocale(tabsEl));
 }
 
-// --- Menu contextuel d'onglet (clic droit) ---
+// --- Tab context menu (right click) ---
 
 const menuEl = /** @type {HTMLElement} */ (document.getElementById("tab-menu"));
 /** @type {number | null} */
 let menuDocId = null;
 
-/** Presse-papiers : API asynchrone, repli execCommand si la webview la refuse
- *  (contexte jugé non sécurisé, cas possible sous WebKitGTK).
+/** Clipboard: async API, execCommand fallback if the webview refuses it
+ *  (context deemed insecure, possible under WebKitGTK).
  * @param {string} text
  */
 async function copyText(text) {
@@ -191,16 +189,16 @@ function openTabMenu(tabEl, x, y) {
   menuDocId = Number(tabEl.dataset.id);
   /** @type {Record<string, boolean>} */
   const disabled = {
-    detach: count === 1, // seul onglet : la nouvelle fenêtre serait la même
+    detach: count === 1, // only tab: the new window would be the same
     left: idx === 0,
     right: idx === count - 1,
     others: count === 1,
   };
   for (const item of menuEl.querySelectorAll("button")) {
-    item.disabled = !!disabled[/** @type {string} */ (item.dataset.action)]; // data-action sur chaque bouton (index.html)
+    item.disabled = !!disabled[/** @type {string} */ (item.dataset.action)]; // data-action on every button (index.html)
   }
   menuEl.hidden = false;
-  // Mesuré une fois affiché : recalé dans la fenêtre près des bords droit et bas.
+  // Measured once displayed: repositioned inside the window near the right and bottom edges.
   const { width, height } = menuEl.getBoundingClientRect();
   menuEl.style.left = `${Math.max(0, Math.min(x, innerWidth - width - 4))}px`;
   menuEl.style.top = `${Math.max(0, Math.min(y, innerHeight - height - 4))}px`;
@@ -210,7 +208,7 @@ function initTabMenu() {
   tabsEl.addEventListener("contextmenu", (e) => {
     const tabEl = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".tab"));
     if (!tabEl) return;
-    e.preventDefault(); // pas de menu natif de la webview
+    e.preventDefault(); // no native webview menu
     openTabMenu(tabEl, e.clientX, e.clientY);
   });
   menuEl.addEventListener("click", (e) => {
@@ -233,7 +231,7 @@ function initTabMenu() {
     }
   });
   menuEl.addEventListener("contextmenu", (e) => e.preventDefault());
-  // Tout clic hors du menu le referme (capture : avant le drag d'onglet).
+  // Any click outside the menu closes it (capture: before the tab drag).
   window.addEventListener(
     "pointerdown",
     (e) => {
@@ -241,8 +239,8 @@ function initTabMenu() {
     },
     true,
   );
-  // Capture + stopPropagation : Échap ferme le menu sans fermer aussi la
-  // recherche ou le sommaire (écouteur de main.js, en phase de bouillonnement).
+  // Capture + stopPropagation: Escape closes the menu without also closing
+  // the search or the table of contents (main.js listener, in the bubbling phase).
   window.addEventListener(
     "keydown",
     (e) => {

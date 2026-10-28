@@ -1,5 +1,5 @@
-// Test runtime des moteurs via l'API Kroki locale (rendu réel sous WebKitGTK).
-// Lancé DANS le conteneur, l'app tournant en headless (Xvfb).
+// Runtime test of the engines via the local Kroki API (real rendering under WebKitGTK).
+// Run INSIDE the container, with the app running headless (Xvfb).
 const BASE = process.env.KROKI_URL || "http://127.0.0.1:8442";
 
 const VEGALITE = JSON.stringify({
@@ -29,7 +29,7 @@ const BPMN = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
 
-// [type, source, famille] — famille pour le résumé
+// [type, source, family] — family for the summary
 const cases = [
   ["svgbob", "  +--->\n  |", "native Rust"],
   ["pikchr", "box \"hello\"", "native Rust"],

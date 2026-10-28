@@ -1,27 +1,27 @@
 // @ts-check
 
-// Options d'un champ de recherche — casse / mot entier / expression régulière —
-// et la RegExp qui en découle. Partagé par la recherche dans le document
-// (`docsearch.js`) et la recherche multi-documents (`globalsearch.js`) : mêmes
-// boutons `Aa` `ab` `.*` collés à droite du champ, même sémantique.
+// Options of a search field — case / whole word / regular expression — and the
+// RegExp derived from them. Shared by the in-document search (`docsearch.js`)
+// and the multi-document search (`globalsearch.js`): same `Aa` `ab` `.*`
+// buttons stuck to the right of the field, same semantics.
 
 /**
- * État des boutons `Aa` `ab` `.*`.
+ * State of the buttons `Aa` `ab` `.*`.
  * @typedef {object} SearchOptions
  * @property {boolean} caseSensitive
  * @property {boolean} wholeWord
  * @property {boolean} regex
  */
 
-// Caractère « de mot » pour l'option « mot entier ». `\b` est ASCII-only en
-// JavaScript : il couperait `été` ou `naïve` en deux (é/ï hors `\w`) et ferait
-// échouer la recherche sur du texte français. On pose donc des lookarounds sur
-// un `\w` étendu au latin accentué, au grec et au cyrillique — sans le flag `u`,
-// qui rendrait invalides des expressions utilisateur par ailleurs correctes.
+// "Word" character for the "whole word" option. `\b` is ASCII-only in
+// JavaScript: it would split `été` or `naïve` in two (é/ï are outside `\w`) and
+// break the search on French text. So we put lookarounds on a `\w` extended to
+// accented Latin, Greek and Cyrillic — without the `u` flag, which would make
+// otherwise valid user expressions invalid.
 const WORD = "[\\w\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u04FF]";
 
-// Lookbehind : Chromium l'a depuis toujours, WebKitGTK seulement depuis 2023.
-// Sur un moteur qui ne le connaît pas, « mot entier » retombe sur `\b` (ASCII).
+// Lookbehind: Chromium has always had it, WebKitGTK only since 2023. On an
+// engine that lacks it, "whole word" falls back to `\b` (ASCII).
 const LOOKBEHIND = (() => {
   try {
     new RegExp("(?<!a)b");
@@ -40,9 +40,9 @@ export function escapeRegExp(s) {
 }
 
 /**
- * RegExp globale correspondant à la requête, ou `null` si elle est vide.
- * Lève (SyntaxError) quand `regex` est demandé sur une expression invalide :
- * c'est à l'appelant d'en faire un état affiché, pas un plantage.
+ * Global RegExp matching the query, or `null` if it is empty.
+ * Throws (SyntaxError) when `regex` is requested on an invalid expression:
+ * it is up to the caller to turn that into a displayed state, not a crash.
  * @param {string | null | undefined} query
  * @param {Partial<SearchOptions>} [options]
  * @returns {RegExp | null}
@@ -50,18 +50,18 @@ export function escapeRegExp(s) {
 export function buildMatcher(query, { caseSensitive = false, wholeWord = false, regex = false } = {}) {
   const q = String(query ?? "");
   if (!q) return null;
-  // Groupe non capturant : sans lui, `foo|bar` + « mot entier » ne cadrerait que
-  // la dernière alternative. Ne décale aucun numéro de groupe de l'utilisateur.
+  // Non-capturing group: without it, `foo|bar` + "whole word" would only bound
+  // the last alternative. Does not shift any of the user's group numbers.
   let src = regex ? `(?:${q})` : escapeRegExp(q);
   if (wholeWord) src = LOOKBEHIND ? `(?<!${WORD})${src}(?!${WORD})` : `\\b${src}\\b`;
   return new RegExp(src, caseSensitive ? "g" : "gi");
 }
 
 /**
- * Itère les occurrences de `re` dans `text`, au plus `cap` fois.
- * Les correspondances vides (`a*`, `^`) sont sautées : elles n'ont rien à
- * surligner et boucleraient indéfiniment sur `lastIndex`.
- * @param {RegExp | null} re  globale (`g`), sinon `exec` boucle sur la même occurrence
+ * Iterates the occurrences of `re` in `text`, at most `cap` times.
+ * Empty matches (`a*`, `^`) are skipped: they have nothing to highlight and
+ * would loop forever on `lastIndex`.
+ * @param {RegExp | null} re  global (`g`), otherwise `exec` loops on the same occurrence
  * @param {string} text
  * @param {number} [cap]
  * @returns {Generator<RegExpExecArray, void, unknown>}
@@ -85,9 +85,9 @@ export function* iterMatches(re, text, cap = Infinity) {
 const KEYS = { case: "caseSensitive", word: "wholeWord", regex: "regex" };
 
 /**
- * Câble les `<button data-opt>` d'une rangée d'options sur un objet d'état
- * (muté en place, à lire au moment de chaque recherche) et prévient `onChange`
- * à chaque bascule.
+ * Wires the `<button data-opt>` of an options row to a state object (mutated
+ * in place, to be read at each search) and notifies `onChange` on every
+ * toggle.
  * @param {ParentNode} container
  * @param {() => void} [onChange]
  * @returns {SearchOptions}

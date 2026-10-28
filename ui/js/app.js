@@ -1,6 +1,6 @@
 // @ts-check
 
-// Socle commun : accès Tauri, état de la fenêtre, petits utilitaires.
+// Common foundation: Tauri access, window state, small utilities.
 
 export const { invoke, convertFileSrc } = window.__TAURI__.core;
 export const { listen } = window.__TAURI__.event;
@@ -10,13 +10,13 @@ export const currentLabel =
 /** @type {import("../../types/app").AppState} */
 export const state = {
   tabs: [], // [{id, title, path}]
-  active: null, // id du document actif ou null
+  active: null, // id of the active document or null
   views: new Map(), // id -> {el, rendered, seq}
-  stale: new Set(), // documents modifiés sur disque, à re-rendre à l'activation
+  stale: new Set(), // documents modified on disk, to re-render on activation
 };
 
-// Page HTML statique (dont les exports de l'app) : affichée dans une iframe
-// sandboxée, hors du pipeline markdown (cf. renderHtmlDocument, render.js).
+// Static HTML page (including the app's exports): displayed in a sandboxed
+// iframe, outside the markdown pipeline (cf. renderHtmlDocument, render.js).
 /** @param {string | null | undefined} path */
 export function isHtmlPath(path) {
   return /\.html?$/i.test(String(path ?? ""));
@@ -34,7 +34,7 @@ export function escapeHtml(s) {
     .replaceAll('"', "&quot;");
 }
 
-// Base64 sûr pour l'UTF-8 (transport du source des diagrammes via data-attributes).
+// UTF-8-safe Base64 (carries the diagram source through data-attributes).
 /**
  * @param {string} s
  * @returns {string}

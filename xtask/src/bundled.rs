@@ -1,30 +1,31 @@
-//! Stratégie d'embarquement des plugins dans les installeurs (MSI, .deb).
+//! Plugin bundling strategy for the installers (MSI, .deb).
 //!
-//! Source : `bundled-plugins.txt` à la racine du dépôt (gitignoré — la
-//! sélection propre à un poste ou à une distribution), sinon
-//! `bundled-plugins.default.txt` (suivi — le comportement par défaut). La
-//! variable d'environnement `KROKI_BUNDLED_PLUGINS` (chemin relatif à la racine
-//! du dépôt, ou absolu) court-circuite ce choix : c'est par elle que
-//! `build_dist.py --channel` impose la stratégie d'un canal de distribution,
-//! quel que soit le fichier local présent. Une ligne par plugin, dans l'ordre d'affichage de la page du MSI :
+//! Source: `bundled-plugins.txt` at the repository root (gitignored — the
+//! selection specific to a workstation or a distribution), otherwise
+//! `bundled-plugins.default.txt` (tracked — the default behavior). The
+//! `KROKI_BUNDLED_PLUGINS` environment variable (path relative to the
+//! repository root, or absolute) short-circuits that choice: it is how
+//! `build_dist.py --channel` imposes the strategy of a distribution channel,
+//! whatever local file is present. One line per plugin, in the display order
+//! of the MSI page:
 //!
 //! ```text
-//! # commentaire
-//! latex-doc  on      ← coché (MSI) / installé au premier lancement (.deb)
-//! csv-tables         ← embarqué, décoché / simplement posé à côté
+//! # comment
+//! latex-doc  on      ← checked (MSI) / installed at first launch (.deb)
+//! csv-tables         ← bundled, unchecked / merely dropped alongside
 //! ```
 //!
-//! Tout le reste est lu dans le `manifest.json` de chaque archive
-//! `dist/<id>.kdext` — et non dans `plugins/<id>/`, qui peut être une jonction
-//! vers un autre dépôt, irrésoluble dans le conteneur du build .deb. Le nom
-//! affiché vient de `name`, les associations de fichiers de `extensions`.
+//! Everything else is read from the `manifest.json` of each
+//! `dist/<id>.kdext` archive — and not from `plugins/<id>/`, which may be a
+//! junction to another repo, unresolvable in the .deb build container. The
+//! displayed name comes from `name`, the file associations from `extensions`.
 //!
-//! Trois sorties, toutes gitignorées et régénérées à chaque build :
-//! - `src-tauri/bundled-plugins/` : les archives retenues (cf. `stage`) ;
-//! - `src-tauri/wix/plugins.generated.wxs` : propriétés `PLUGIN_*`, composants
-//!   des archives et de leurs associations, page de sélection (cf. `wix_fragment`) ;
-//! - `src-tauri/tauri.deb.generated.json` + `src-tauri/linux/kroki-desk.generated.xml` :
-//!   l'overlay .deb complet et le paquet shared-mime-info (cf. `deb_overlay`).
+//! Three outputs, all gitignored and regenerated on every build:
+//! - `src-tauri/bundled-plugins/`: the retained archives (see `stage`);
+//! - `src-tauri/wix/plugins.generated.wxs`: `PLUGIN_*` properties, components
+//!   of the archives and of their associations, selection page (see `wix_fragment`);
+//! - `src-tauri/tauri.deb.generated.json` + `src-tauri/linux/kroki-desk.generated.xml`:
+//!   the complete .deb overlay and the shared-mime-info package (see `deb_overlay`).
 
 use std::fs;
 use std::io::Read;
@@ -38,11 +39,12 @@ const STRATEGY: &str = "bundled-plugins.txt";
 const STRATEGY_DEFAULT: &str = "bundled-plugins.default.txt";
 const STRATEGY_ENV: &str = "KROKI_BUNDLED_PLUGINS";
 
-/// Extensions dont le type MIME existe déjà dans la base freedesktop : un
-/// plugin qui les lit s'y associe sous ce type. Toute autre extension reçoit un
-/// type propre à Kroki Desk (`text/x-kroki-desk-<ext>`), généré dans le paquet
-/// shared-mime-info. Une extension standard absente de cette table recevrait à
-/// tort un type propre qui supplanterait le sien : la compléter au besoin.
+/// Extensions whose MIME type already exists in the freedesktop database: a
+/// plugin that reads them is associated under that type. Any other extension
+/// gets a Kroki Desk-specific type (`text/x-kroki-desk-<ext>`), generated in the
+/// shared-mime-info package. A standard extension missing from this table
+/// would wrongly receive a type of its own that would supplant the standard
+/// one: extend it as needed.
 const STANDARD_MIME: &[(&str, &str)] = &[
     ("tex", "text/x-tex"),
     ("latex", "text/x-tex"),
@@ -53,10 +55,10 @@ const STANDARD_MIME: &[(&str, &str)] = &[
 
 pub struct Plugin {
     pub id: String,
-    /// Coché par défaut (MSI) / installé au premier lancement (.deb).
+    /// Checked by default (MSI) / installed at first launch (.deb).
     pub on: bool,
     pub name: String,
-    /// Extensions servies, sans point, en minuscules.
+    /// Extensions served, without the dot, lowercase.
     pub extensions: Vec<String>,
 }
 
@@ -64,7 +66,7 @@ impl Plugin {
     fn archive(&self) -> String {
         format!("{}.kdext", self.id)
     }
-    /// `latex-doc` → `LatexDoc` : identifiants WiX et ProgID.
+    /// `latex-doc` → `LatexDoc`: WiX identifiers and ProgID.
     fn camel(&self) -> String {
         self.id
             .split(|c: char| !c.is_ascii_alphanumeric())
@@ -77,7 +79,7 @@ impl Plugin {
             })
             .collect()
     }
-    /// `latex-doc` → `PLUGIN_LATEX_DOC` : propriété publique du MSI.
+    /// `latex-doc` → `PLUGIN_LATEX_DOC`: public MSI property.
     fn property(&self) -> String {
         let up: String = self
             .id
@@ -94,10 +96,10 @@ impl Plugin {
     }
 }
 
-/// Lit la stratégie et les manifestes des archives de dist/.
+/// Reads the strategy and the manifests of the dist/ archives.
 pub fn load(repo: &Path, cmd: &str) -> Vec<Plugin> {
-    // Imposée, la stratégie doit exister : retomber sur un autre fichier
-    // embarquerait en silence les plugins d'un autre canal.
+    // When imposed, the strategy must exist: falling back to another file
+    // would silently bundle the plugins of another channel.
     let forced = std::env::var_os(STRATEGY_ENV).filter(|v| !v.is_empty());
     let (path, text) = match forced {
         Some(v) => {
@@ -202,21 +204,21 @@ fn read_manifest(kdext: &Path, id: &str, cmd: &str) -> (String, Vec<String>) {
     (name, extensions)
 }
 
-/// Recopie les archives retenues de dist/ vers src-tauri/bundled-plugins/
-/// (gitignoré), d'où les installeurs les embarquent.
+/// Copies the retained archives from dist/ to src-tauri/bundled-plugins/
+/// (gitignored), from where the installers embed them.
 ///
-/// Les deux lisent sous `src-tauri/` et non dans dist/, pour des raisons
-/// distinctes : les `<File>` du fragment WiX sont écrits en
-/// `$(sys.SOURCEFILEDIR)..\bundled-plugins\…`, que candle résout depuis le
-/// dossier du .wxs ; le `bundle.resources` de l'overlay .deb est résolu depuis le
-/// dossier de tauri.conf.json, où le CLI se place avant de bundler. Le
-/// sous-dossier, lui, n'est pas cosmétique — `resource_dir()` étant le dossier
-/// de l'exécutable, sans ce niveau le binaire portable lancé depuis dist/
-/// installerait *tous* les `.kdext` qui s'y trouvent.
+/// Both read under `src-tauri/` and not from dist/, for distinct reasons: the
+/// `<File>` entries of the WiX fragment are written as
+/// `$(sys.SOURCEFILEDIR)..\bundled-plugins\…`, which candle resolves from the
+/// .wxs's folder; the `bundle.resources` of the .deb overlay is resolved from
+/// the tauri.conf.json folder, where the CLI sits before bundling. The
+/// subfolder, for its part, is not cosmetic — `resource_dir()` being the
+/// executable's folder, without that level the portable binary launched from
+/// dist/ would install *all* the `.kdext` found there.
 pub fn stage(repo: &Path, plugins: &[Plugin], cmd: &str) {
     let payload = repo.join("src-tauri/bundled-plugins");
-    // Table rase : un plugin retiré de la stratégie ne doit pas survivre dans
-    // un installeur ultérieur.
+    // Clean slate: a plugin removed from the strategy must not survive into a
+    // later installer.
     let _ = fs::remove_dir_all(&payload);
     fs::create_dir_all(&payload)
         .unwrap_or_else(|e| die(&format!("{cmd}: cannot create {}: {e}", payload.display())));
@@ -231,9 +233,9 @@ pub fn stage(repo: &Path, plugins: &[Plugin], cmd: &str) {
 // MSI
 // --------------------------------------------------------------------------- //
 
-/// Écrit `src-tauri/wix/plugins.generated.wxs`, branché par
-/// tauri.msi.conf.json (`fragmentPaths` + `componentGroupRefs`). Cf. l'en-tête
-/// de src-tauri/wix/installer.wxs pour le pourquoi de chaque mécanisme.
+/// Writes `src-tauri/wix/plugins.generated.wxs`, wired in by
+/// tauri.msi.conf.json (`fragmentPaths` + `componentGroupRefs`). See the header
+/// of src-tauri/wix/installer.wxs for the why of each mechanism.
 pub fn write_wix_fragment(repo: &Path, plugins: &[Plugin], cmd: &str) {
     let out = repo.join("src-tauri/wix/plugins.generated.wxs");
     fs::write(&out, wix_fragment(plugins, cmd))
@@ -243,9 +245,10 @@ pub fn write_wix_fragment(repo: &Path, plugins: &[Plugin], cmd: &str) {
 fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
     let exe = format!("[INSTALLDIR]{}.exe", crate::BIN_NAME);
     let mut props = String::new();
-    // Dossier créé même si aucun plugin n'est coché : sa présence dit à
-    // `plugins::seed_bundled` qu'un installeur a choisi — sans lui, l'exe
-    // installerait le plugin embarqué (latex-doc) malgré la case décochée.
+    // Folder created even if no plugin is checked: its presence tells
+    // `plugins::seed_bundled` that an installer made the choice — without it,
+    // the exe would install the embedded plugin (latex-doc) despite the
+    // unchecked box.
     let mut files = format!(
         "        <Component Id=\"BundledPluginsFolder\" Guid=\"{}\">\n          \
          <CreateFolder />\n        </Component>\n",
@@ -273,8 +276,8 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
         file_refs.push_str(&format!("      <ComponentRef Id=\"Kdext{camel}\" />\n"));
 
         if !p.extensions.is_empty() {
-            // Clé de registre en KeyPath : GUID fixe obligatoire (pas d'auto-GUID
-            // sous HKMU), dérivé de l'id pour rester stable d'un build à l'autre.
+            // Registry key as KeyPath: fixed GUID mandatory (no auto-GUID under
+            // HKMU), derived from the id to stay stable from one build to the next.
             let progid = format!("KrokiDesk.{camel}");
             let mut values = String::new();
             for ext in &p.extensions {
@@ -304,8 +307,8 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
             "        <Control Id=\"Cb{camel}\" Type=\"CheckBox\" X=\"28\" Y=\"{y}\" Width=\"320\" Height=\"12\"\n                 \
              Property=\"{prop}\" CheckBoxValue=\"1\"\n                 Text=\"{text}\" />\n",
             y = 92 + 15 * i,
-            // Pas de NoPrefix sur une CheckBox (CNDL0004) : un `&` y
-            // marquerait un raccourci clavier, doublé il s'affiche tel quel.
+            // No NoPrefix on a CheckBox (CNDL0004): a `&` there would mark a
+            // keyboard shortcut, doubled it is displayed as is.
             text = wix_text(&p.name.replace('&', "&&")),
         ));
     }
@@ -313,8 +316,8 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
     let ui = if plugins.is_empty() {
         String::new()
     } else {
-        // Page fixe de 370×270 (taille WixUI) : la note occupe ce qui reste
-        // sous les cases, jusqu'à la ligne du bas (Y=234).
+        // Fixed 370×270 page (WixUI size): the note takes what remains
+        // below the checkboxes, down to the bottom line (Y=234).
         let note_y = 92 + 15 * plugins.len() + 9;
         let note_h = 228usize.saturating_sub(note_y);
         if note_h < 26 {
@@ -370,8 +373,8 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
 
     format!(
         r#"<?xml version="1.0" encoding="utf-8"?>
-<!-- Généré par xtask (xtask/src/bundled.rs) depuis la stratégie d'embarquement
-     des plugins — ne pas éditer, ne pas committer. -->
+<!-- Generated by xtask (xtask/src/bundled.rs) from the plugin bundling
+     strategy — do not edit, do not commit. -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
 
@@ -396,8 +399,8 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
     )
 }
 
-/// GUID déterministe (FNV-1a 128 bits sur deux graines, bits de version 5 et
-/// de variante RFC 4122 posés) : stable d'un build à l'autre pour une même clé.
+/// Deterministic GUID (128-bit FNV-1a over two seeds, RFC 4122 version 5 and
+/// variant bits set): stable from one build to the next for the same key.
 pub fn stable_guid(key: &str) -> String {
     let fnv = |seed: u64| {
         key.bytes().fold(seed, |h, b| {
@@ -424,8 +427,8 @@ fn xml_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// Texte de contrôle WiX : XML échappé, et `[`/`]` neutralisés — ce sont des
-/// références de propriété pour le moteur MSI.
+/// WiX control text: XML-escaped, with `[`/`]` neutralized — they are property
+/// references for the MSI engine.
 fn wix_text(s: &str) -> String {
     xml_escape(s)
         .chars()
@@ -441,20 +444,20 @@ fn wix_text(s: &str) -> String {
 // .deb
 // --------------------------------------------------------------------------- //
 
-/// Écrit l'overlay .deb complet (`src-tauri/tauri.deb.generated.json`) et le
-/// paquet shared-mime-info (`src-tauri/linux/kroki-desk.generated.xml`) ;
-/// renvoie le chemin de l'overlay, à passer à `tauri build --config`.
+/// Writes the complete .deb overlay (`src-tauri/tauri.deb.generated.json`) and
+/// the shared-mime-info package (`src-tauri/linux/kroki-desk.generated.xml`);
+/// returns the overlay's path, to pass to `tauri build --config`.
 ///
-/// L'overlay est le suivi `tauri.deb.conf.json` complété, et non un second
-/// overlay : la fusion des configurations Tauri remplace les tableaux au lieu
-/// de les concaténer, un `fileAssociations` partiel effacerait ceux des
-/// formats natifs.
+/// The overlay is the tracked `tauri.deb.conf.json` completed, not a second
+/// overlay: merging Tauri configurations replaces arrays instead of
+/// concatenating them, so a partial `fileAssociations` would erase those of the
+/// native formats.
 ///
-/// Sans page de sélection possible (cf. CLAUDE.md § « Paquet Debian/Ubuntu »),
-/// le choix se rend par la destination : les plugins `on` dans
-/// `bundled-plugins/` (installés au premier lancement par
-/// `plugins::seed_bundled`), les autres dans `example-plugins/`, que rien ne
-/// lit. Seuls les premiers reçoivent des associations.
+/// With no selection page possible (see CLAUDE.md § "Debian/Ubuntu package
+/// (.deb)"), the choice is expressed by the destination: `on` plugins go in
+/// `bundled-plugins/` (installed at first launch by
+/// `plugins::seed_bundled`), the others in `example-plugins/`, which nothing
+/// reads. Only the former get associations.
 pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf {
     let tauri = repo.join("src-tauri");
     let base = tauri.join("tauri.deb.conf.json");
@@ -505,7 +508,7 @@ pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf 
     }
     conf["bundle"]["resources"] = Value::Object(resources);
 
-    // Paquet MIME : le suivi (formats natifs) + les types propres des plugins.
+    // MIME package: the tracked one (native formats) + the plugins' own types.
     let mime_base = tauri.join("linux/kroki-desk.xml");
     let xml = fs::read_to_string(&mime_base)
         .unwrap_or_else(|e| die(&format!("{cmd}: {} unreadable: {e}", mime_base.display())));
@@ -516,7 +519,7 @@ pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf 
         ))
     });
     let generated = format!(
-        "{}  <!-- Types propres des plugins embarqués, générés par xtask (bundled.rs). -->\n{own_types}\n{}",
+        "{}  <!-- Own types of the bundled plugins, generated by xtask (bundled.rs). -->\n{own_types}\n{}",
         &xml[..close],
         &xml[close..]
     );

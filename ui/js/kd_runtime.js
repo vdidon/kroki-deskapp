@@ -1,15 +1,15 @@
 // @ts-check
-// Runtime `kd` injecté dans le worker de chaque plugin (protocole v1,
-// doc/plugin-protocol.md §5-§6). Ce fichier n'est PAS un module de l'app : il
-// est chargé comme texte par ui/js/plugins.js et préfixé au blob du worker,
-// suivi de `kd.__load("<url absolue de l'entry>")`. Il tourne donc dans le
-// scope global d'un module worker sandboxé (pas de DOM, pas d'`invoke`).
+// `kd` runtime injected into each plugin's worker (protocol v1,
+// doc/plugin-protocol.md §5-§6). This file is NOT an app module: it is
+// loaded as text by ui/js/plugins.js and prepended to the worker blob,
+// followed by `kd.__load("<absolute URL of the entry>")`. It therefore runs in the
+// global scope of a sandboxed module worker (no DOM, no `invoke`).
 //
-// Enveloppe des messages : { kd: 1, id?, method?, params?, result?, error? }.
-// Champs inconnus ignorés des deux côtés (levier de compat du protocole).
+// Message envelope: { kd: 1, id?, method?, params?, result?, error? }.
+// Unknown fields are ignored on both sides (protocol compat lever).
 //
-// Types : types/plugin-protocol.d.ts. Ce fichier est un script (pas d'import :
-// il est concaténé au blob), d'où les `import()` en JSDoc.
+// Types: types/plugin-protocol.d.ts. This file is a script (no import:
+// it is concatenated into the blob), hence the JSDoc `import()`s.
 
 /** @typedef {import("../../types/plugin-protocol").KdGlobal} KdGlobal */
 /** @typedef {import("../../types/plugin-protocol").KdWireMessage} KdWireMessage */
@@ -23,10 +23,10 @@ const __kdPending = new Map();
 const __kdHandlers = new Map();
 let __kdNextId = 1;
 
-// `kd` n'existe pas sur le `globalThis` de la lib DOM : cast vers KdGlobal.
+// `kd` does not exist on the DOM lib's `globalThis`: cast to KdGlobal.
 /** @type {KdGlobal} */ (/** @type {unknown} */ (globalThis)).kd = {
   /**
-   * Enregistre le handler d'une méthode entrante (hôte → plugin).
+   * Registers the handler of an incoming method (host → plugin).
    * @param {string} method
    * @param {KdRawHandler} handler
    */
@@ -34,7 +34,7 @@ let __kdNextId = 1;
     __kdHandlers.set(method, handler);
   },
   /**
-   * Appelle un service de l'hôte (plugin → hôte), ex. `host/readFile`.
+   * Calls a host service (plugin → host), e.g. `host/readFile`.
    * @param {string} method
    * @param {unknown} [params]
    * @returns {Promise<unknown>}
@@ -47,7 +47,7 @@ let __kdNextId = 1;
     });
   },
   /**
-   * Notification sans réponse (plugin → hôte), ex. `host/log`.
+   * Notification with no reply (plugin → host), e.g. `host/log`.
    * @param {string} method
    * @param {unknown} [params]
    */
@@ -57,19 +57,19 @@ let __kdNextId = 1;
 };
 
 self.onmessage = async (e) => {
-  // Message de l'hôte, non validé : seuls `kd`, `id`, `method` sont testés.
+  // Message from the host, unvalidated: only `kd`, `id`, `method` are tested.
   const m = /** @type {KdWireMessage | null | undefined} */ (e.data);
   if (!m || m.kd !== 1) return;
 
-  // Réponse à une requête du plugin (kd.request).
+  // Reply to a plugin request (kd.request).
   if (m.id != null && ("result" in m || "error" in m)) {
     const p = __kdPending.get(/** @type {number} */ (m.id));
     if (!p) return;
     __kdPending.delete(/** @type {number} */ (m.id));
     if ("error" in m) {
-      // `Error()` convertit un message non chaîne ; `code` est relayé tel quel.
+      // `Error()` converts a non-string message; `code` is relayed as is.
       const err = /** @type {KdRequestError} */ (
-        new Error(/** @type {string | undefined} */ (m.error?.message) || "erreur de l'hôte")
+        new Error(/** @type {string | undefined} */ (m.error?.message) || "host error")
       );
       err.code = /** @type {string | undefined} */ (m.error?.code) || "internal";
       p.reject(err);
@@ -80,23 +80,23 @@ self.onmessage = async (e) => {
   }
 
   if (!m.method) return;
-  // Clé de Map : une méthode non chaîne ne trouve simplement aucun handler.
+  // Map key: a non-string method simply finds no handler.
   const handler = __kdHandlers.get(/** @type {string} */ (m.method));
 
-  // Notification entrante (pas d'id) : best effort, jamais de réponse.
+  // Incoming notification (no id): best effort, never a reply.
   if (m.id == null) {
     if (handler) {
       try {
         await handler(m.params);
       } catch {
-        /* une notification n'a pas de canal d'erreur */
+        /* a notification has no error channel */
       }
     }
     return;
   }
 
-  // Requête entrante : le retour du handler devient `result`, une exception
-  // devient `error` (code `internal` par défaut, ou `err.code` si posé).
+  // Incoming request: the handler's return value becomes `result`, an exception
+  // becomes `error` (code `internal` by default, or `err.code` if set).
   if (!handler) {
     postMessage(/** @satisfies {KdOutgoingFromWorker} */ ({
       kd: 1,
@@ -111,9 +111,9 @@ self.onmessage = async (e) => {
       /** @satisfies {KdOutgoingFromWorker} */ ({ kd: 1, id: /** @type {number} */ (m.id), result: result ?? {} }),
     );
   } catch (err) {
-    // N'importe quelle valeur peut être levée par le plugin : `code`/`message`
-    // lus seulement si `err` est vrai, puis `|| …` / `String()`. Un `code` non
-    // chaîne posé par le plugin passe tel quel (l'hôte ne le valide pas non plus).
+    // The plugin may throw any value: `code`/`message` are read only if
+    // `err` is truthy, then `|| …` / `String()`. A non-string `code` set by
+    // the plugin passes through as is (the host does not validate it either).
     postMessage(/** @satisfies {KdOutgoingFromWorker} */ ({
       kd: 1,
       id: /** @type {number} */ (m.id),
@@ -125,9 +125,9 @@ self.onmessage = async (e) => {
   }
 };
 
-// Charge l'entry du plugin (URL absolue plugin://…) puis signale l'hôte. Les
-// handlers `kd.onRequest` du module sont enregistrés à l'import, avant que
-// l'hôte n'envoie `initialize`.
+// Loads the plugin entry (absolute plugin://… URL) then signals the host. The
+// module's `kd.onRequest` handlers are registered at import time, before the
+// host sends `initialize`.
 /** @type {KdGlobal} */ (/** @type {unknown} */ (globalThis)).kd.__load = async (entryUrl) => {
   try {
     await import(entryUrl);

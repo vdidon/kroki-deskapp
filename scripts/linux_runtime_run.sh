@@ -1,39 +1,39 @@
 #!/usr/bin/env bash
-# Lance l'app Tauri en headless (Xvfb + dbus géré manuellement) et teste les
-# moteurs via l'API Kroki locale. Conçu pour tourner dans le conteneur.
+# Runs the Tauri app headless (Xvfb + manually managed dbus) and tests the
+# engines through the local Kroki API. Designed to run in the container.
 set -u
 
 export CARGO_TARGET_DIR=/target
-# Surchargable pour tester un autre artefact, p. ex. l'AppImage :
+# Overridable to test another artifact, e.g. the AppImage:
 #   docker run ... -e APP="/app/dist/Kroki Desk_<version>_amd64.AppImage" ...
 APP="${APP:-/target/debug/kroki_deskapp}"
-# AppImage sans FUSE dans le conteneur : le runtime s'extrait au lieu de se
-# monter. Sans effet sur un binaire ordinaire.
+# AppImage without FUSE in the container: the runtime extracts itself instead
+# of mounting. No effect on an ordinary binary.
 export APPIMAGE_EXTRACT_AND_RUN=1
 
-# --- Compilation si nécessaire ---
+# --- Compile if needed ---
 if [ ! -x "$APP" ]; then
   echo "== Binary missing, compiling (cargo build) =="
   (cd /app/src-tauri && cargo build) || { echo "!! build failed"; exit 1; }
 fi
 
-# --- Display virtuel ---
+# --- Virtual display ---
 echo "== Starting Xvfb =="
 Xvfb :99 -screen 0 1280x1024x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
 XVFB_PID=$!
 export DISPLAY=:99
-# Attendre que le socket X soit prêt
+# Wait for the X socket to be ready
 for i in $(seq 1 20); do
   [ -S /tmp/.X11-unix/X99 ] && break
   sleep 0.25
 done
 
-# --- Session D-Bus ---
+# --- D-Bus session ---
 echo "== Starting D-Bus =="
 eval "$(dbus-launch --sh-syntax)"
 export DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID
 
-# WebKitGTK en conteneur sans GPU : désactiver le rendu accéléré sinon crash.
+# WebKitGTK in a container without GPU: disable accelerated rendering, otherwise it crashes.
 export WEBKIT_DISABLE_DMABUF_RENDERER=1
 export WEBKIT_DISABLE_COMPOSITING_MODE=1
 export LIBGL_ALWAYS_SOFTWARE=1

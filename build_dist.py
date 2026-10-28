@@ -87,9 +87,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
 IMAGE_NAME = "kroki-linux-build"
-# Indirection volontaire : testé directement, `sys.platform` est narrowé
-# statiquement par les type-checkers, qui déclarent alors mort le code de
-# l'autre plateforme.
+# Deliberate indirection: tested directly, `sys.platform` is narrowed
+# statically by type checkers, which then declare the other platform's code
+# dead.
 IS_WINDOWS = sys.platform == "win32"
 COMMON_VOLUMES = [
     "-v", f"{REPO_ROOT}:/app",
@@ -97,12 +97,12 @@ COMMON_VOLUMES = [
     "-v", "kroki_cargo:/usr/local/cargo/registry",
 ]
 
-# Les étapes, dans l'ordre d'exécution. Chacune a un --skip-<étape>.
+# The steps, in execution order. Each has a --skip-<step>.
 STEPS = ("plugins", "native", "msi", "appimage", "binary", "deb")
 
-# Chaque --<x>-only : l'étape qu'il isole (celle dont le --skip- le
-# contredirait) et l'ensemble des étapes qu'il conserve. --compile-only n'en
-# garde aucune : il ne produit aucun artefact.
+# Each --<x>-only: the step it isolates (the one whose --skip- would
+# contradict it) and the set of steps it keeps. --compile-only keeps none:
+# it produces no artifact.
 ONLY_MODES = {
     "native_only": ("native", {"native"}),
     "plugins_only": ("plugins", {"plugins"}),
@@ -111,7 +111,7 @@ ONLY_MODES = {
     "compile_only": (None, set()),
 }
 
-# Stratégies d'embarquement des plugins (cf. xtask/src/bundled.rs).
+# Plugin bundling strategies (see xtask/src/bundled.rs).
 STRATEGY_LOCAL = "bundled-plugins.txt"
 STRATEGY_DEFAULT = "bundled-plugins.default.txt"
 STRATEGY_ENV = "KROKI_BUNDLED_PLUGINS"
@@ -125,7 +125,7 @@ def say(msg: str, color: str = "36") -> None:
 
 
 def flag(name: str) -> str:
-    """Nom d'option tel que l'utilisateur l'a tapé : skip_msi -> --skip-msi."""
+    """Option name as the user typed it: skip_msi -> --skip-msi."""
     return "--" + name.replace("_", "-")
 
 
@@ -153,12 +153,12 @@ def project_version() -> str:
 
 
 def pack_plugins() -> None:
-    """Empaquette en .kdext tout dossier de plugins/ portant un manifest.json.
+    """Packs into a .kdext every plugins/ folder holding a manifest.json.
 
-    Délégué à pack_plugin.py (une invocation par plugin) : c'est lui qui porte
-    la convention `packInclude` et la publication versionnée + twin dans dist/.
-    Une jonction cassée (plugin vivant dans un dépôt absent) n'a pas de
-    manifest lisible : elle est simplement ignorée, pas une erreur.
+    Delegated to pack_plugin.py (one invocation per plugin): it carries the
+    `packInclude` convention and the versioned + twin publication into dist/.
+    A broken junction (plugin living in a missing repo) has no readable
+    manifest: it is simply ignored, not an error.
     """
     plugins_root = REPO_ROOT / "plugins"
     plugin_dirs = sorted(
@@ -174,14 +174,14 @@ def pack_plugins() -> None:
 
 
 def channel_strategy(channel: str) -> Path:
-    """Fichier de stratégie d'un canal : le public ignore la sélection du poste."""
+    """Strategy file of a channel: the public one ignores the workstation's selection."""
     if channel == "local" and (REPO_ROOT / STRATEGY_LOCAL).is_file():
         return REPO_ROOT / STRATEGY_LOCAL
     return REPO_ROOT / STRATEGY_DEFAULT
 
 
 def strategy_ids(strategy: Path) -> list[str]:
-    """Identifiants des plugins d'une stratégie (même lecture que bundled::load)."""
+    """Plugin ids of a strategy (same reading as bundled::load)."""
     ids = []
     for raw in strategy.read_text(encoding="utf-8").splitlines():
         words = raw.split("#", 1)[0].split()
@@ -191,7 +191,7 @@ def strategy_ids(strategy: Path) -> list[str]:
 
 
 def newest(pattern: str, exclude_suffixes: tuple[str, ...] = ()) -> Path | None:
-    """Artefact le plus récent de dist/ correspondant au motif."""
+    """Most recent artifact in dist/ matching the pattern."""
     candidates = sorted(
         (p for p in (REPO_ROOT / "dist").glob(pattern)
          if p.is_file() and p.suffix not in exclude_suffixes),
@@ -202,8 +202,8 @@ def newest(pattern: str, exclude_suffixes: tuple[str, ...] = ()) -> Path | None:
 
 
 def collect(artifact: Path, release_dir: Path | None) -> None:
-    """Recopie un artefact dans dist/public/<version>/ (hardlink, copie en
-    repli) ; no-op hors canal public, dont les artefacts restent dans dist/."""
+    """Copies an artifact into dist/public/<version>/ (hardlink, copy as a
+    fallback); no-op outside the public channel, whose artifacts stay in dist/."""
     if release_dir is None:
         return
     release_dir.mkdir(parents=True, exist_ok=True)
@@ -216,7 +216,7 @@ def collect(artifact: Path, release_dir: Path | None) -> None:
 
 
 def collect_plugins(ids: list[str], release_dir: Path | None) -> None:
-    """Recopie les .kdext versionnés des seuls plugins de la stratégie."""
+    """Copies the versioned .kdext of the strategy's plugins only."""
     if release_dir is None:
         return
     for plugin_id in ids:
@@ -228,11 +228,11 @@ def collect_plugins(ids: list[str], release_dir: Path | None) -> None:
 
 
 def check_staged(ids: list[str], label: str) -> None:
-    """Vérifie que l'installeur a embarqué exactement les plugins du canal.
+    """Checks that the installer embedded exactly the channel's plugins.
 
-    bundled::stage vide src-tauri/bundled-plugins/ puis y recopie la stratégie
-    qu'il a lue : son contenu dit donc ce que le build vient d'embarquer, y
-    compris depuis le conteneur du .deb (dépôt monté).
+    bundled::stage empties src-tauri/bundled-plugins/ then copies back the
+    strategy it read: its content therefore says what the build just embedded,
+    including from the .deb container (mounted repo).
     """
     staged = sorted(p.stem for p in (REPO_ROOT / "src-tauri" / "bundled-plugins").glob("*.kdext"))
     if staged != sorted(ids):
@@ -275,8 +275,8 @@ def main() -> None:
                         help="after the build, headless runtime test on the AppImage (or the bare binary if --skip-appimage)")
     args = parser.parse_args()
 
-    # Mémorisé avant que les --*-only ne forcent les autres skips, pour que les
-    # messages « sauté » nomment l'option réellement tapée.
+    # Recorded before the --*-only options force the other skips, so that the
+    # "skipped" messages name the option actually typed.
     explicit_skips = {s for s in STEPS if getattr(args, f"skip_{s}")}
 
     selected = [name for name in ONLY_MODES if getattr(args, name)]
@@ -295,8 +295,8 @@ def main() -> None:
             if step not in kept:
                 setattr(args, f"skip_{step}", True)
 
-    # WiX v3 ne tourne que sous Windows : ailleurs, le MSI est hors sujet, pas
-    # une erreur — sauf s'il est explicitement le seul artefact demandé.
+    # WiX v3 only runs on Windows: elsewhere, the MSI is out of scope, not an
+    # error — unless it is explicitly the only artifact requested.
     msi_skip_reason = None
     if not IS_WINDOWS and not args.skip_msi:
         if args.msi_only:
@@ -319,10 +319,10 @@ def main() -> None:
 
     (REPO_ROOT / "dist").mkdir(exist_ok=True)
 
-    # La stratégie du canal est imposée au xtask : sans ça, un poste qui a un
-    # bundled-plugins.txt l'embarquerait aussi dans un build public. `all`
-    # construit le public d'abord, pour que dist/ finisse sur les installeurs
-    # du canal local.
+    # The channel's strategy is imposed on the xtask: without that, a
+    # workstation that has a bundled-plugins.txt would embed it in a public
+    # build too. `all` builds the public one first, so that dist/ ends up on
+    # the local channel's installers.
     version = project_version()
     channels = []
     for name in (("public", "local") if args.channel == "all" else (args.channel,)):
@@ -330,22 +330,22 @@ def main() -> None:
         channels.append((name, strategy.relative_to(REPO_ROOT).as_posix(), strategy_ids(strategy)))
         say(f"== Channel {name}: {channels[-1][1]} ({', '.join(channels[-1][2]) or 'no plugin'}) ==")
     public = next((c for c in channels if c[0] == "public"), None)
-    # Les artefacts sans plugin (binaires, AppImage) sont les mêmes pour tous
-    # les canaux : ils ne sont construits qu'une fois, et recopiés si le canal
-    # public en fait partie.
+    # Artifacts without plugins (binaries, AppImage) are the same for every
+    # channel: they are built only once, and copied over if the public channel
+    # is among them.
     release_dir = REPO_ROOT / "dist" / "public" / version if public else None
 
     def per_channel(label: str):
-        """Itère les canaux en imposant leur stratégie au xtask (cf. STRATEGY_ENV)."""
+        """Iterates over the channels, imposing their strategy on the xtask (see STRATEGY_ENV)."""
         for name, rel, ids in channels:
             os.environ[STRATEGY_ENV] = rel
             if len(channels) > 1:
                 say(f"== {label}: {name} channel ==")
             yield name, rel, ids, (release_dir if name == "public" else None)
 
-    # Les plugins d'abord : quelques centaines de ms, sans cargo ni Docker.
-    # Même logique que pour le natif ci-dessous, en plus fort — rien de ce qui
-    # suit ne doit pouvoir retarder ou empêcher un artefact aussi bon marché.
+    # Plugins first: a few hundred ms, neither cargo nor Docker. Same logic as
+    # for the native binary below, only stronger — nothing that follows must be
+    # able to delay or prevent an artifact this cheap.
     if args.skip_plugins:
         skipped("Plugins", "plugins")
     else:
@@ -355,9 +355,9 @@ def main() -> None:
     if args.plugins_only:
         return
 
-    # Le natif ensuite : c'est l'artefact le plus rapide à obtenir et celui
-    # qu'on attend le plus souvent. Une étape Docker lente ou en panne (daemon
-    # arrêté, image à retélécharger) ne doit ni le retarder ni l'empêcher.
+    # The native binary next: it is the fastest artifact to get and the one
+    # most often awaited. A slow or broken Docker step (daemon stopped, image
+    # to re-download) must neither delay nor prevent it.
     if args.skip_native:
         skipped("Native binary", "native")
     else:
@@ -372,9 +372,9 @@ def main() -> None:
     if args.native_only:
         return
 
-    # Le MSI après le natif : il relance un build release, qui est alors un
-    # no-op. Avant Docker, comme le natif — c'est un artefact Windows, rien de
-    # ce qui suit ne doit pouvoir l'empêcher.
+    # The MSI after the native binary: it reruns a release build, which is then
+    # a no-op. Before Docker, like the native binary — it is a Windows
+    # artifact, nothing that follows must be able to prevent it.
     if args.skip_msi:
         skipped("MSI installer", "msi", msi_skip_reason)
     else:
@@ -420,15 +420,16 @@ def main() -> None:
         skipped("Bare Linux binary", "binary")
     else:
         say("== Extracting the bare Linux binary (counterpart of kroki_deskapp.exe) ==")
-        # cargo build-app (xtask) rebuilde si besoin (no-op si le build AppImage
-        # vient de compiler le release) et publie le binaire + le twin non
-        # versionné, suffixés du tag distro (debian12 dans le conteneur).
-        # -w /app : l'alias build-app pointe xtask/Cargo.toml en relatif — il
-        # doit être lancé depuis la racine du dépôt (WORKDIR de l'image = src-tauri/).
+        # cargo build-app (xtask) rebuilds if needed (no-op if the AppImage build
+        # has just compiled the release) and publishes the binary + the
+        # unversioned twin, suffixed with the distro tag (debian12 in the
+        # container).
+        # -w /app: the build-app alias points to xtask/Cargo.toml relatively — it
+        # must be run from the repository root (image WORKDIR = src-tauri/).
         run(["docker", "run", "--rm", "-w", "/app", *COMMON_VOLUMES,
              "-e", "CARGO_TARGET_DIR=/target", IMAGE_NAME, "cargo", "build-app"])
-        # Retrouver l'artefact plutôt que deviner le tag (le plus récent, hors
-        # AppImage — un éventuel build natif du même hôte est plus ancien).
+        # Find the artifact rather than guess the tag (the most recent, excluding
+        # AppImage — any native build on the same host is older).
         candidates = sorted(
             (p for p in (REPO_ROOT / "dist").glob(f"kroki_deskapp-{version}-linux-*")
              if p.suffix not in (".AppImage", ".deb")),
@@ -444,7 +445,7 @@ def main() -> None:
 
     appimage = None
     if not args.skip_appimage:
-        # Cibler l'AppImage versionnée (le xtask publie aussi un twin non versionné).
+        # Target the versioned AppImage (the xtask also publishes an unversioned twin).
         candidates = sorted(
             (REPO_ROOT / "dist").glob(f"*-{version}-*.AppImage"),
             key=lambda p: p.stat().st_mtime,
@@ -456,10 +457,10 @@ def main() -> None:
         collect(appimage, release_dir)
         say(f"== AppImage built: {appimage} ==", "32")
 
-    # Le .deb en dernier des artefacts Linux : il relance un build release, qui
-    # est alors un no-op si l'AppImage ou le binaire nu vient de compiler, et sa
-    # publication ne doit pas s'intercaler dans les recherches d'artefacts
-    # ci-dessus (le nom du paquet a le même préfixe que celui du binaire nu).
+    # The .deb last of the Linux artifacts: it reruns a release build, which is
+    # then a no-op if the AppImage or the bare binary has just compiled, and its
+    # publication must not slip into the artifact lookups above (the package
+    # name has the same prefix as the bare binary's).
     if args.skip_deb:
         skipped(".deb package", "deb")
     else:

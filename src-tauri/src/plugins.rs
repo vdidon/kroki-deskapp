@@ -1,15 +1,15 @@
-//! Registre des plugins — protocole v1, cf. `doc/plugin-protocol.md`.
+//! Plugin registry — protocol v1, see `doc/plugin-protocol.md`.
 //!
-//! Un plugin est un dossier `plugins/<id>/` contenant un `manifest.json` (schéma
-//! §3 de la spec) et son code (worker JS + assets). Le backend ne **jamais**
-//! n'exécute le code d'un plugin : il énumère les manifestes (serde, champs
-//! inconnus ignorés), installe/désinstalle les archives `.kdext` (zip), sert les
-//! fichiers via le protocole custom `plugin://` (webview → worker) et applique
-//! le confinement de `host/readFile`. L'exécution vit côté frontend
-//! (`ui/js/plugins.js`, worker sandboxé).
+//! A plugin is a `plugins/<id>/` folder containing a `manifest.json` (schema
+//! §3 of the spec) and its code (JS worker + assets). The backend **never**
+//! runs plugin code: it enumerates the manifests (serde, unknown fields
+//! ignored), installs/uninstalls the `.kdext` archives (zip), serves the files
+//! through the custom `plugin://` protocol (webview → worker) and enforces the
+//! confinement of `host/readFile`. Execution lives on the frontend side
+//! (`ui/js/plugins.js`, sandboxed worker).
 //!
-//! Le dossier des plugins est volontairement **hors** du dossier d'identité
-//! Tauri (qui suit l'`identifier` du bundle) : `%APPDATA%\kroki-deskapp\plugins`
+//! The plugins folder is deliberately **outside** the Tauri identity folder
+//! (which follows the bundle's `identifier`): `%APPDATA%\kroki-deskapp\plugins`
 //! (Windows) / `$XDG_CONFIG_HOME/kroki-deskapp/plugins` (Linux) — spec §9.1.
 
 use std::io::{Cursor, Read, Seek};
@@ -26,14 +26,14 @@ use crate::commands::save_settings;
 use crate::manager;
 use crate::state::SettingsState;
 
-/// Extension des archives de plugins (glisser-déposer + bouton « Ajouter »).
+/// Extension of plugin archives (drag-and-drop + « Ajouter » button).
 pub const ARCHIVE_EXT: &str = "kdext";
 
-/// Changelog optionnel d'un plugin, à la racine de son dossier (spec §3.1) :
-/// nom conventionnel fixe, pas de champ de manifeste.
+/// Optional plugin changelog, at the root of its folder (spec §3.1):
+/// fixed conventional name, no manifest field.
 const CHANGELOG_FILE: &str = "CHANGELOG.md";
 
-/// Capacités que CET hôte sait servir (négociation `initialize`, spec §6.1).
+/// Capabilities THIS host can serve (`initialize` negotiation, spec §6.1).
 pub const HOST_CAPABILITIES: &[&str] = &[
     "document:markdown",
     "fence:svg",
@@ -43,8 +43,8 @@ pub const HOST_CAPABILITIES: &[&str] = &[
     "read:siblings",
 ];
 
-/// `manifest.json` d'un plugin (spec §3). Les champs inconnus sont ignorés
-/// (compat ascendante) ; les listes absentes valent vide.
+/// A plugin's `manifest.json` (spec §3). Unknown fields are ignored
+/// (forward compat); missing lists default to empty.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Manifest {
@@ -71,8 +71,8 @@ struct Manifest {
     sibling_extensions: Vec<String>,
 }
 
-/// Entrée du registre, sérialisée telle quelle vers le frontend
-/// (`list_plugins`, événement `plugins-changed`).
+/// Registry entry, serialized as is to the frontend
+/// (`list_plugins`, `plugins-changed` event).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginInfo {
@@ -84,19 +84,19 @@ pub struct PluginInfo {
     pub api_version: String,
     pub runtime: String,
     pub entry: String,
-    /// Extensions revendiquées, normalisées : minuscules, sans point.
+    /// Claimed extensions, normalized: lowercase, no dot.
     pub extensions: Vec<String>,
     pub fences: Vec<String>,
     pub highlights: Vec<String>,
     pub capabilities: Vec<String>,
     pub sibling_extensions: Vec<String>,
-    /// "ok" | "inert" (chargeable mais aucune capacité servable) | "invalid".
+    /// "ok" | "inert" (loadable but no servable capability) | "invalid".
     pub status: String,
     pub status_reason: String,
     pub warnings: Vec<String>,
-    /// Un `CHANGELOG.md` existe à la racine du plugin (bouton « Nouveautés »).
+    /// A `CHANGELOG.md` exists at the plugin root (« Nouveautés » button).
     pub has_changelog: bool,
-    /// Ordre d'installation (mtime du dossier) — départage des conflits (§8).
+    /// Installation order (folder mtime) — conflict tie-breaker (§8).
     installed_at: u64,
 }
 
@@ -107,7 +107,7 @@ fn registry() -> &'static RwLock<Vec<PluginInfo>> {
 }
 
 /// `%APPDATA%\kroki-deskapp` (Windows) / `$XDG_CONFIG_HOME/kroki-deskapp`
-/// (Linux, défaut `~/.config`) : plugins et réglages.
+/// (Linux, default `~/.config`): plugins and settings.
 pub fn app_dir() -> PathBuf {
     #[cfg(windows)]
     let base = std::env::var_os("APPDATA")
@@ -128,24 +128,24 @@ pub fn plugins_dir() -> PathBuf {
     app_dir().join("plugins")
 }
 
-/// Charge le registre au démarrage (avant la première fenêtre).
+/// Loads the registry at startup (before the first window).
 pub fn init() {
     *registry().write().unwrap() = scan();
 }
 
-/// Re-scanne et notifie toutes les fenêtres (`plugins-changed`, payload = liste).
+/// Re-scans and notifies all windows (`plugins-changed`, payload = list).
 pub fn rescan(app: &AppHandle) {
     init();
     let list = list();
     let _ = app.emit("plugins-changed", &list);
 }
 
-/// Instantané du registre.
+/// Snapshot of the registry.
 pub fn list() -> Vec<PluginInfo> {
     registry().read().unwrap().clone()
 }
 
-/// Un plugin actif revendique-t-il cette extension (minuscule, sans point) ?
+/// Does an active plugin claim this extension (lowercase, no dot)?
 pub fn claims_extension(ext: &str) -> bool {
     registry()
         .read()
@@ -154,7 +154,7 @@ pub fn claims_extension(ext: &str) -> bool {
         .any(|p| p.status == "ok" && p.extensions.iter().any(|e| e == ext))
 }
 
-/// Extensions de documents effectives : natives ∪ plugins actifs (spec §9.3).
+/// Effective document extensions: native ∪ active plugins (spec §9.3).
 pub fn effective_doc_extensions() -> Vec<String> {
     let mut out: Vec<String> = manager::DOC_EXTENSIONS
         .iter()
@@ -173,28 +173,28 @@ pub fn effective_doc_extensions() -> Vec<String> {
     out
 }
 
-/// Le chemin est-il une archive de plugin `.kdext` ?
+/// Is the path a `.kdext` plugin archive?
 pub fn is_plugin_archive(p: &Path) -> bool {
     p.extension()
         .and_then(|e| e.to_str())
         .is_some_and(|e| e.eq_ignore_ascii_case(ARCHIVE_EXT))
 }
 
-/// Archives en attente du dialog de confiance (§9.2). Une file, et non un
-/// simple événement porteur du chemin : une archive peut arriver **avant** que
-/// la fenêtre ait enregistré son écouteur — c'est le cas du double-clic quand
-/// l'application n'est pas déjà lancée, l'ouverture ayant lieu dans le `setup`
-/// alors que la webview charge son JS ensuite. L'événement
-/// `plugin-install-request` n'est donc qu'un signal ; la charge utile se
-/// récupère par `take_pending_plugin_installs`, que le frontend appelle aussi
-/// une fois son écouteur en place.
+/// Archives waiting for the trust dialog (§9.2). A queue, rather than a
+/// plain event carrying the path: an archive can arrive **before** the
+/// window has registered its listener — this is the double-click case when
+/// the application is not already running, the opening happening in `setup`
+/// while the webview loads its JS afterwards. The
+/// `plugin-install-request` event is therefore only a signal; the payload is
+/// retrieved through `take_pending_plugin_installs`, which the frontend also
+/// calls once its listener is in place.
 static PENDING_INSTALLS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 
 fn pending_installs() -> &'static Mutex<Vec<String>> {
     PENDING_INSTALLS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-/// Empile une archive pour installation et signale la fenêtre cible.
+/// Queues an archive for installation and signals the target window.
 pub fn request_install(app: &AppHandle, label: &str, path: &Path) {
     pending_installs()
         .lock()
@@ -203,14 +203,14 @@ pub fn request_install(app: &AppHandle, label: &str, path: &Path) {
     let _ = app.emit_to(label, "plugin-install-request", ());
 }
 
-/// Récupère et vide la file des archives en attente.
+/// Takes and empties the queue of pending archives.
 #[tauri::command]
 pub fn take_pending_plugin_installs() -> Vec<String> {
     std::mem::take(&mut *pending_installs().lock().unwrap())
 }
 
 // --------------------------------------------------------------------------- //
-// Scan du dossier des plugins
+// Scan of the plugins folder
 // --------------------------------------------------------------------------- //
 
 fn scan() -> Vec<PluginInfo> {
@@ -228,8 +228,8 @@ fn scan() -> Vec<PluginInfo> {
         })
         .map(|p| load_plugin(&p))
         .collect();
-    // Ordre d'installation ≈ mtime du dossier (l'extraction crée un dossier
-    // frais) : départage « dernier installé gagne » (§8.2).
+    // Installation order ≈ folder mtime (extraction creates a fresh folder):
+    // tie-breaker, « last installed wins » (§8.2).
     list.sort_by_key(|p| p.installed_at);
     resolve_conflicts(&mut list);
     list
@@ -244,7 +244,7 @@ fn dir_mtime(dir: &Path) -> u64 {
         .unwrap_or(0)
 }
 
-/// Minuscules, sans point de tête — forme canonique des extensions/fences.
+/// Lowercase, no leading dot — canonical form of extensions/fences.
 fn norm_ext(e: &str) -> String {
     e.trim().trim_start_matches('.').to_ascii_lowercase()
 }
@@ -257,9 +257,9 @@ pub(crate) fn valid_id(id: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-/// Erreurs **dures** du manifeste : refus à l'installation, statut `invalid` au
-/// scan. Les cas « soft » (runtime inconnu, aucune capacité servable) rendent
-/// le plugin inerte, pas invalide (spec §3).
+/// **Hard** manifest errors: refused at install time, `invalid` status at
+/// scan. The « soft » cases (unknown runtime, no servable capability) make
+/// the plugin inert, not invalid (spec §3).
 fn validate_hard(m: &Manifest) -> Result<(), String> {
     if !valid_id(&m.id) {
         return Err(tr!("pluginpkg.manifest_id_invalid", id = m.id));
@@ -333,8 +333,8 @@ fn load_plugin(dir: &Path) -> PluginInfo {
         return invalid(tr!("pluginpkg.entry_not_found", entry = m.entry));
     }
 
-    // Statut : inerte si le runtime est inconnu ou si aucune capacité
-    // productrice n'est servable par cet hôte.
+    // Status: inert if the runtime is unknown or if no producing capability
+    // can be served by this host.
     let (status, status_reason) = if m.runtime != "worker" {
         (
             "inert",
@@ -376,9 +376,9 @@ fn load_plugin(dir: &Path) -> PluginInfo {
     }
 }
 
-/// Avertissements d'un conflit de revendication, côté perdant puis côté
-/// gagnant. `kind` : 0 = extension, 1 = fence, 2 = coloration. Une clé par
-/// phrase entière : le nom du type de revendication n'est pas recollé.
+/// Warnings of a claim conflict, loser side then winner side. `kind`:
+/// 0 = extension, 1 = fence, 2 = highlighting. One key per whole sentence:
+/// the claim type's name is not glued in.
 fn conflict_messages(kind: usize, name: &str, winner: &str, loser: &str) -> (String, String) {
     match kind {
         0 => (
@@ -416,11 +416,11 @@ fn conflict_messages(kind: usize, name: &str, winner: &str, loser: &str) -> (Str
     }
 }
 
-/// Règles de conflit (§8) : le natif gagne toujours (extensions — les fences
-/// natives sont arbitrées côté frontend qui connaît `KROKI_TYPES`), puis entre
-/// plugins le dernier installé gagne, avec avertissement des deux côtés.
+/// Conflict rules (§8): native always wins (extensions — native fences
+/// are arbitrated on the frontend, which knows `KROKI_TYPES`), then between
+/// plugins the last installed wins, with a warning on both sides.
 fn resolve_conflicts(list: &mut [PluginInfo]) {
-    // Natif d'abord : une extension native est retirée de la revendication.
+    // Native first: a native extension is removed from the claim.
     for p in list.iter_mut() {
         if p.status != "ok" {
             continue;
@@ -434,8 +434,8 @@ fn resolve_conflicts(list: &mut [PluginInfo]) {
         }
         p.extensions = kept;
     }
-    // Entre plugins : pour chaque revendication, le dernier installé (fin de
-    // liste) gagne. `list` est trié par installed_at croissant.
+    // Between plugins: for each claim, the last installed (end of list)
+    // wins. `list` is sorted by ascending installed_at.
     for kind in 0..3usize {
         let claims = |p: &PluginInfo| -> Vec<String> {
             match kind {
@@ -464,15 +464,15 @@ fn resolve_conflicts(list: &mut [PluginInfo]) {
 }
 
 // --------------------------------------------------------------------------- //
-// Protocole custom `plugin://` — sert les fichiers des plugins au worker
+// Custom `plugin://` protocol — serves the plugins' files to the worker
 // --------------------------------------------------------------------------- //
 
 fn http_response(status: u16, ctype: &str, body: Vec<u8>) -> tauri::http::Response<Vec<u8>> {
     tauri::http::Response::builder()
         .status(status)
         .header("Content-Type", ctype)
-        // Le worker (blob, origine de l'app) importe les modules du plugin en
-        // cross-origin : les module scripts exigent CORS.
+        // The worker (blob, app origin) imports the plugin's modules
+        // cross-origin: module scripts require CORS.
         .header("Access-Control-Allow-Origin", "*")
         .body(body)
         .unwrap_or_else(|_| tauri::http::Response::new(Vec::new()))
@@ -517,11 +517,11 @@ pub(crate) fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// Handler du protocole : `plugin://localhost/<id>/<chemin>` (Windows :
-/// `http://plugin.localhost/<id>/<chemin>`). Lecture seule, confinée au dossier
-/// du plugin (canonicalisation + `starts_with`, comme `read_data_file`).
+/// Protocol handler: `plugin://localhost/<id>/<path>` (Windows:
+/// `http://plugin.localhost/<id>/<path>`). Read-only, confined to the plugin's
+/// folder (canonicalization + `starts_with`, like `read_data_file`).
 pub fn serve(request: &tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
-    // Réponse HTTP technique, lue par le worker (jamais affichée) : anglais fixe.
+    // Technical HTTP response, read by the worker (never displayed): fixed English.
     let not_found = || http_response(404, "text/plain", b"not found".to_vec());
     let path = percent_decode(request.uri().path());
     let mut parts = path.trim_start_matches('/').splitn(2, '/');
@@ -547,7 +547,7 @@ pub fn serve(request: &tauri::http::Request<Vec<u8>>) -> tauri::http::Response<V
 }
 
 // --------------------------------------------------------------------------- //
-// Installation / désinstallation (archives .kdext)
+// Install / uninstall (.kdext archives)
 // --------------------------------------------------------------------------- //
 
 fn open_archive(path: &Path) -> Result<zip::ZipArchive<std::fs::File>, String> {
@@ -563,7 +563,7 @@ fn archive_manifest(path: &Path) -> Result<Manifest, String> {
 fn zip_manifest<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Result<Manifest, String> {
     let mut entry = zip.by_name("manifest.json").map_err(|e| match e {
         zip::result::ZipError::FileNotFound => tr!("pluginpkg.manifest_missing"),
-        // Ex. méthode de compression non supportée (PPMd) : montrer la cause.
+        // E.g. unsupported compression method (PPMd): show the cause.
         e => tr!("pluginpkg.manifest_unreadable", error = e),
     })?;
     let mut bytes = Vec::new();
@@ -576,7 +576,7 @@ fn zip_manifest<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Result<Manifest
     Ok(m)
 }
 
-/// Comparaison de versions `x.y.z` (composantes numériques, lexicographique).
+/// `x.y.z` version comparison (numeric components, lexicographic).
 pub(crate) fn version_less(a: &str, b: &str) -> bool {
     let parse = |v: &str| -> Vec<u64> {
         v.split(['.', '-', '+'])
@@ -586,8 +586,8 @@ pub(crate) fn version_less(a: &str, b: &str) -> bool {
     parse(a) < parse(b)
 }
 
-/// Aperçu d'une archive pour le dialog de confiance (spec §9.2) — lu sans
-/// exécuter le moindre code du plugin.
+/// Preview of an archive for the trust dialog (spec §9.2) — read without
+/// running any plugin code.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestPreview {
@@ -633,12 +633,12 @@ pub fn plugin_manifest_preview(path: String) -> Result<ManifestPreview, String> 
     })
 }
 
-/// Installe (ou met à jour) une archive `.kdext` : extraction vers un dossier
-/// temporaire, bascule atomique, précédente version en `<id>.bak` (spec §9.2).
+/// Installs (or updates) a `.kdext` archive: extraction to a temporary
+/// folder, atomic swap, previous version kept as `<id>.bak` (spec §9.2).
 ///
-/// Ne touche ni au registre ni aux réglages : l'appelant décide. Partagé par la
-/// commande `install_plugin` (dialog de confiance en amont) et par `seed_bundled`
-/// (plugins livrés avec l'application).
+/// Touches neither the registry nor the settings: the caller decides. Shared by
+/// the `install_plugin` command (trust dialog upstream) and by `seed_bundled`
+/// (plugins shipped with the application).
 fn install_archive(src: &Path) -> Result<Manifest, String> {
     install_zip(open_archive(src)?)
 }
@@ -662,7 +662,7 @@ fn install_zip<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Result<Manifest, 
         std::fs::rename(&dest, &bak).map_err(|e| tr!("pluginpkg.backup_failed", error = e))?;
     }
     if let Err(e) = std::fs::rename(&tmp, &dest) {
-        // Restaure l'ancienne version si la bascule échoue.
+        // Restore the old version if the swap fails.
         if bak.exists() {
             let _ = std::fs::rename(&bak, &dest);
         }
@@ -675,15 +675,15 @@ fn install_zip<R: Read + Seek>(mut zip: zip::ZipArchive<R>) -> Result<Manifest, 
 #[tauri::command]
 pub fn install_plugin(app: AppHandle, path: String) -> Result<(), String> {
     let m = install_archive(Path::new(&path))?;
-    // Installer à la main lève un refus antérieur : le plugin redevient
-    // éligible aux mises à jour silencieuses de l'installeur.
+    // Installing by hand lifts an earlier refusal: the plugin becomes
+    // eligible again for the installer's silent updates.
     set_removed(&app, &m.id, false);
     rescan(&app);
     Ok(())
 }
 
-/// Supprime un plugin (dossier + `.bak`). Pas de corbeille : l'utilisateur
-/// ré-installe depuis son archive s'il se trompe (spec §9.4).
+/// Deletes a plugin (folder + `.bak`). No recycle bin: the user
+/// reinstalls from their archive if they made a mistake (spec §9.4).
 #[tauri::command]
 pub fn uninstall_plugin(app: AppHandle, id: String) -> Result<(), String> {
     if !valid_id(&id) {
@@ -695,8 +695,8 @@ pub fn uninstall_plugin(app: AppHandle, id: String) -> Result<(), String> {
         std::fs::remove_dir_all(&dest).map_err(|e| tr!("pluginpkg.remove_failed", error = e))?;
     }
     let _ = std::fs::remove_dir_all(dir.join(format!("{id}.bak")));
-    // Mémorise le refus, sinon un plugin livré avec l'installeur reviendrait au
-    // démarrage suivant (cf. `seed_bundled`).
+    // Remember the refusal, otherwise a plugin shipped with the installer would
+    // come back at the next startup (see `seed_bundled`).
     set_removed(&app, &id, true);
     crate::journal::forget_plugin(&id);
     rescan(&app);
@@ -704,10 +704,10 @@ pub fn uninstall_plugin(app: AppHandle, id: String) -> Result<(), String> {
 }
 
 // --------------------------------------------------------------------------- //
-// Plugins livrés avec l'installeur
+// Plugins shipped with the installer
 // --------------------------------------------------------------------------- //
 
-/// Marque (ou démarque) un plugin comme supprimé par l'utilisateur, et persiste.
+/// Marks (or unmarks) a plugin as removed by the user, and persists.
 fn set_removed(app: &AppHandle, id: &str, removed: bool) {
     {
         let st = app.state::<SettingsState>();
@@ -716,32 +716,33 @@ fn set_removed(app: &AppHandle, id: &str, removed: bool) {
         match (removed, present) {
             (true, false) => s.removed_plugins.push(id.to_string()),
             (false, true) => s.removed_plugins.retain(|x| x != id),
-            // Déjà dans l'état voulu : pas de réécriture de settings.json.
+            // Already in the desired state: no rewrite of settings.json.
             _ => return,
         }
     }
     save_settings(app);
 }
 
-/// Archive du plugin `latex-doc`, empaquetée par `build.rs` depuis
-/// `plugins/latex-doc/` : ce qu'installe `seed_bundled` en l'absence
-/// d'installeur.
+/// `latex-doc` plugin archive, packed by `build.rs` from
+/// `plugins/latex-doc/`: what `seed_bundled` installs when there is no
+/// installer.
 const EMBEDDED_PLUGIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/latex-doc.kdext"));
 
-/// Dossier des plugins livrés avec l'application — l'installeur y dépose les
-/// `.kdext` **cochés à l'installation** (composants conditionnés du fragment
-/// WiX généré, ressources de l'overlay `.deb`). Rien à filtrer ici : le seeding
-/// installe ce qu'il trouve, un plugin décoché est simplement absent du dossier.
+/// Folder of the plugins shipped with the application — the installer drops
+/// the `.kdext` **checked at install time** there (conditional components of
+/// the generated WiX fragment, resources of the `.deb` overlay). Nothing to
+/// filter here: seeding installs what it finds, an unchecked plugin is simply
+/// absent from the folder.
 ///
-/// Les deux installeurs créent ce dossier **même vide** (composant `CreateFolder`
-/// du MSI, `postinst` du `.deb`) : sa présence signifie « un installeur a
-/// choisi », son absence « pas d'installeur » (portable, AppImage, debug) — seul
-/// cas où le plugin embarqué dans le binaire est installé.
+/// Both installers create this folder **even when empty** (MSI `CreateFolder`
+/// component, `.deb` `postinst`): its presence means « an installer made a
+/// choice », its absence « no installer » (portable, AppImage, debug) — the
+/// only case where the plugin embedded in the binary is installed.
 ///
-/// Le sous-dossier est essentiel, et pas seulement par propreté : `resource_dir()`
-/// est le dossier de l'exécutable, or le binaire portable est publié dans `dist/`
-/// — à côté de toutes les archives produites par `build_dist.py`. Sans
-/// ce niveau, le lancer depuis là installerait n'importe quel `.kdext` voisin.
+/// The subfolder is essential, and not just for tidiness: `resource_dir()`
+/// is the executable's folder, and the portable binary is published in `dist/`
+/// — next to all the archives produced by `build_dist.py`. Without
+/// this level, launching it from there would install any neighboring `.kdext`.
 pub(crate) fn bundled_plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     app.path()
         .resource_dir()
@@ -749,8 +750,8 @@ pub(crate) fn bundled_plugins_dir(app: &AppHandle) -> Option<PathBuf> {
         .map(|d| d.join("bundled-plugins"))
 }
 
-/// Version installée d'un plugin, lue directement sur disque : le registre
-/// n'est pas encore chargé quand le seeding tourne (avant `init`).
+/// Installed version of a plugin, read straight from disk: the registry
+/// is not loaded yet when seeding runs (before `init`).
 fn installed_version(id: &str) -> Option<String> {
     let bytes = std::fs::read(plugins_dir().join(id).join("manifest.json")).ok()?;
     serde_json::from_slice::<Manifest>(&bytes)
@@ -758,19 +759,19 @@ fn installed_version(id: &str) -> Option<String> {
         .map(|m| m.version)
 }
 
-/// Installe et met à jour les plugins livrés avec l'application, **sans dialog
-/// de confiance** : ils proviennent de l'exécutable ou de son installeur, donc
-/// de la même chaîne de confiance (dérogation au §9.2 de la spec, seule voie
-/// d'installation qui s'en dispense — drop et dialog Plugins le conservent).
-/// Source : le dossier `bundled-plugins/` s'il existe, sinon le plugin embarqué
-/// dans le binaire (cf. `bundled_plugins_dir`).
+/// Installs and updates the plugins shipped with the application, **without a
+/// trust dialog**: they come from the executable or its installer, hence from
+/// the same chain of trust (exemption from spec §9.2, the only installation
+/// path that skips it — drop and the Plugins dialog keep it).
+/// Source: the `bundled-plugins/` folder if it exists, otherwise the plugin
+/// embedded in the binary (see `bundled_plugins_dir`).
 ///
-/// À appeler avant `init()` : le premier scan voit alors l'état final, et aucun
-/// worker n'a chargé la version précédente.
+/// To be called before `init()`: the first scan then sees the final state, and
+/// no worker has loaded the previous version.
 ///
-/// Deux garde-fous : jamais de régression de version (un `.kdext` plus récent
-/// posé à la main est conservé), et un plugin supprimé par l'utilisateur n'est
-/// pas réinstallé (`SettingsData::removed_plugins`).
+/// Two safeguards: never a version regression (a newer `.kdext` placed by hand
+/// is kept), and a plugin removed by the user is not reinstalled
+/// (`SettingsData::removed_plugins`).
 pub fn seed_bundled(app: &AppHandle) {
     let removed = app
         .state::<SettingsState>()
@@ -813,7 +814,7 @@ fn seed_archive<R: Read + Seek>(
     if removed.contains(&m.id) {
         return;
     }
-    // Installé en version égale ou supérieure : ne rien faire.
+    // Installed at an equal or higher version: do nothing.
     if installed_version(&m.id).is_some_and(|cur| !version_less(&cur, &m.version)) {
         return;
     }
@@ -834,9 +835,9 @@ pub fn list_plugins() -> Vec<PluginInfo> {
     list()
 }
 
-/// Ouvre le dossier des plugins dans le gestionnaire de fichiers de la
-/// plateforme (Explorateur / xdg-open). Le dossier n'existe pas tant que rien
-/// n'a été installé : on le crée d'abord pour que le bouton marche toujours.
+/// Opens the plugins folder in the platform's file manager
+/// (Explorer / xdg-open). The folder does not exist until something has been
+/// installed: it is created first so the button always works.
 #[tauri::command]
 pub fn open_plugins_dir(app: AppHandle) -> Result<(), String> {
     let dir = plugins_dir();
@@ -846,9 +847,9 @@ pub fn open_plugins_dir(app: AppHandle) -> Result<(), String> {
         .map_err(|e| tr!("pluginpkg.open_failed", error = e))
 }
 
-/// Sélecteur natif d'archive `.kdext` (bouton « Ajouter un plugin… ») : le
-/// chemin choisi repart vers le frontend par la même file que le drop et le
-/// double-clic, toutes les voies convergent vers le dialog de confiance (§9.4).
+/// Native `.kdext` archive picker (« Ajouter un plugin… » button): the
+/// chosen path goes back to the frontend through the same queue as drop and
+/// double-click, all paths converge on the trust dialog (§9.4).
 #[tauri::command]
 pub fn pick_plugin_archive(app: AppHandle, window: WebviewWindow) {
     let label = window.label().to_string();
@@ -862,9 +863,9 @@ pub fn pick_plugin_archive(app: AppHandle, window: WebviewWindow) {
         });
 }
 
-/// Contenu du `CHANGELOG.md` d'un plugin installé (bouton « Nouveautés » du
-/// dialog Plugins, spec §3.1). Nom de fichier **fixe** joint au dossier du
-/// plugin — aucun chemin fourni par l'appelant, pas de traversée possible.
+/// Content of an installed plugin's `CHANGELOG.md` (« Nouveautés » button of
+/// the Plugins dialog, spec §3.1). **Fixed** file name joined to the plugin's
+/// folder — no caller-supplied path, no traversal possible.
 #[tauri::command]
 pub fn plugin_changelog(id: String) -> Result<String, String> {
     if !valid_id(&id) {
@@ -874,13 +875,13 @@ pub fn plugin_changelog(id: String) -> Result<String, String> {
         .map_err(|e| tr!("pluginpkg.changelog_unreadable", error = e))
 }
 
-/// Service `host/readFile` (capacité `read:siblings`, spec §6.5) : lecture
-/// confinée au dossier du document en cours, allowlist = `siblingExtensions`
-/// du manifeste. Même garde anti-traversée que `read_data_file`.
+/// `host/readFile` service (`read:siblings` capability, spec §6.5): read
+/// confined to the current document's folder, allowlist = the manifest's
+/// `siblingExtensions`. Same anti-traversal guard as `read_data_file`.
 ///
-/// L'erreur porte le code du protocole (`not-found` | `denied`) à côté du
-/// message traduit : le worker ne doit pas le deviner dans un texte qui change
-/// avec la langue de l'interface.
+/// The error carries the protocol code (`not-found` | `denied`) alongside the
+/// translated message: the worker must not guess it from text that changes
+/// with the interface language.
 #[tauri::command]
 pub fn plugin_read_sibling(
     plugin_id: String,
@@ -890,17 +891,17 @@ pub fn plugin_read_sibling(
     read_sibling(&plugin_id, &base_dir, &rel)
 }
 
-/// Erreur de `plugin_read_sibling`, telle que relayée au plugin (spec §6.5).
+/// Error of `plugin_read_sibling`, as relayed to the plugin (spec §6.5).
 #[derive(Serialize)]
 pub struct SiblingError {
     code: &'static str,
     message: String,
 }
 
-/// `not-found` seulement pour un fichier absent **dans** le dossier, une fois
-/// le plugin et l'extension admis : sinon `denied`, sans consulter le disque —
-/// un plugin ne doit pas pouvoir sonder l'existence de fichiers hors de son
-/// confinement (cf. `read_confined`).
+/// `not-found` only for a file missing **inside** the folder, once the plugin
+/// and the extension are admitted: otherwise `denied`, without consulting the
+/// disk — a plugin must not be able to probe for files outside its
+/// confinement (see `read_confined`).
 fn read_sibling(plugin_id: &str, base_dir: &str, rel: &str) -> Result<String, SiblingError> {
     let denied = |message| SiblingError {
         code: "denied",

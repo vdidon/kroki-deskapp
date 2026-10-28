@@ -39,8 +39,8 @@ def main() -> None:
     if not plugin_id or not version:
         sys.exit("manifest.json: id/version fields required")
 
-    # packInclude : liste explicite des fichiers à embarquer (chemins relatifs
-    # POSIX) ; manifest.json et l'entry sont toujours inclus d'office.
+    # packInclude: explicit list of the files to embed (relative POSIX paths);
+    # manifest.json and the entry are always included regardless.
     files = manifest.get("packInclude")
     if files is not None and (
         not isinstance(files, list) or not all(isinstance(f, str) for f in files)
@@ -56,9 +56,9 @@ def main() -> None:
     kdext.unlink(missing_ok=True)
     twin.unlink(missing_ok=True)
 
-    # Contenu du dossier à la racine de l'archive (manifest.json au premier
-    # niveau). Exclusions : fichiers/dossiers cachés, __pycache__, et un
-    # éventuel dist/ local (sinon les archives précédentes seraient embarquées).
+    # Folder content at the archive root (manifest.json at the top level).
+    # Exclusions: hidden files/folders, __pycache__, and any local dist/
+    # (otherwise the previous archives would be embedded).
     def excluded(rel: Path) -> bool:
         parts = rel.parts
         return (
@@ -69,7 +69,7 @@ def main() -> None:
     packed = 0
     with zipfile.ZipFile(kdext, "w", zipfile.ZIP_DEFLATED) as zf:
         if files is not None:
-            # Ordre du manifeste, manifest.json et entry en tête, dédoublonné.
+            # Manifest order, manifest.json and entry first, deduplicated.
             entry = manifest.get("entry")
             selection = dict.fromkeys(["manifest.json"] + ([entry] if entry else []) + files)
             for rel_posix in selection:
@@ -85,8 +85,8 @@ def main() -> None:
                     zf.write(path, rel.as_posix())
                     packed += 1
 
-    # Twin non versionné (même contenu, nom stable pour les scripts) :
-    # hardlink de préférence (cf. publish_dist), copie en repli.
+    # Unversioned twin (same content, stable name for scripts): hardlink
+    # preferred (see publish_dist), copy as a fallback.
     try:
         twin.hardlink_to(kdext)
     except OSError:

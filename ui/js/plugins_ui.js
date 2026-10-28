@@ -1,13 +1,13 @@
 // @ts-check
-// UI de gestion des plugins (spec §9.4) : dialog « Plugins » (cartes, bouton
-// Supprimer, bouton « Ajouter un plugin… ») et dialog de confiance à
-// l'installation (§9.2). Les deux voies d'ajout — drop d'un `.kdext` sur la
-// fenêtre, double-clic sur un `.kdext` associé, ligne de commande et sélecteur
-// natif — convergent ici. Côté Rust elles empilent l'archive puis émettent
-// `plugin-install-request` comme simple signal ; la charge utile se récupère
-// par `take_pending_plugin_installs` (une archive arrivée au lancement précède
-// l'enregistrement de l'écouteur — cf. `drainPendingInstalls`). Le drop Tauri
-// (Linux) appelle `requestPluginInstall` en direct, cf. filedrop.js.
+// Plugin management UI (spec §9.4): the « Plugins » dialog (cards, Delete
+// button, « Ajouter un plugin… » button) and the install trust dialog
+// (§9.2). All the ways of adding one — dropping a `.kdext` on the
+// window, double-clicking an associated `.kdext`, command line and native
+// picker — converge here. On the Rust side they queue the archive then emit
+// `plugin-install-request` as a mere signal; the payload is fetched
+// through `take_pending_plugin_installs` (an archive that arrived at launch precedes
+// the listener registration — cf. `drainPendingInstalls`). The Tauri drop
+// (Linux) calls `requestPluginInstall` directly, cf. filedrop.js.
 
 import { invoke, listen, escapeHtml } from "./app.js";
 import { allPlugins, pluginRuntimeState } from "./plugins.js";
@@ -19,7 +19,7 @@ import { onLocaleChange, t } from "./i18n.js";
 /** @typedef {import("../../types/ipc").PluginInfo} PluginInfo */
 /** @typedef {import("../../types/ipc").ManifestPreview} ManifestPreview */
 
-// Éléments statiques de ui/index.html.
+// Static elements of ui/index.html.
 const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("plugins-dialog"));
 const listEl = /** @type {HTMLDivElement} */ (document.getElementById("plugins-list"));
 const trustDialog = /** @type {HTMLDialogElement} */ (document.getElementById("plugin-trust-dialog"));
@@ -28,8 +28,8 @@ const trustBody = /** @type {HTMLDivElement} */ (document.getElementById("plugin
 const trustError = /** @type {HTMLParagraphElement} */ (document.getElementById("plugin-trust-error"));
 const trustInstall = /** @type {HTMLButtonElement} */ (document.getElementById("plugin-trust-install"));
 
-// Capacités du manifeste « en clair » pour le dialog de confiance (§9.2) :
-// des fonctions, résolues à l'affichage dans la langue courante.
+// Manifest capabilities in plain language for the trust dialog (§9.2):
+// functions, resolved at display time in the current language.
 /** @type {Record<string, () => string>} */
 const CAP_LABELS = {
   "document:markdown": () => t("trust.cap.document_markdown"),
@@ -43,7 +43,7 @@ const CAP_LABELS = {
   "read:siblings": () => t("trust.cap.read_siblings"),
 };
 
-// statut -> [classe du badge, libellé]
+// status -> [badge class, label]
 /** @type {Record<string, [badgeClass: string, label: () => string]>} */
 const STATUS_LABELS = {
   ok: ["ok", () => t("plugins.status.ok")],
@@ -63,8 +63,8 @@ function chip(text) {
   return el;
 }
 
-// Avertissements calculés côté frontend : fences/colorations masquées par le
-// natif (le backend ne connaît ni KROKI_TYPES ni les grammaires hljs — §8.1).
+// Warnings computed on the frontend side: fences/highlightings shadowed by the
+// native ones (the backend knows neither KROKI_TYPES nor the hljs grammars — §8.1).
 /**
  * @param {PluginInfo} p
  * @returns {string[]}
@@ -82,7 +82,7 @@ function nativeClaimWarnings(p) {
   return out;
 }
 
-// Bouton « Journal » de chaque carte affichée (id -> bouton).
+// « Journal » button of each displayed card (id -> button).
 /** @type {Map<string, HTMLButtonElement>} */
 const journalButtons = new Map();
 
@@ -161,12 +161,12 @@ function renderCard(p) {
     card.append(warn);
   }
 
-  // Suppression en deux temps (armement) plutôt qu'un dialog imbriqué.
+  // Two-step deletion (arming) rather than a nested dialog.
   const actions = document.createElement("div");
   actions.className = "plugin-actions";
-  // Changelog optionnel du plugin (CHANGELOG.md à la racine, spec §3.1) :
-  // rendu par le dialog « Nouveautés » de l'hôte, le code du plugin ne
-  // s'exécute pas.
+  // Optional plugin changelog (CHANGELOG.md at the root, spec §3.1):
+  // rendered by the host's « Nouveautés » (What's new) dialog, the plugin's code
+  // does not run.
   if (p.hasChangelog) {
     const news = document.createElement("button");
     news.type = "button";
@@ -175,8 +175,8 @@ function renderCard(p) {
     news.addEventListener("click", () => openPluginChangelog(p));
     actions.append(news);
   }
-  // Journal du plugin (journal.js), affiché seulement s'il a des entrées ;
-  // tenu à jour par `updateJournalButtons` tant que le dialog est ouvert.
+  // Plugin log (journal.js), shown only if it has entries;
+  // kept up to date by `updateJournalButtons` while the dialog is open.
   const journal = document.createElement("button");
   journal.type = "button";
   journal.className = "plugin-journal";
@@ -198,7 +198,7 @@ function renderCard(p) {
     del.disabled = true;
     try {
       await invoke("uninstall_plugin", { id: p.id });
-      // `plugins-changed` re-rend la liste ; rien d'autre à faire ici.
+      // `plugins-changed` re-renders the list; nothing else to do here.
     } catch (err) {
       del.disabled = false;
       delete del.dataset.armed;
@@ -214,7 +214,7 @@ function renderCard(p) {
 
 /**
  * @param {HTMLElement} container
- * @param {unknown} err rejet d'`invoke` (chaîne d'erreur Rust)
+ * @param {unknown} err `invoke` rejection (Rust error string)
  */
 function alertError(container, err) {
   const p = document.createElement("p");
@@ -242,19 +242,19 @@ export function openPlugins() {
   dialog.showModal();
 }
 
-// Cartes écrites par le JS : refaites si la langue change, dialog ouvert.
+// Cards written by JS: rebuilt if the language changes while the dialog is open.
 onLocaleChange(() => {
   if (dialog.open) renderList();
 });
 
 // --------------------------------------------------------------------------- //
-// Dialog de confiance (§9.2) — obligatoire, y compris en mise à jour
+// Trust dialog (§9.2) — mandatory, updates included
 // --------------------------------------------------------------------------- //
 
 /**
  * @param {string} label
  * @param {string} value
- * @returns {string} HTML échappé
+ * @returns {string} escaped HTML
  */
 function trustRow(label, value) {
   return `<div class="trust-row"><span class="trust-label">${escapeHtml(label)}</span>` +
@@ -262,9 +262,9 @@ function trustRow(label, value) {
 }
 
 /**
- * Point d'entrée commun des deux voies d'installation : lit le manifeste de
- * l'archive **sans exécuter le plugin**, affiche le dialog de confiance, puis
- * installe si l'utilisateur confirme.
+ * Common entry point of both install paths: reads the archive's manifest
+ * **without running the plugin**, shows the trust dialog, then installs if
+ * the user confirms.
  * @param {string} path
  * @returns {Promise<void>}
  */
@@ -346,9 +346,9 @@ export async function requestPluginInstall(path) {
 }
 
 /**
- * Vide la file des archives en attente côté Rust et les enchaîne dans le dialog
- * de confiance. Séquentiel : `showModal()` sur un dialog déjà ouvert lèverait —
- * on attend donc la fermeture avant la suivante.
+ * Drains the queue of archives pending on the Rust side and chains them through
+ * the trust dialog. Sequential: `showModal()` on an already open dialog would
+ * throw — so we wait for it to close before the next one.
  * @returns {Promise<void>}
  */
 async function drainPendingInstalls() {
@@ -379,16 +379,16 @@ export async function initPluginsUi() {
     "click",
     () => trustDialog.close(),
   );
-  // Drop Windows (drop_target.rs), double-clic / ligne de commande
-  // (open_mixed_paths) et sélecteur natif (pick_plugin_archive) convergent ici.
-  // Le drop Tauri (Linux) appelle requestPluginInstall en direct depuis
+  // Windows drop (drop_target.rs), double-click / command line
+  // (open_mixed_paths) and native picker (pick_plugin_archive) converge here.
+  // The Tauri drop (Linux) calls requestPluginInstall directly from
   // filedrop.js.
   await listen("plugin-install-request", () => drainPendingInstalls());
-  // Une archive passée au lancement (double-clic, application fermée) est
-  // empilée pendant le `setup`, donc AVANT ce listen : l'événement seul serait
-  // perdu. On vide la file une fois l'écouteur en place.
+  // An archive passed at launch (double-click, application closed) is
+  // queued during `setup`, hence BEFORE this listen: the event alone would be
+  // lost. We drain the queue once the listener is in place.
   await drainPendingInstalls();
-  // Liste rafraîchie si le registre change pendant que le dialog est ouvert.
+  // List refreshed if the registry changes while the dialog is open.
   await listen("plugins-changed", () => {
     if (dialog.open) renderList();
   });

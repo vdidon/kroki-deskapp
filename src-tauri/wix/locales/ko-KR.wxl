@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Textes de l'installeur en coreen (Codepage 949 : pas d'accents ici) - memes Id que en-US.wxl. -->
+<!-- Installer texts in Korean (Codepage 949: no accents here) - same Ids as en-US.wxl. -->
 <WixLocalization Culture="ko-kr" Codepage="949" xmlns="http://schemas.microsoft.com/wix/2006/localization">
   <String Id="LaunchApp">Kroki Desk 시작</String>
   <String Id="DowngradeErrorMessage">최신 버전의 Kroki Desk가 이미 설치되어 있습니다.</String>

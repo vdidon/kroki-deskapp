@@ -1,6 +1,6 @@
 // @ts-check
 
-// Glisser-déposer de fichiers depuis l'Explorateur (drag & drop natif Tauri).
+// File drag & drop from Explorer (native Tauri drag & drop).
 
 import { invoke, listen } from "./app.js";
 import { isOpenableDocPath, isPluginArchivePath, isSessionFilePath } from "./plugins.js";
@@ -8,9 +8,9 @@ import { requestPluginInstall } from "./plugins_ui.js";
 
 const overlay = /** @type {HTMLElement} */ (document.getElementById("drop-overlay"));
 
-// Documents ouvrables (extensions natives + plugins actifs), archives de
-// plugins `.kdext` (routées vers le flux d'installation, spec §9.2) et
-// sessions `.kdws` (routées côté Rust par `open_mixed_paths`).
+// Openable documents (native extensions + active plugins), `.kdext` plugin
+// archives (routed to the install flow, spec §9.2) and `.kdws` sessions
+// (routed on the Rust side by `open_mixed_paths`).
 /**
  * @param {string[] | null | undefined} paths
  * @returns {string[]}
@@ -37,10 +37,10 @@ export async function initFileDrop() {
       requestPluginInstall(archive);
     }
   });
-  // Windows : un IDropTarget natif custom (drop_target.rs) remplace celui de
-  // wry pour aussi accepter les chemins texte (Cursor/VS Code). L'ouverture des
-  // documents et le routage des .kdext sont faits côté Rust ; ici on ne pilote
-  // que l'overlay via cet événement.
+  // Windows: a custom native IDropTarget (drop_target.rs) replaces wry's to
+  // also accept text paths (Cursor/VS Code). Opening documents and routing
+  // .kdext files are done on the Rust side; here we only drive the overlay
+  // through this event.
   await listen("drop-overlay", (e) => {
     overlay.hidden = !e.payload;
   });

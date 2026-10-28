@@ -1,31 +1,31 @@
-//! Tâches de build du dépôt, pilotées par les alias .cargo/config.toml :
+//! Repository build tasks, driven by the .cargo/config.toml aliases:
 //!
-//!   cargo build-app      → `xtask build`    : build release du crate src-tauri
-//!                          puis publication dans dist/ (Windows et Linux).
-//!   cargo build-appimage → `xtask appimage` : AppImage Linux via tauri-cli
-//!                          (utilisé depuis le PATH s'il y est, sinon installé
-//!                          en one-shot dans xtask/target/tools/, local au
-//!                          dépôt et gitignoré), puis publication dans dist/.
-//!   cargo build-msi      → `xtask msi`      : installeur MSI Windows (WiX v3)
-//!                          via le même tauri-cli, puis publication dans dist/.
-//!   cargo build-deb      → `xtask deb`      : paquet Debian/Ubuntu (.deb) via
-//!                          le même tauri-cli, puis publication dans dist/.
-//!   (sans alias)         → `xtask bundled`  : génère seuls les fichiers dérivés
-//!                          de la stratégie d'embarquement des plugins (bundled.rs).
+//!   cargo build-app      → `xtask build`    : release build of the src-tauri crate
+//!                          then publication into dist/ (Windows and Linux).
+//!   cargo build-appimage → `xtask appimage` : Linux AppImage via tauri-cli
+//!                          (taken from the PATH if present, otherwise installed
+//!                          one-shot into xtask/target/tools/, local to the
+//!                          repo and gitignored), then publication into dist/.
+//!   cargo build-msi      → `xtask msi`      : Windows MSI installer (WiX v3)
+//!                          via the same tauri-cli, then publication into dist/.
+//!   cargo build-deb      → `xtask deb`      : Debian/Ubuntu package (.deb) via
+//!                          the same tauri-cli, then publication into dist/.
+//!   (no alias)           → `xtask bundled`  : generates only the files derived
+//!                          from the plugin bundling strategy (bundled.rs).
 //!
-//! Publication (`publish_dist`) : l'artefact est copié dans dist/ sous un nom
-//! postfixé de la version (source de vérité : src-tauri/Cargo.toml), doublé
-//! d'un fichier non versionné pointant sur lui — hardlink de préférence
-//! (aucun droit administrateur requis, sur NTFS comme sur ext4 ; un symlink
-//! Windows exigerait admin ou mode développeur), copie en repli (systèmes de
-//! fichiers sans hardlink, ex. montages Docker Desktop).
+//! Publication (`publish_dist`): the artifact is copied into dist/ under a
+//! version-suffixed name (source of truth: src-tauri/Cargo.toml), paired with
+//! an unversioned file pointing at it — hardlink preferred (no administrator
+//! rights needed, on NTFS as well as ext4; a Windows symlink would require
+//! admin or developer mode), copy as a fallback (filesystems without
+//! hardlinks, e.g. Docker Desktop mounts).
 //!
-//! Le bundling est activé par des overlays de configuration
+//! Bundling is enabled by configuration overlays
 //! (src-tauri/tauri.appimage.conf.json, src-tauri/tauri.msi.conf.json,
-//! src-tauri/tauri.deb.conf.json) :
-//! tauri.conf.json garde bundle.active=false, donc `cargo build --release` ne
-//! produit toujours que le binaire nu. Les arguments supplémentaires des alias
-//! sont transmis à la commande sous-jacente (`cargo build` / `tauri build`).
+//! src-tauri/tauri.deb.conf.json):
+//! tauri.conf.json keeps bundle.active=false, so `cargo build --release` still
+//! only produces the bare binary. Extra arguments to the aliases are forwarded
+//! to the underlying command (`cargo build` / `tauri build`).
 
 use std::env;
 use std::fs;
@@ -60,9 +60,9 @@ fn main() {
     }
 }
 
-/// `cargo run --manifest-path xtask/Cargo.toml -- bundled` : génère seuls les
-/// fichiers dérivés de la stratégie d'embarquement des plugins (fragment WiX,
-/// overlay et paquet MIME .deb), sans rien bundler — pour les relire.
+/// `cargo run --manifest-path xtask/Cargo.toml -- bundled`: generates only the
+/// files derived from the plugin bundling strategy (WiX fragment, .deb overlay
+/// and MIME package), without bundling anything — to re-read them.
 fn gen_bundled() {
     let repo = repo_root();
     let plugins = bundled::load(&repo, "bundled");
@@ -74,7 +74,7 @@ fn gen_bundled() {
     );
 }
 
-/// `cargo build-app` : build release de src-tauri puis publication dans dist/.
+/// `cargo build-app`: release build of src-tauri then publication into dist/.
 fn build_app(extra: &[String]) {
     let repo = repo_root();
     let mut cargo = Command::new("cargo");
@@ -88,15 +88,15 @@ fn build_app(extra: &[String]) {
         .args(extra)
         .current_dir(&repo);
     if cfg!(windows) {
-        // sccache (RUSTC_WRAPPER, souvent posé globalement sur le poste) ne sait
-        // pas relayer la ligne de commande de web-sys — des centaines de
-        // --check-cfg qui dépassent la limite Windows des 32 Ko d'un CreateProcess :
-        // « failed to spawn … os error 206 », build en échec. Cargo, lui, sait
-        // basculer sur un fichier @argfile. La chaîne vide neutralise le wrapper,
-        // env ET config confondus (contrairement à env_remove, qui laisserait un
-        // build.rustc-wrapper d'un config.toml reprendre la main). Le cache est
-        // perdu pour ce build ; c'est le prix d'un build qui aboutit. Pas de
-        // problème sur Linux (limite d'argv ~2 Mo) : on n'y touche pas.
+        // sccache (RUSTC_WRAPPER, often set globally on the workstation) cannot
+        // relay web-sys's command line — hundreds of --check-cfg that exceed
+        // the 32 KB Windows CreateProcess limit: "failed to spawn … os error
+        // 206", build fails. Cargo itself can fall back to an @argfile. The
+        // empty string neutralizes the wrapper, env AND config alike (unlike
+        // env_remove, which would let a config.toml build.rustc-wrapper take
+        // over again). The cache is lost for this build; that is the price of
+        // a build that succeeds. No problem on Linux (argv limit ~2 MB): left
+        // alone there.
         cargo.env("RUSTC_WRAPPER", "");
     }
     run_or_die(&mut cargo, "build-app: release build failed");
@@ -121,7 +121,7 @@ fn build_app(extra: &[String]) {
     publish_dist(&repo, &built, &versioned, &unversioned);
 }
 
-/// `cargo build-appimage` : AppImage Linux via tauri-cli, puis publication dans dist/.
+/// `cargo build-appimage`: Linux AppImage via tauri-cli, then publication into dist/.
 fn build_appimage(extra: &[String]) {
     if !cfg!(target_os = "linux") {
         eprintln!(
@@ -145,15 +145,15 @@ fn build_appimage(extra: &[String]) {
             ])
             .args(extra)
             .current_dir(&repo)
-            // linuxdeploy/appimagetool (téléchargés par le bundler) sont eux-mêmes
-            // des AppImages : sans FUSE (conteneur), leur runtime doit s'extraire
-            // au lieu de se monter. Sans effet quand FUSE est présent.
+            // linuxdeploy/appimagetool (downloaded by the bundler) are themselves
+            // AppImages: without FUSE (container), their runtime must extract
+            // itself instead of mounting. No effect when FUSE is present.
             .env("APPIMAGE_EXTRACT_AND_RUN", "1")
-            // Le strip embarqué dans linuxdeploy (vieux binutils) ne connaît pas
-            // les sections .relr.dyn des libs des distros récentes (Ubuntu 24.04+,
-            // Arch…) et fait échouer tout le bundling. Sauter le strip ne coûte
-            // rien : les .so des distros sont déjà strippés, et notre binaire
-            // l'est par le profil release (strip = true).
+            // The strip embedded in linuxdeploy (old binutils) does not know the
+            // .relr.dyn sections of recent distros' libs (Ubuntu 24.04+, Arch…)
+            // and makes the whole bundling fail. Skipping strip costs nothing:
+            // the distros' .so files are already stripped, and our binary is by
+            // the release profile (strip = true).
             .env("NO_STRIP", "1"),
         "build-appimage: bundling failed",
     );
@@ -171,11 +171,11 @@ fn build_appimage(extra: &[String]) {
     );
 }
 
-/// `cargo build-msi` : installeur MSI Windows (WiX v3) via tauri-cli, puis
-/// publication dans dist/. L'overlay src-tauri/tauri.msi.conf.json active le
-/// bundling et branche les fragments WiX — le suivi (formats natifs) et celui
-/// que génère `bundled::write_wix_fragment` (plugins embarqués, selon la
-/// stratégie de bundled.rs) ; tauri.conf.json garde bundle.active=false.
+/// `cargo build-msi`: Windows MSI installer (WiX v3) via tauri-cli, then
+/// publication into dist/. The src-tauri/tauri.msi.conf.json overlay enables
+/// bundling and wires in the WiX fragments — the tracked one (native formats)
+/// and the one generated by `bundled::write_wix_fragment` (bundled plugins,
+/// per the bundled.rs strategy); tauri.conf.json keeps bundle.active=false.
 fn build_msi(extra: &[String]) {
     if !cfg!(windows) {
         eprintln!(
@@ -190,11 +190,11 @@ fn build_msi(extra: &[String]) {
     bundled::stage(&repo, &plugins, "build-msi");
     bundled::write_wix_fragment(&repo, &plugins, "build-msi");
 
-    // ProductCode neuf à chaque build (mise à jour majeure, comme `Id="*"`),
-    // mais commun aux MSI de chaque langue : `light`, qui résout `*`, tourne
-    // une fois par langue — cf. src-tauri/wix/main.wxs et msi_lang.rs. Préfixe
-    // TAURI obligatoire : tauri-bundler lance WiX avec un environnement vidé,
-    // hors SYSTEMROOT/TMP/TEMP et les variables TAURI* (`clear_env_for_wix`).
+    // Fresh ProductCode on every build (major upgrade, like `Id="*"`), but
+    // shared by the MSIs of every language: `light`, which resolves `*`, runs
+    // once per language — see src-tauri/wix/main.wxs and msi_lang.rs. TAURI
+    // prefix mandatory: tauri-bundler launches WiX with a cleared environment,
+    // except SYSTEMROOT/TMP/TEMP and the TAURI* variables (`clear_env_for_wix`).
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
@@ -217,8 +217,8 @@ fn build_msi(extra: &[String]) {
             .args(extra)
             .current_dir(&repo)
             .env("TAURI_KROKI_DESK_PRODUCT_CODE", &product_code)
-            // Même neutralisation de sccache que build_app : tauri build lance
-            // un cargo build --release, qui bute sinon sur web-sys.
+            // Same sccache neutralization as build_app: tauri build runs a
+            // cargo build --release, which would otherwise choke on web-sys.
             .env("RUSTC_WRAPPER", ""),
         "build-msi: bundling failed",
     );
@@ -226,24 +226,24 @@ fn build_msi(extra: &[String]) {
     merge_msi();
 }
 
-/// Fusion des MSI par langue du dernier `tauri build` en un MSI multilingue,
-/// puis publication dans dist/. Fin de `build_msi` ; seule, `cargo run
-/// --manifest-path xtask/Cargo.toml -- msi-merge` rejoue la fusion sans
-/// recompiler ni relancer WiX (mise au point de msi_lang.rs).
+/// Merges the per-language MSIs of the last `tauri build` into one multilingual
+/// MSI, then publishes it into dist/. End of `build_msi`; on its own, `cargo run
+/// --manifest-path xtask/Cargo.toml -- msi-merge` replays the merge without
+/// recompiling or relaunching WiX (for tuning msi_lang.rs).
 fn merge_msi() {
     if !cfg!(windows) {
         die("msi-merge: msi.dll and torch only exist on Windows");
     }
     let repo = repo_root();
-    // Un MSI par langue (tauri.msi.conf.json, `wix.language`), fusionnés en un
-    // seul qui suit la langue de l'interface Windows (cf. msi_lang.rs).
+    // One MSI per language (tauri.msi.conf.json, `wix.language`), merged into a
+    // single one that follows the Windows display language (see msi_lang.rs).
     let version = read_version(&repo);
     let bundle_dir = target_dir(&repo).join("release/bundle/msi");
     #[cfg(windows)]
     let built = msi_lang::merge(&bundle_dir, &version, |suffix| {
         find_bundle(&bundle_dir, &version, suffix)
     });
-    // Inatteignable (sortie en tête hors Windows) : seulement pour compiler.
+    // Unreachable (early exit off Windows): only there to compile.
     #[cfg(not(windows))]
     let built = find_bundle(&bundle_dir, &version, ".msi");
     publish_dist(
@@ -254,11 +254,11 @@ fn merge_msi() {
     );
 }
 
-/// `cargo build-deb` : paquet Debian/Ubuntu via tauri-cli, puis publication dans
-/// dist/. L'overlay src-tauri/tauri.deb.conf.json active le bundling, déclare les
-/// types MIME et le modèle de fichier .desktop ; `bundled::write_deb_overlay` le
-/// complète des plugins embarqués (selon la stratégie de bundled.rs) dans une
-/// copie générée, seule passée à tauri build. tauri.conf.json garde
+/// `cargo build-deb`: Debian/Ubuntu package via tauri-cli, then publication into
+/// dist/. The src-tauri/tauri.deb.conf.json overlay enables bundling, declares
+/// the MIME types and the .desktop file template; `bundled::write_deb_overlay`
+/// completes it with the bundled plugins (per the bundled.rs strategy) in a
+/// generated copy, the only one passed to tauri build. tauri.conf.json keeps
 /// bundle.active=false.
 fn build_deb(extra: &[String]) {
     if !cfg!(target_os = "linux") {
@@ -291,9 +291,9 @@ fn build_deb(extra: &[String]) {
     let tag = linux_tag();
     let bundle_dir = target_dir(&repo).join("release/bundle/deb");
     let built = find_bundle(&bundle_dir, &version, ".deb");
-    // Suffixé du tag distro comme les autres artefacts Linux : les dépendances
-    // déclarées sont portables, mais le plancher glibc du binaire est celui de la
-    // machine qui compile — le distribuable reste le -debian12.
+    // Suffixed with the distro tag like the other Linux artifacts: the declared
+    // dependencies are portable, but the binary's glibc floor is that of the
+    // building machine — the distributable remains the -debian12.
     publish_dist(
         &repo,
         &built,
@@ -302,10 +302,11 @@ fn build_deb(extra: &[String]) {
     );
 }
 
-/// Tag de la distro qui compile (`debian12`, `ubuntu24.04`, `arch`…), depuis
-/// /etc/os-release. Deux builds Linux n'ont pas la même base glibc selon
-/// qu'ils sortent du conteneur bookworm ou d'une machine native : le nom de
-/// l'artefact doit le dire, sinon ils s'écrasent mutuellement dans dist/.
+/// Tag of the building distro (`debian12`, `ubuntu24.04`, `arch`…), from
+/// /etc/os-release. Two Linux builds do not share the same glibc baseline
+/// depending on whether they come out of the bookworm container or a native
+/// machine: the artifact name must say so, otherwise they overwrite each other
+/// in dist/.
 fn linux_tag() -> String {
     let content = fs::read_to_string("/etc/os-release").unwrap_or_default();
     let field = |key: &str| {
@@ -326,9 +327,9 @@ fn linux_tag() -> String {
     }
 }
 
-/// Copie l'artefact dans dist/ sous son nom versionné, puis crée à côté le
-/// fichier non versionné (hardlink, copie en repli). Les fichiers existants
-/// sont supprimés d'abord — jamais d'écriture à travers un ancien hardlink.
+/// Copies the artifact into dist/ under its versioned name, then creates the
+/// unversioned file next to it (hardlink, copy as a fallback). Existing files
+/// are removed first — never write through an old hardlink.
 fn publish_dist(repo: &Path, built: &Path, versioned: &str, unversioned: &str) {
     if !built.is_file() {
         eprintln!("xtask: artifact not found: {}", built.display());
@@ -356,11 +357,11 @@ fn publish_dist(repo: &Path, built: &Path, versioned: &str, unversioned: &str) {
     );
 }
 
-/// L'artefact de la version courante dans un dossier bundle. Le nommage Tauri
-/// dérive du productName et contient la version (« Kroki Desk_x.y.z_amd64.AppImage »,
-/// « Kroki Desk_x.y.z_x64_fr-FR.msi ») : on filtre là-dessus plutôt que de le
-/// reconstruire, et d'anciennes versions peuvent traîner dans un target/
-/// persistant (volume Docker, builds successifs).
+/// The current version's artifact in a bundle folder. Tauri's naming derives
+/// from the productName and contains the version ("Kroki Desk_x.y.z_amd64.AppImage",
+/// "Kroki Desk_x.y.z_x64_fr-FR.msi"): we filter on that rather than rebuild it,
+/// and older versions may linger in a persistent target/ (Docker volume,
+/// successive builds).
 fn find_bundle(bundle_dir: &Path, version: &str, ext: &str) -> PathBuf {
     fs::read_dir(bundle_dir)
         .ok()
@@ -381,7 +382,7 @@ fn find_bundle(bundle_dir: &Path, version: &str, ext: &str) -> PathBuf {
         })
 }
 
-/// Version de l'app — source de vérité unique : src-tauri/Cargo.toml.
+/// App version — single source of truth: src-tauri/Cargo.toml.
 fn read_version(repo: &Path) -> String {
     let manifest = repo.join("src-tauri/Cargo.toml");
     let content = fs::read_to_string(&manifest)
@@ -402,8 +403,8 @@ fn read_version(repo: &Path) -> String {
         .unwrap_or_else(|| die("xtask: version field not found in src-tauri/Cargo.toml"))
 }
 
-/// Dossier target du crate src-tauri, en honorant CARGO_TARGET_DIR (volume
-/// /target des builds Docker).
+/// Target folder of the src-tauri crate, honoring CARGO_TARGET_DIR (the
+/// /target volume of Docker builds).
 fn target_dir(repo: &Path) -> PathBuf {
     match env::var_os("CARGO_TARGET_DIR") {
         Some(d) => {
@@ -439,14 +440,14 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// Le hook AppRun généré par linuxdeploy-plugin-gtk force `GDK_BACKEND=x11`
-/// sans condition (tauri#8541) : sur une session Wayland pure sans XWayland
-/// joignable (DISPLAY vide), gtk_init échoue et l'AppImage crash au lancement.
-/// On patche le script plugin mis en cache par le bundler (source du hook,
-/// heredoc quoté `<<\EOF` donc copié verbatim) pour ne forcer X11 que si un
-/// DISPLAY existe — sinon GDK choisit lui-même (Wayland). Idempotent ; si le
-/// script est absent on le télécharge d'abord (même URL que le bundler), et en
-/// cas d'échec on continue : le build produira juste le hook upstream.
+/// The AppRun hook generated by linuxdeploy-plugin-gtk forces `GDK_BACKEND=x11`
+/// unconditionally (tauri#8541): on a pure Wayland session without a reachable
+/// XWayland (empty DISPLAY), gtk_init fails and the AppImage crashes at launch.
+/// We patch the plugin script cached by the bundler (the hook's source, quoted
+/// heredoc `<<\EOF` hence copied verbatim) so that X11 is forced only if a
+/// DISPLAY exists — otherwise GDK chooses itself (Wayland). Idempotent; if the
+/// script is absent we download it first (same URL as the bundler), and on
+/// failure we carry on: the build will just produce the upstream hook.
 fn soften_gtk_plugin() {
     const URL: &str =
         "https://raw.githubusercontent.com/tauri-apps/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh";
@@ -512,12 +513,12 @@ fn make_executable(p: &Path) {
 #[cfg(not(unix))]
 fn make_executable(_: &Path) {}
 
-/// Retourne le binaire cargo-tauri à utiliser : local au dépôt, sinon PATH,
-/// sinon installation locale (chemin fixe, volontairement indépendant de
-/// CARGO_TARGET_DIR pour survivre aux redirections type Docker).
+/// Returns the cargo-tauri binary to use: repo-local, else PATH, else a local
+/// install (fixed path, deliberately independent of CARGO_TARGET_DIR so it
+/// survives Docker-style redirections).
 fn ensure_tauri_cli(repo: &Path) -> PathBuf {
-    // `.exe` sous Windows, sinon le binaire déjà installé n'est jamais retrouvé
-    // et l'installation one-shot se rejoue à chaque build.
+    // `.exe` on Windows, otherwise the already installed binary is never found
+    // and the one-shot install is replayed on every build.
     let exe = if cfg!(windows) {
         "cargo-tauri.exe"
     } else {

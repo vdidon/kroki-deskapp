@@ -1,14 +1,14 @@
 // @ts-check
-// Recherche plein-texte dans TOUS les documents ouverts (les onglets de la
-// fenêtre) — complète findword.js, qui ne surligne que dans la vue active.
-// La requête est cherchée dans le SOURCE réel de chaque document, relu via
-// `read_document` (lecture pure, sans effet de bord) : les onglets jamais
-// affichés ou modifiés sur disque sont couverts, sans toucher à l'état de
-// rendu des vues. Les numéros de ligne obtenus s'alignent directement sur la
-// vue source (`data-line`) et sur le preview (`data-source-line`, déjà
-// exprimé dans le source réel pour les documents transformés par un plugin).
-// Le surlignage des occurrences réutilise la CSS Custom Highlight API
-// (aucune modification du DOM, cf. findword.js) sous un nom dédié.
+// Full-text search across ALL open documents (the window's tabs) — complements
+// findword.js, which only highlights in the active view.
+// The query is searched in each document's real SOURCE, re-read via
+// `read_document` (pure read, no side effects): tabs never displayed or
+// modified on disk are covered, without touching the views' render state. The
+// resulting line numbers align directly with the source view (`data-line`) and
+// with the preview (`data-source-line`, already expressed in the real source
+// for plugin-transformed documents).
+// Occurrence highlighting reuses the CSS Custom Highlight API (no DOM change,
+// cf. findword.js) under a dedicated name.
 
 import { invoke, state, isHtmlPath } from "./app.js";
 import { t, getLocale, onLocaleChange } from "./i18n.js";
@@ -20,16 +20,16 @@ import { buildMatcher, initSearchToggles, iterMatches } from "./searchopts.js";
 /** @typedef {import("../../types/ipc").TabInfo} TabInfo */
 /** @typedef {import("../../types/ipc").Anchor} Anchor */
 /** @typedef {import("./searchopts.js").SearchOptions} SearchOptions */
-/** @typedef {{ line: number, text: string, spans: [number, number][] }} Hit  ligne 0-based */
+/** @typedef {{ line: number, text: string, spans: [number, number][] }} Hit  0-based line */
 /** @typedef {{ hits: Hit[], total: number, capped: boolean, truncated: boolean }} Hits */
 /** @typedef {{ tab: TabInfo, error: true } | (Hits & { tab: TabInfo, error?: undefined })} DocResult */
 
 const HIGHLIGHT_NAME = "search-occurrences";
-const MIN_LEN = 2; // même seuil que findword : en dessous, trop de bruit
-const MAX_LINES_PER_DOC = 200; // lignes de résultat affichées par document
-const MAX_PER_LINE = 200; // occurrences comptées sur une même ligne
-const MAX_TOTAL_PER_DOC = 5000; // garde-fou : `.` ou `\\s` en mode regex
-const EXCERPT_LEN = 88; // longueur max d'un extrait, fenêtré sur la 1ʳᵉ occurrence
+const MIN_LEN = 2; // same threshold as findword: below it, too much noise
+const MAX_LINES_PER_DOC = 200; // result lines shown per document
+const MAX_PER_LINE = 200; // occurrences counted on a single line
+const MAX_TOTAL_PER_DOC = 5000; // safeguard: `.` or `\\s` in regex mode
+const EXCERPT_LEN = 88; // max excerpt length, windowed on the 1st occurrence
 const DEBOUNCE_MS = 180;
 
 const hlSupported =
@@ -37,8 +37,8 @@ const hlSupported =
   !!window.CSS.highlights &&
   typeof window.Highlight !== "undefined";
 
-// Éléments d'index.html, renseignés par initGlobalSearch. Avant elle, `panel`
-// est undefined : les points d'entrée le testent (`!panel`).
+// Elements from index.html, set by initGlobalSearch. Before it runs, `panel`
+// is undefined: the entry points test for it (`!panel`).
 /** @type {HTMLElement} */
 let panel;
 /** @type {HTMLInputElement} */
@@ -54,24 +54,24 @@ let closeBtn;
 /** @type {SearchOptions} */
 let opts = { caseSensitive: false, wholeWord: false, regex: false };
 /** @type {(() => void) | null} */
-let onBeforeOpen = null; // hook de main.js (ferme le sommaire, exclusif du panneau)
-let seq = 0; // anti-course : seule la dernière recherche lancée peut afficher
+let onBeforeOpen = null; // main.js hook (closes the table of contents, mutually exclusive with the panel)
+let seq = 0; // race guard: only the last search launched may display
 let debounceTimer = 0;
 /** @type {RegExp | null} */
-let shownRe = null; // motif des résultats affichés, réutilisé pour le surlignage
-// Saut vers un onglet pas encore actif : mémorisé ici, consommé par
-// `onActiveViewShown` une fois l'onglet cible rendu (même mécanique que
-// `pendingAnchor` pour les deep-links).
+let shownRe = null; // pattern of the displayed results, reused for highlighting
+// Jump to a tab that is not active yet: remembered here, consumed by
+// `onActiveViewShown` once the target tab is rendered (same mechanism as
+// `pendingAnchor` for deep links).
 /** @type {{ docId: number, line: number, expires: number } | null} */
 let pendingJump = null;
-let searchedTabsKey = ""; // onglets couverts par les résultats affichés (ids)
+let searchedTabsKey = ""; // tabs covered by the displayed results (ids)
 
 function clearHighlight() {
   if (hlSupported) window.CSS.highlights.delete(HIGHLIGHT_NAME);
 }
 
-// Surligne toutes les occurrences de la requête courante dans une vue (mêmes
-// Ranges que findword.js, cf. textmatch.js, sous un nom de highlight distinct).
+// Highlights all occurrences of the current query in a view (same Ranges as
+// findword.js, cf. textmatch.js, under a distinct highlight name).
 /** @param {HTMLElement} viewEl */
 function highlightView(viewEl) {
   if (!hlSupported) return;
@@ -84,8 +84,8 @@ function highlightView(viewEl) {
   else window.CSS.highlights.set(HIGHLIGHT_NAME, new window.Highlight(...ranges));
 }
 
-// Occurrences dans un source : une entrée par ligne matchée (positions retenues
-// pour l'extrait), total toutes occurrences confondues.
+// Occurrences in a source: one entry per matched line (positions kept for the
+// excerpt), total counting all occurrences.
 /**
  * @param {string} text
  * @param {RegExp | null} re
@@ -116,11 +116,11 @@ function findHits(text, re) {
   return { hits, total, capped, truncated: matchedLines > MAX_LINES_PER_DOC };
 }
 
-// Extrait d'une ligne, fenêtré autour de la première occurrence, occurrences
-// marquées en <mark> (DOM construit par textContent : aucun HTML interprété).
+// Excerpt of a line, windowed around the first occurrence, occurrences wrapped
+// in <mark> (DOM built via textContent: no HTML interpreted).
 /**
  * @param {string} lineText
- * @param {[number, number][]} spans  non vide
+ * @param {[number, number][]} spans  non-empty
  * @returns {HTMLElement}
  */
 function excerptEl(lineText, spans) {
@@ -150,8 +150,8 @@ function excerptEl(lineText, spans) {
   return el;
 }
 
-// Ligne du markdown généré correspondant à une ligne source (vue debug
-// « dérivée » : les data-line y sont dans le markdown du plugin).
+// Line of the generated markdown matching a source line (debug "derived" view:
+// the data-line values there refer to the plugin's markdown).
 /**
  * @param {Anchor[]} anchors
  * @param {number} srcLine
@@ -165,14 +165,14 @@ function mdLineForSource(anchors, srcLine) {
   return best;
 }
 
-// Amène la ligne source `line` en haut de la vue, quel que soit son mode.
+// Brings source line `line` to the top of the view, whatever its mode.
 /**
  * @param {View | undefined} v
  * @param {number} line
  */
 function scrollToHit(v, line) {
   if (!v || !v.rendered) return;
-  let attr = "data-source-line"; // preview : déjà exprimé dans le source réel
+  let attr = "data-source-line"; // preview: already expressed in the real source
   if (v.mode === "source") attr = "data-line";
   else if (v.mode === "derived") {
     attr = "data-line";
@@ -195,8 +195,8 @@ function jumpTo(docId, line) {
   invoke("activate_tab", { docId });
 }
 
-// Appelé par showActive (main.js) une fois l'onglet actif rendu : consomme un
-// saut en attente, sinon fait suivre le surlignage à la vue affichée.
+// Called by showActive (main.js) once the active tab is rendered: consumes a
+// pending jump, otherwise makes the highlight follow the displayed view.
 /**
  * @param {View} v
  * @param {number} id
@@ -216,7 +216,7 @@ export function onActiveViewShown(v, id) {
 
 /** @param {DocResult[]} results */
 function renderResults(results) {
-  const scrollTop = resultsEl.scrollTop; // rafraîchissement : ne pas perdre la position
+  const scrollTop = resultsEl.scrollTop; // refresh: do not lose the position
   const frag = document.createDocumentFragment();
   let total = 0;
   let docCount = 0;
@@ -278,15 +278,15 @@ function renderResults(results) {
   else statusEl.textContent = summaryText(total, docCount, anyCapped ? "capped" : anyTruncated ? "truncated" : "");
 }
 
-// Nombre affiché, séparateurs de milliers de la langue courante.
+// Displayed number, with the current language's thousands separators.
 /** @param {number} n */
 function formatCount(n) {
   return n.toLocaleString(getLocale());
 }
 
-// Bilan « N occurrences dans M documents (note) ». Une phrase par combinaison
-// (document unique ou non × note) : le pluriel du catalogue ne porte que sur
-// `count` (les occurrences), et on ne recolle jamais de fragments traduits.
+// Summary "N occurrences in M documents (note)". One sentence per combination
+// (single document or not × note): the catalog's plural only applies to
+// `count` (the occurrences), and translated fragments are never glued together.
 /**
  * @param {number} total
  * @param {number} docCount
@@ -305,7 +305,7 @@ function summaryText(total, docCount, note) {
   return t("globalsearch.summary_docs", p);
 }
 
-// Vide les résultats ; `status` non vide = message d'erreur (motif invalide).
+// Clears the results; a non-empty `status` = error message (invalid pattern).
 /** @param {string} [status] */
 function clearResults(status = "") {
   shownRe = null;
@@ -319,8 +319,8 @@ function clearResults(status = "") {
 async function runSearch() {
   const raw = input.value.trim();
   const mySeq = ++seq;
-  // Une expression régulière utile tient parfois en un caractère (`.`) ; un
-  // littéral d'un seul caractère, lui, ne ferait que du bruit.
+  // A useful regular expression is sometimes a single character (`.`); a
+  // single-character literal, on the other hand, would only be noise.
   if (raw.length < (opts.regex ? 1 : MIN_LEN)) {
     clearResults();
     return;
@@ -335,8 +335,8 @@ async function runSearch() {
   statusEl.classList.remove("error");
   input.classList.remove("invalid");
   searchedTabsKey = state.tabs.map((t) => t.id).join(",");
-  // Les onglets HTML (iframe) sont exclus : chercher dans leur balisage brut
-  // serait du bruit, et le saut vers une ligne n'a pas de sens dans l'iframe.
+  // HTML tabs (iframe) are excluded: searching their raw markup would be
+  // noise, and jumping to a line makes no sense inside the iframe.
   const results = await Promise.all(
     state.tabs.filter((t) => !isHtmlPath(t.path)).map(
       /** @returns {Promise<DocResult>} */
@@ -350,10 +350,10 @@ async function runSearch() {
       },
     ),
   );
-  if (mySeq !== seq || panel.hidden) return; // recherche plus récente ou panneau fermé
+  if (mySeq !== seq || panel.hidden) return; // newer search or panel closed
   shownRe = re;
   renderResults(results);
-  // `active` null : `get` rend undefined.
+  // `active` null: `get` returns undefined.
   const v = state.views.get(/** @type {number} */ (state.active));
   if (v) highlightView(v.el);
 }
@@ -386,12 +386,12 @@ export function closeGlobalSearch() {
   if (!panel || panel.hidden) return;
   panel.hidden = true;
   searchBtn.classList.remove("active");
-  seq++; // invalide une recherche encore en vol
+  seq++; // invalidates a search still in flight
   clearTimeout(debounceTimer);
   pendingJump = null;
   shownRe = null;
   clearHighlight();
-  // Rend le focus à la vue active : PgUp/PgDn/flèches y défilent à nouveau.
+  // Gives focus back to the active view: PgUp/PgDn/arrows scroll there again.
   state.views.get(/** @type {number} */ (state.active))?.el.focus({ preventScroll: true });
 }
 
@@ -400,13 +400,13 @@ export function toggleGlobalSearch() {
   else openGlobalSearch();
 }
 
-// Onglets ouverts/fermés pendant que le panneau est affiché : les résultats
-// suivent (appelé par applyTabs). Un simple changement d'onglet actif ne
-// relance rien : la liste des documents couverts n'a pas bougé.
+// Tabs opened/closed while the panel is displayed: the results follow (called
+// by applyTabs). A mere active-tab change re-runs nothing: the list of covered
+// documents has not moved.
 export function refreshGlobalSearch() {
   if (!isGlobalSearchOpen()) return;
   if (state.tabs.map((t) => t.id).join(",") === searchedTabsKey) return;
-  scheduleSearch(0); // runSearch gère aussi la requête trop courte
+  scheduleSearch(0); // runSearch also handles a too-short query
 }
 
 /** @param {{ beforeOpen?: () => void }} [hooks] */
@@ -420,8 +420,8 @@ export function initGlobalSearch({ beforeOpen } = {}) {
   closeBtn = /** @type {HTMLElement} */ (document.getElementById("search-close"));
   opts = initSearchToggles(/** @type {HTMLElement} */ (document.getElementById("search-opts")), () => scheduleSearch(0));
   searchBtn.addEventListener("click", toggleGlobalSearch);
-  // Statut, notes et bilan affichés : une nouvelle recherche les reconstruit
-  // dans la langue courante (résultats rafraîchis, position de défilement gardée).
+  // Displayed status, notes and summary: a new search rebuilds them in the
+  // current language (results refreshed, scroll position kept).
   onLocaleChange(() => {
     if (isGlobalSearchOpen()) scheduleSearch(0);
   });

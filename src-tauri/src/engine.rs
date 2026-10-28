@@ -1,13 +1,13 @@
-//! Moteur de rendu intégré : remplace le serveur Kroki par des moteurs embarqués.
+//! Built-in rendering engine: replaces the Kroki server with embedded engines.
 //!
-//! Quatre familles :
-//! - natifs Rust, compilés dans l'exe : svgbob, pikchr ;
-//! - JS/WASM, exécutés dans une webview cachée dédiée (« renderer ») :
-//!   mermaid, graphviz, vega, vegalite, nomnoml, wavedrom, bytefield ;
-//! - JVM : plantuml/c4plantuml (plantuml-mit.jar) et ditaa (ditaa-standalone.jar),
-//!   exécutés en sous-process si Java est présent ;
-//! - TeX : tikz, compilé par la distribution TeX du poste (latex + dvisvgm) si
-//!   elle est présente — rien n'est embarqué.
+//! Four families:
+//! - native Rust, compiled into the exe: svgbob, pikchr;
+//! - JS/WASM, run in a dedicated hidden webview (« renderer »):
+//!   mermaid, graphviz, vega, vegalite, nomnoml, wavedrom, bytefield;
+//! - JVM: plantuml/c4plantuml (plantuml-mit.jar) and ditaa (ditaa-standalone.jar),
+//!   run as a subprocess if Java is present;
+//! - TeX: tikz, compiled by the workstation's TeX distribution (latex + dvisvgm)
+//!   if present — nothing is embedded.
 
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -24,11 +24,11 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub const RENDERER_LABEL: &str = "renderer";
 
-/// Version du jar embarqué — utilisée pour nommer le fichier extrait.
+/// Version of the embedded jar — used to name the extracted file.
 const PLANTUML_VERSION: &str = "1.2026.6";
 static PLANTUML_JAR: &[u8] = include_bytes!("../assets/plantuml-mit.jar");
 
-/// ditaa : jar standalone (Batik embarqué pour la sortie SVG via `--svg`).
+/// ditaa: standalone jar (Batik embedded for SVG output via `--svg`).
 const DITAA_VERSION: &str = "0.11.0";
 static DITAA_JAR: &[u8] = include_bytes!("../assets/ditaa-0.11.0-standalone.jar");
 
@@ -50,10 +50,10 @@ const NATIVE_TYPES: &[&str] = &["svgbob", "pikchr"];
 const JAVA_TYPES: &[&str] = &["plantuml", "c4plantuml", "ditaa"];
 const TEX_TYPES: &[&str] = &["tikz"];
 
-/// Types reconnus par Kroki en amont mais **non** embarqués dans l'application :
-/// ils ne sont rendus que via un serveur Kroki externe (cf. réglages). Liste de
-/// référence figée d'après la doc Kroki — pas auto-détectée, à compléter si l'on
-/// embarque un nouveau moteur ou si Kroki en ajoute.
+/// Types known to upstream Kroki but **not** embedded in the application:
+/// they are only rendered through an external Kroki server (see settings).
+/// Reference list frozen from the Kroki docs — not auto-detected, to be updated
+/// if a new engine is embedded or if Kroki adds some.
 const EXTERNAL_ONLY_TYPES: &[&str] = &[
     "actdiag",
     "blockdiag",
@@ -68,7 +68,7 @@ const EXTERNAL_ONLY_TYPES: &[&str] = &[
     "wireviz",
 ];
 
-/// Alias acceptés en plus des noms officiels Kroki (partagés avec le frontend).
+/// Aliases accepted in addition to the official Kroki names (shared with the frontend).
 pub fn resolve_alias(dtype: &str) -> &str {
     match dtype {
         "dot" | "gv" => "graphviz",
@@ -89,12 +89,12 @@ pub fn supported_summary() -> String {
     )
 }
 
-/// Alias officiels acceptés en plus des noms Kroki (cf. `resolve_alias`).
+/// Official aliases accepted in addition to the Kroki names (see `resolve_alias`).
 const ALIASES: &[&str] = &["dot", "gv", "vega-lite", "vl", "c4", "puml", "plant-uml"];
 
-/// Liste plate de tous les types reconnus (noms Kroki + alias). Sert à la route
-/// `/v1/health` consommée par les extensions (markdown-kroki) pour savoir quels
-/// fences rendre.
+/// Flat list of all recognized types (Kroki names + aliases). Used by the
+/// `/v1/health` route consumed by extensions (markdown-kroki) to know which
+/// fences to render.
 pub fn supported_types() -> Vec<&'static str> {
     JS_TYPES
         .iter()
@@ -106,27 +106,27 @@ pub fn supported_types() -> Vec<&'static str> {
         .collect()
 }
 
-/// Un groupe de moteurs partageant le même runtime d'exécution, avec son état
-/// vis-à-vis du poste courant. Sérialisé pour la fenêtre d'information.
+/// A group of engines sharing the same execution runtime, with its status
+/// on the current workstation. Serialized for the info window.
 #[derive(Serialize)]
 pub struct RuntimeGroup {
-    /// Runtime sous-jacent : `native` | `webview` | `jvm` | `tex` | `external`.
+    /// Underlying runtime: `native` | `webview` | `jvm` | `tex` | `external`.
     pub runtime: &'static str,
-    /// Libellé lisible du groupe (dans la langue de l'interface).
+    /// Human-readable group label (in the interface language).
     pub label: String,
-    /// Prérequis système (ce qu'il faut pour que le système le supporte).
+    /// System requirement (what the system needs to support it).
     pub requirement: String,
-    /// `ok` (app + système) | `blocked` (app, prérequis système manquant) |
-    /// `unsupported` (pas pris en charge par l'application).
+    /// `ok` (app + system) | `blocked` (app, system requirement missing) |
+    /// `unsupported` (not handled by the application).
     pub status: &'static str,
-    /// Précision contextuelle (Java détecté ou non, etc.).
+    /// Contextual detail (Java detected or not, etc.).
     pub note: String,
-    /// Types de diagrammes couverts par ce groupe.
+    /// Diagram types covered by this group.
     pub types: Vec<&'static str>,
 }
 
-/// État des runtimes pour la fenêtre d'information : pour chaque famille de
-/// moteurs, indique si elle est supportée par l'app **et** par le système.
+/// Runtime status for the info window: for each engine family, tells whether
+/// it is supported by the app **and** by the system.
 pub fn runtime_report(app: &AppHandle) -> Vec<RuntimeGroup> {
     let java_ok = java_available(app);
     let tex = find_tex(app);
@@ -184,18 +184,18 @@ pub fn runtime_report(app: &AppHandle) -> Vec<RuntimeGroup> {
 
 #[derive(Default)]
 pub struct EngineState {
-    /// Jobs envoyés à la webview de rendu, en attente de réponse.
+    /// Jobs sent to the render webview, awaiting a response.
     pending: Mutex<HashMap<u64, mpsc::Sender<Result<String, String>>>>,
     next_job: Mutex<u64>,
-    /// La webview de rendu a fini de charger ses moteurs.
+    /// The render webview has finished loading its engines.
     ready: (Mutex<bool>, Condvar),
-    /// Une création de la webview de rendu est déjà postée/en cours : évite la
-    /// double création quand `ensure_renderer` est appelé concurremment (boot
-    /// différé + filet de `render_js`). Remis à false si la webview est détruite.
+    /// A creation of the render webview is already posted/in progress: avoids
+    /// double creation when `ensure_renderer` is called concurrently (deferred
+    /// boot + `render_js` safety net). Reset to false if the webview is destroyed.
     creating: AtomicBool,
-    /// Chemin de java.exe : non sondé (None) / sondé absent (Some(None)) / présent.
+    /// Path of java.exe: not probed (None) / probed absent (Some(None)) / present.
     java: Mutex<Option<Option<PathBuf>>>,
-    /// Outils TeX, même convention que `java`.
+    /// TeX tools, same convention as `java`.
     tex: Mutex<Option<Option<TexTools>>>,
 }
 
@@ -214,19 +214,19 @@ pub fn complete_job(app: &AppHandle, id: u64, result: Result<String, String>) {
     }
 }
 
-/// Demande la création de la webview cachée de rendu si elle n'existe pas déjà.
+/// Requests creation of the hidden render webview if it does not exist yet.
 ///
-/// Idempotent et sûr depuis **n'importe quel thread** : la construction d'une
-/// webview WebView2 doit se faire sur le main thread, donc on poste le `build()`
-/// via `run_on_main_thread`. Appelé deux fois : au boot (différé hors du chemin
-/// critique, cf. `setup`) et en filet par `render_js` (qui tourne sur un thread
-/// `spawn_blocking`) si la webview a crashé.
+/// Idempotent and safe from **any thread**: building a WebView2 webview must
+/// happen on the main thread, so the `build()` is posted via
+/// `run_on_main_thread`. Called twice: at boot (deferred off the critical
+/// path, see `setup`) and as a safety net by `render_js` (which runs on a
+/// `spawn_blocking` thread) if the webview crashed.
 pub fn ensure_renderer(app: &AppHandle) {
     if app.get_webview_window(RENDERER_LABEL).is_some() {
         return;
     }
     let st = app.state::<EngineState>();
-    // Une seule création en vol : si une autre est déjà postée, on la laisse faire.
+    // Only one creation in flight: if another is already posted, let it proceed.
     if st.creating.swap(true, Ordering::SeqCst) {
         return;
     }
@@ -237,14 +237,14 @@ pub fn ensure_renderer(app: &AppHandle) {
         move || build_renderer(&app)
     });
     if post.is_err() {
-        // Impossible de poster sur le main thread : relâcher le verrou pour réessayer.
+        // Cannot post to the main thread: release the lock so it can be retried.
         app.state::<EngineState>()
             .creating
             .store(false, Ordering::SeqCst);
     }
 }
 
-/// Construit effectivement la webview cachée. **Doit** tourner sur le main thread.
+/// Actually builds the hidden webview. **Must** run on the main thread.
 fn build_renderer(app: &AppHandle) {
     if app.get_webview_window(RENDERER_LABEL).is_some() {
         return;
@@ -254,7 +254,7 @@ fn build_renderer(app: &AppHandle) {
         RENDERER_LABEL,
         WebviewUrl::App("renderer/renderer.html".into()),
     )
-    // Fenêtre cachée, jamais affichée : titre technique, non traduit.
+    // Hidden window, never shown: technical title, not translated.
     .title("Kroki Desk — renderer")
     .visible(false)
     .skip_taskbar(true)
@@ -262,16 +262,16 @@ fn build_renderer(app: &AppHandle) {
     .build();
     if let Err(e) = built {
         crate::journal::error("engine", format!("cannot create the render webview: {e}"));
-        // Échec : relâcher le verrou pour autoriser une nouvelle tentative.
+        // Failure: release the lock to allow a new attempt.
         app.state::<EngineState>()
             .creating
             .store(false, Ordering::SeqCst);
     }
 }
 
-/// À appeler quand la webview de rendu est détruite : relâche le verrou de
-/// création et marque les moteurs comme indisponibles, pour qu'un prochain rendu
-/// la recrée.
+/// To be called when the render webview is destroyed: releases the creation
+/// lock and marks the engines as unavailable, so that the next render
+/// recreates it.
 pub fn renderer_destroyed(app: &AppHandle) {
     app.state::<EngineState>()
         .creating
@@ -294,7 +294,7 @@ fn wait_renderer_ready(app: &AppHandle, timeout: Duration) -> Result<(), String>
     }
 }
 
-/// Rendu via la webview cachée (moteurs JS/WASM).
+/// Rendering through the hidden webview (JS/WASM engines).
 fn render_js(
     app: &AppHandle,
     dtype: &str,
@@ -329,9 +329,9 @@ fn render_js(
         .unwrap()
         .remove(&id);
     match res {
-        // Erreur vide = réponse sans résultat (cf. `render_job_done`) : le texte
-        // est produit ici, sur le thread qui attend, pour suivre sa langue (celle
-        // de l'API HTTP locale est l'anglais, pas celle de l'interface).
+        // Empty error = response with no result (see `render_job_done`): the text
+        // is produced here, on the waiting thread, to follow its language (the
+        // local HTTP API's is English, not the interface's).
         Ok(Err(e)) if e.is_empty() => Err(tr!("engine.empty_response")),
         Ok(r) => r,
         Err(_) => Err(tr!("engine.render_timeout", dtype = dtype)),
@@ -360,7 +360,7 @@ fn find_java(app: &AppHandle) -> Option<PathBuf> {
         cmd.arg("-version");
         no_window(&mut cmd);
         let out = cmd.output().ok().filter(|o| o.status.success())?;
-        // `java -version` écrit sur stderr ; 1re ligne = distribution et version.
+        // `java -version` writes to stderr; 1st line = distribution and version.
         let version = first_line(&out.stderr);
         Some((p, version))
     });
@@ -387,7 +387,7 @@ fn first_line(bytes: &[u8]) -> String {
         .to_string()
 }
 
-/// Java est-il utilisable sur ce poste ? (sondé une fois, mis en cache)
+/// Is Java usable on this workstation? (probed once, cached)
 pub fn java_available(app: &AppHandle) -> bool {
     find_java(app).is_some()
 }
@@ -455,8 +455,8 @@ fn render_plantuml(app: &AppHandle, source: &str) -> Result<String, String> {
         .write_all(src.as_bytes())
         .map_err(|e| e.to_string())?;
 
-    // wait_with_output ferme stdin (déjà droppé) et lit tout ; PlantUML termine
-    // toujours en -pipe, on borne quand même via un thread de garde.
+    // wait_with_output closes stdin (already dropped) and reads everything; PlantUML
+    // always terminates in -pipe mode, but we still bound it via a guard thread.
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let _ = tx.send(child.wait_with_output());
@@ -468,8 +468,8 @@ fn render_plantuml(app: &AppHandle, source: &str) -> Result<String, String> {
     };
     let stdout = String::from_utf8_lossy(&output.stdout);
     if stdout.contains("<svg") {
-        // En cas d'erreur de syntaxe, PlantUML produit un SVG décrivant l'erreur :
-        // on l'affiche tel quel, c'est le diagnostic le plus utile.
+        // On a syntax error, PlantUML produces an SVG describing the error:
+        // we display it as is, it is the most useful diagnostic.
         Ok(stdout.into_owned())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -507,8 +507,8 @@ fn render_ditaa(app: &AppHandle, source: &str) -> Result<String, String> {
     };
     let jar = ensure_ditaa_jar(app)?;
 
-    // ditaa attend <entrée> <sortie> ; « - » des deux côtés = pipe stdin→stdout
-    // (comme PlantUML), « -o » autorise l'écrasement de la sortie « - ».
+    // ditaa expects <input> <output>; « - » on both sides = stdin→stdout pipe
+    // (like PlantUML), « -o » allows overwriting the « - » output.
     let mut cmd = std::process::Command::new(&java);
     cmd.args([
         "-Djava.awt.headless=true",
@@ -533,7 +533,7 @@ fn render_ditaa(app: &AppHandle, source: &str) -> Result<String, String> {
         .write_all(source.as_bytes())
         .map_err(|e| e.to_string())?;
 
-    // Garde de temps comme pour PlantUML : ditaa termine en pipe, on borne.
+    // Time guard as for PlantUML: ditaa terminates in pipe mode, but we bound it.
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let _ = tx.send(child.wait_with_output());
@@ -556,22 +556,22 @@ fn render_ditaa(app: &AppHandle, source: &str) -> Result<String, String> {
     }
 }
 
-// ---------- TikZ (distribution TeX du poste) ----------
+// ---------- TikZ (workstation's TeX distribution) ----------
 
-/// Délai d'une étape de compilation. Large : le premier appel à une
-/// distribution MiKTeX fraîchement installée reconstruit ses bases de fichiers
-/// (~15 s mesurées), les suivants prennent ~1 s.
+/// Timeout of one compilation step. Generous: the first call to a freshly
+/// installed MiKTeX distribution rebuilds its file databases
+/// (~15 s measured), subsequent ones take ~1 s.
 const TEX_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Clone)]
 struct TexTools {
-    /// MiKTeX : option propre pour couper l'installation automatique de paquets.
+    /// MiKTeX: dedicated option to turn off automatic package installation.
     miktex: bool,
-    /// 1re ligne de `latex --version` (journal).
+    /// 1st line of `latex --version` (journal).
     version: String,
 }
 
-/// `latex` et `dvisvgm` sont-ils sur le PATH ? (sondé une fois, mis en cache)
+/// Are `latex` and `dvisvgm` on the PATH? (probed once, cached)
 fn find_tex(app: &AppHandle) -> Option<TexTools> {
     let st = app.state::<EngineState>();
     let mut cache = st.tex.lock().unwrap();
@@ -612,12 +612,12 @@ fn probe_tex() -> Option<TexTools> {
     }
 }
 
-/// Une distribution TeX est-elle utilisable sur ce poste ?
+/// Is a TeX distribution usable on this workstation?
 pub fn tex_available(app: &AppHandle) -> bool {
     find_tex(app).is_some()
 }
 
-/// Dossier de compilation, supprimé quoi qu'il arrive.
+/// Compilation folder, removed no matter what.
 struct ScratchDir(PathBuf);
 
 impl Drop for ScratchDir {
@@ -626,9 +626,9 @@ impl Drop for ScratchDir {
     }
 }
 
-/// Lance `cmd` et l'attend au plus `TEX_TIMEOUT`, puis le tue. Les sorties
-/// standard sont jetées : latex écrit tout dans son `.log`, dvisvgm ses
-/// diagnostics dans `stderr_to`.
+/// Runs `cmd` and waits for it at most `TEX_TIMEOUT`, then kills it. Standard
+/// outputs are discarded: latex writes everything to its `.log`, dvisvgm its
+/// diagnostics to `stderr_to`.
 fn run_bounded(
     mut cmd: std::process::Command,
     what: &str,
@@ -665,8 +665,8 @@ fn run_bounded(
     }
 }
 
-/// Kroki attend un document LaTeX complet ; une `tikzpicture` nue, voire de
-/// simples commandes de tracé, sont acceptées en plus et enrobées.
+/// Kroki expects a complete LaTeX document; a bare `tikzpicture`, or even
+/// plain drawing commands, are also accepted and wrapped.
 fn tikz_document(source: &str) -> String {
     if source.contains("\\documentclass") {
         return source.to_string();
@@ -679,11 +679,11 @@ fn tikz_document(source: &str) -> String {
     format!("\\documentclass[tikz,border=4pt]{{standalone}}\n\\begin{{document}}\n{body}\n\\end{{document}}\n")
 }
 
-/// Extrait du `.log` la première erreur TeX : la ligne `! …`, puis la ligne
-/// `l.<n>` qui la situe dans le document compilé. TeX coupe celle-ci au point
-/// de l'erreur et en affiche la suite sur la ligne d'après : elles sont
-/// recollées. L'aide interactive qui les sépare (« Type X to quit… ») est
-/// omise, elle n'a pas de sens hors terminal.
+/// Extracts the first TeX error from the `.log`: the `! …` line, then the
+/// `l.<n>` line that locates it in the compiled document. TeX cuts the latter
+/// at the error point and prints the rest on the next line: they are
+/// glued back together. The interactive help that separates them
+/// (« Type X to quit… ») is omitted, it makes no sense outside a terminal.
 fn tex_error(log: &str) -> String {
     let lines: Vec<&str> = log.lines().collect();
     let Some(start) = lines.iter().position(|l| l.starts_with('!')) else {
@@ -705,16 +705,16 @@ fn tex_error(log: &str) -> String {
     message
 }
 
-/// Préfixe les identifiants d'un SVG de dvisvgm. Ses glyphes s'appellent
-/// `g20-11` dans **chaque** fichier : deux figures insérées dans la même page
-/// partageraient ces `id`, et la seconde s'afficherait avec les glyphes de la
-/// première. Le préfixe dérive du source : deux figures identiques restent
-/// cohérentes.
+/// Prefixes the identifiers of a dvisvgm SVG. Its glyphs are named
+/// `g20-11` in **every** file: two figures inserted in the same page
+/// would share these `id`s, and the second would be displayed with the
+/// first one's glyphs. The prefix derives from the source: two identical
+/// figures stay consistent.
 fn scope_svg_ids(svg: &str, source: &str) -> String {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     source.hash(&mut h);
     let p = format!("tikz{:x}-", h.finish());
-    let svg = &svg[svg.find("<svg").unwrap_or(0)..]; // sans le prologue XML
+    let svg = &svg[svg.find("<svg").unwrap_or(0)..]; // without the XML prologue
     svg.replace(" id='", &format!(" id='{p}"))
         .replace(" id=\"", &format!(" id=\"{p}"))
         .replace("href='#", &format!("href='#{p}"))
@@ -722,10 +722,10 @@ fn scope_svg_ids(svg: &str, source: &str) -> String {
         .replace("url(#", &format!("url(#{p}"))
 }
 
-/// Polices que dvisvgm n'a pas su vectoriser, d'après son journal : il ne
-/// dispose de contours que pour les polices Type 1, et se rabat sinon sur
-/// METAFONT, qui échoue couramment (« failed to create ecrm1000.gf »). Le SVG
-/// est tout de même écrit, **sans le texte** de ces polices.
+/// Fonts that dvisvgm could not vectorize, according to its log: it only
+/// has outlines for Type 1 fonts, and otherwise falls back on METAFONT, which
+/// commonly fails (« failed to create ecrm1000.gf »). The SVG is
+/// still written, **without the text** of those fonts.
 fn missing_glyph_fonts(log: &str) -> Vec<String> {
     log.lines()
         .filter_map(|l| l.split_once("failed to create ").map(|(_, f)| f.trim()))
@@ -733,16 +733,16 @@ fn missing_glyph_fonts(log: &str) -> Vec<String> {
         .collect()
 }
 
-/// TikZ → SVG : `latex` en DVI avec le pilote PGF `dvisvgm`, puis `dvisvgm
-/// --no-fonts`, qui convertit le texte en tracés — le SVG ne dépend d'aucune
-/// police installée. Pour que ces tracés existent, les polices doivent être
-/// vectorielles : `lmodern` (Type 1) est donc chargé **avant** la classe s'il
-/// est installé. Sans lui, `\usepackage[T1]{fontenc}` seul sélectionne les
-/// polices EC, bitmap, dont dvisvgm ne tire aucun glyphe ; un choix de police
-/// du document, chargé après, reste prioritaire. La compilation se fait dans un dossier temporaire, sans
-/// `\write18` et, sous MiKTeX, sans installation automatique de paquets (qui
-/// ouvrirait sa fenêtre en plein rendu). Sous TeX Live, `openin_any=p`
-/// interdit en plus la lecture de fichiers par chemin absolu.
+/// TikZ → SVG: `latex` to DVI with the PGF `dvisvgm` driver, then `dvisvgm
+/// --no-fonts`, which converts text to outlines — the SVG depends on no
+/// installed font. For these outlines to exist, the fonts must be
+/// vector: `lmodern` (Type 1) is therefore loaded **before** the class if it
+/// is installed. Without it, `\usepackage[T1]{fontenc}` alone selects the
+/// EC fonts, bitmap, from which dvisvgm draws no glyph; a font choice
+/// in the document, loaded afterwards, still takes precedence. Compilation happens in a temporary folder, without
+/// `\write18` and, under MiKTeX, without automatic package installation (which
+/// would open its window mid-render). Under TeX Live, `openin_any=p`
+/// additionally forbids reading files by absolute path.
 fn render_tikz(app: &AppHandle, source: &str) -> Result<String, String> {
     let Some(tex) = find_tex(app) else {
         return Err(tr!("engine.tex_missing"));
@@ -798,7 +798,7 @@ fn compile_tikz(tex: &TexTools, source: &str) -> Result<String, String> {
     let status = run_bounded(dvisvgm, "dvisvgm", Some(&stderr))?;
     let missing = missing_glyph_fonts(&std::fs::read_to_string(&stderr).unwrap_or_default());
     if !missing.is_empty() {
-        // Une figure amputée de son texte passerait pour correcte : on refuse.
+        // A figure stripped of its text would pass for correct: refuse it.
         return Err(tr!("engine.tex_fonts_missing", fonts = missing.join(", ")));
     }
     match std::fs::read_to_string(dir.0.join("figure.svg")) {
@@ -811,7 +811,7 @@ fn compile_tikz(tex: &TexTools, source: &str) -> Result<String, String> {
     }
 }
 
-// ---------- Natifs Rust ----------
+// ---------- Native Rust ----------
 
 fn render_svgbob(source: &str) -> Result<String, String> {
     Ok(svgbob::to_svg_string_pretty(source))
@@ -827,8 +827,8 @@ fn render_pikchr(source: &str) -> Result<String, String> {
 
 // ---------- Dispatch ----------
 
-/// Rend un diagramme avec les moteurs intégrés. `dtype` doit déjà être résolu
-/// (alias) et en minuscules.
+/// Renders a diagram with the built-in engines. `dtype` must already be
+/// resolved (alias) and lowercase.
 pub fn render_local(
     app: &AppHandle,
     dtype: &str,
@@ -838,8 +838,8 @@ pub fn render_local(
     match dtype {
         "svgbob" => render_svgbob(source),
         "pikchr" => render_pikchr(source),
-        // ditaa est un type Java mais a son propre pipeline (args ditaa, pas le
-        // -pipe de PlantUML) : intercepté avant la garde JAVA_TYPES ci-dessous.
+        // ditaa is a Java type but has its own pipeline (ditaa args, not
+        // PlantUML's -pipe): intercepted before the JAVA_TYPES guard below.
         "ditaa" => render_ditaa(app, source),
         t if JS_TYPES.contains(&t) => render_js(app, t, source, options),
         t if JAVA_TYPES.contains(&t) => render_plantuml(app, source),
@@ -886,8 +886,8 @@ mod tikz_tests {
             "{msg}"
         );
         assert!(!msg.contains("Type X"));
-        // Comparés au catalogue plutôt qu'à un texte : le test ne dépend pas de la
-        // langue (les tests tournent en anglais, la référence).
+        // Compared against the catalog rather than a literal text: the test does not
+        // depend on the language (tests run in English, the reference).
         assert!(msg.ends_with(&tr!("engine.tex_package_missing")), "{msg}");
         assert_eq!(tex_error("rien"), tr!("engine.tex_no_error"));
     }
@@ -913,13 +913,13 @@ mod tikz_tests {
         assert!(missing_glyph_fonts("1 of 1 page converted").is_empty());
     }
 
-    /// Compilation réelle, si le poste a une distribution TeX (sinon rien à tester).
+    /// Real compilation, if the workstation has a TeX distribution (otherwise nothing to test).
     #[test]
     fn compile_une_figure_si_tex_present() {
         let Some(tex) = probe_tex() else { return };
         let svg = compile_tikz(&tex, r"\node[draw] {$x^2$ é};").unwrap();
         assert!(svg.starts_with("<svg"));
-        // T1 sans police vectorielle : lmodern, préchargé, doit fournir les glyphes.
+        // T1 without a vector font: lmodern, preloaded, must supply the glyphs.
         let t1 = "\\documentclass[tikz]{standalone}\n\\usepackage[T1]{fontenc}\n\
                   \\begin{document}\\tikz\\node{chaîne};\\end{document}";
         assert!(compile_tikz(&tex, t1).unwrap().contains("<path"));

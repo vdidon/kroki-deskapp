@@ -1,15 +1,15 @@
-// Test du découpage ligne à ligne d'un flot HTML coloré (ui/js/hlsplit.js) —
-// autonome, sans dépendance npm et sans application lancée : il importe le
-// module pur et le confronte au **highlight.js vendoré du dépôt**, celui qui
-// tournera réellement dans la webview.
+// Test of the line-by-line splitting of a colored HTML stream (ui/js/hlsplit.js) —
+// standalone, no npm dependency and no running application: it imports the
+// pure module and checks it against the **repo's vendored highlight.js**, the
+// one that will actually run in the webview.
 //
-//   node tests/test_hlsplit.mjs                 # suite de non-régression
-//   node tests/test_hlsplit.mjs fichier.md …    # + vrais documents
+//   node tests/test_hlsplit.mjs                 # regression suite
+//   node tests/test_hlsplit.mjs file.md …       # + real documents
 //
-// Les deux invariants qui comptent — c'est sur eux que repose l'alignement
-// preview ↔ source de la vue code source :
-//   1. une entrée par ligne du source, exactement ;
-//   2. le texte, spans retirés, est identique au source ligne pour ligne.
+// The two invariants that matter — the preview ↔ source alignment of the
+// source code view rests on them:
+//   1. exactly one entry per source line;
+//   2. the text, spans stripped, is identical to the source line for line.
 
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -40,7 +40,7 @@ function group(title, fn) {
   fn();
 }
 
-/** Texte visible d'une ligne HTML : balises retirées, entités hljs décodées. */
+/** Visible text of an HTML line: tags stripped, hljs entities decoded. */
 function plain(html) {
   return html
     .replace(/<[^>]*>/g, "")
@@ -51,7 +51,7 @@ function plain(html) {
     .replace(/&amp;/g, "&");
 }
 
-/** Chaque ligne doit être un fragment HTML équilibré (spans refermés). */
+/** Each line must be a balanced HTML fragment (spans closed). */
 function balanced(html) {
   let depth = 0;
   for (const m of html.matchAll(/<span\b[^>]*>|<\/span>/g)) {
@@ -61,57 +61,57 @@ function balanced(html) {
   return depth === 0;
 }
 
-/** Invariants complets sur un source colorisé par une grammaire hljs. */
+/** Full invariants on a source colorized by an hljs grammar. */
 function checkRoundTrip(label, source, lang) {
   const html = hljs.highlight(source, { language: lang, ignoreIllegals: true }).value;
   const lines = source.split("\n");
   const painted = splitHighlightedLines(html);
-  check(`${label} : une entrée par ligne`, painted.length === lines.length, `${painted.length} ≠ ${lines.length}`);
+  check(`${label}: one entry per line`, painted.length === lines.length, `${painted.length} ≠ ${lines.length}`);
   const bad = [];
   for (let i = 0; i < Math.min(painted.length, lines.length); i++) {
     if (plain(painted[i]) !== lines[i]) bad.push(`L${i + 1} : ${JSON.stringify(plain(painted[i]).slice(0, 80))} ≠ ${JSON.stringify(lines[i].slice(0, 80))}`);
   }
-  check(`${label} : texte préservé ligne à ligne`, bad.length === 0, bad.slice(0, 5).join("\n"));
+  check(`${label}: text preserved line by line`, bad.length === 0, bad.slice(0, 5).join("\n"));
   const unbalanced = painted.map((h, i) => (balanced(h) ? null : i + 1)).filter(Boolean);
-  check(`${label} : spans équilibrés sur chaque ligne`, unbalanced.length === 0, `lignes ${unbalanced.slice(0, 10).join(", ")}`);
+  check(`${label}: balanced spans on every line`, unbalanced.length === 0, `lines ${unbalanced.slice(0, 10).join(", ")}`);
   return painted;
 }
 
-group("Découpage — cas de base", () => {
-  check("texte nu, 3 lignes", splitHighlightedLines("a\nb\nc").length === 3);
-  check("chaîne vide → 1 ligne vide", JSON.stringify(splitHighlightedLines("")) === '[""]');
+group("Splitting — basic cases", () => {
+  check("plain text, 3 lines", splitHighlightedLines("a\nb\nc").length === 3);
+  check("empty string → 1 empty line", JSON.stringify(splitHighlightedLines("")) === '[""]');
   check(
-    "aucun saut de ligne → flot intact",
+    "no line break → stream intact",
     splitHighlightedLines('<span class="hljs-x">a</span>')[0] === '<span class="hljs-x">a</span>',
   );
   const nl = splitHighlightedLines("a\n\nb");
-  check("ligne vide médiane conservée", nl.length === 3 && nl[1] === "", JSON.stringify(nl));
+  check("middle empty line kept", nl.length === 3 && nl[1] === "", JSON.stringify(nl));
 });
 
-group("Découpage — spans à cheval", () => {
+group("Splitting — spans straddling lines", () => {
   const out = splitHighlightedLines('<span class="hljs-c">un\ndeux</span>fin');
-  check("2 lignes", out.length === 2, JSON.stringify(out));
-  check("span refermé en fin de ligne 1", out[0] === '<span class="hljs-c">un</span>', out[0]);
-  check("span rouvert à l'identique ligne 2", out[1] === '<span class="hljs-c">deux</span>fin', out[1]);
+  check("2 lines", out.length === 2, JSON.stringify(out));
+  check("span closed at end of line 1", out[0] === '<span class="hljs-c">un</span>', out[0]);
+  check("span reopened identically on line 2", out[1] === '<span class="hljs-c">deux</span>fin', out[1]);
 
   const nested = splitHighlightedLines('<span class="a"><span class="b">x\ny</span>z</span>');
-  check("imbrication : 2 lignes", nested.length === 2, JSON.stringify(nested));
-  check("imbrication : pile rouverte dans l'ordre", nested[1].startsWith('<span class="a"><span class="b">y'), nested[1]);
-  check("imbrication : lignes équilibrées", nested.every(balanced), JSON.stringify(nested));
+  check("nesting: 2 lines", nested.length === 2, JSON.stringify(nested));
+  check("nesting: stack reopened in order", nested[1].startsWith('<span class="a"><span class="b">y'), nested[1]);
+  check("nesting: balanced lines", nested.every(balanced), JSON.stringify(nested));
 
   const deep = splitHighlightedLines('<span class="a">1\n<span class="b">2\n3</span>\n4</span>');
-  check("3 sauts → 4 lignes", deep.length === 4, JSON.stringify(deep));
-  check("profondeur variable : lignes équilibrées", deep.every(balanced), JSON.stringify(deep));
+  check("3 breaks → 4 lines", deep.length === 4, JSON.stringify(deep));
+  check("varying depth: balanced lines", deep.every(balanced), JSON.stringify(deep));
 });
 
-group("Découpage — entrées malformées (jamais de crash)", () => {
-  check("fermeture orpheline ignorée", splitHighlightedLines("a</span>\nb").length === 2);
-  check("`<` isolé toléré", splitHighlightedLines("a < b\nc").length === 2);
+group("Splitting — malformed input (never crashes)", () => {
+  check("orphan closing tag ignored", splitHighlightedLines("a</span>\nb").length === 2);
+  check("stray `<` tolerated", splitHighlightedLines("a < b\nc").length === 2);
   const unclosed = splitHighlightedLines('<span class="a">x\ny');
-  check("span jamais refermé : lignes équilibrées", unclosed.every(balanced), JSON.stringify(unclosed));
+  check("span never closed: balanced lines", unclosed.every(balanced), JSON.stringify(unclosed));
 });
 
-group("Markdown réel (grammaire hljs vendorée)", () => {
+group("Real Markdown (vendored hljs grammar)", () => {
   const md = [
     "# Titre",
     "",
@@ -130,30 +130,30 @@ group("Markdown réel (grammaire hljs vendorée)", () => {
     "| 1 | 2 |",
     "",
   ].join("\n");
-  const painted = checkRoundTrip("markdown de référence", md, "markdown");
-  check("fence colorée (au moins un span)", painted.some((l) => l.includes("<span")), "aucune coloration émise");
+  const painted = checkRoundTrip("reference markdown", md, "markdown");
+  check("colored fence (at least one span)", painted.some((l) => l.includes("<span")), "no coloring emitted");
 });
 
-group("Grammaire absente / autres langages", () => {
-  check("langage inconnu signalé par hljs", !hljs.getLanguage("tex-source"));
+group("Missing grammar / other languages", () => {
+  check("unknown language reported by hljs", !hljs.getLanguage("tex-source"));
   checkRoundTrip("xml", '<a href="x">\n<b/>\n</a>', "xml");
 });
 
 const files = process.argv.slice(2);
 if (files.length) {
-  group("Documents fournis", () => {
+  group("Supplied documents", () => {
     for (const file of files) {
       if (!fs.existsSync(file)) {
-        check(`${file} : lisible`, false, "fichier introuvable");
+        check(`${file}: readable`, false, "file not found");
         continue;
       }
       const src = fs.readFileSync(file, "utf8");
       const t0 = Date.now();
       const painted = checkRoundTrip(path.basename(file), src, "markdown");
-      console.log(`  · ${path.basename(file)} — ${Date.now() - t0} ms, ${painted.length} lignes`);
+      console.log(`  · ${path.basename(file)} — ${Date.now() - t0} ms, ${painted.length} lines`);
     }
   });
 }
 
-console.log(`\n${failures ? "ÉCHEC" : "OK"} — ${checks - failures}/${checks} vérifications passées`);
+console.log(`\n${failures ? "FAILED" : "OK"} — ${checks - failures}/${checks} checks passed`);
 process.exit(failures ? 1 : 0);

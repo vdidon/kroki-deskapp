@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Textes de l'installeur en japonais : memes Id que en-US.wxl (sans accents : codepage 932). -->
+<!-- Installer texts in Japanese: same Ids as en-US.wxl (no accents: codepage 932). -->
 <WixLocalization Culture="ja-jp" Codepage="932" xmlns="http://schemas.microsoft.com/wix/2006/localization">
   <String Id="LaunchApp">Kroki Desk を起動する</String>
   <String Id="DowngradeErrorMessage">新しいバージョンの Kroki Desk が既にインストールされています。</String>

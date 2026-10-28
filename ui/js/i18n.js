@@ -1,21 +1,21 @@
 // @ts-check
-// Langue de l'interface : catalogue courant, `t()` et traduction du HTML statique.
+// Interface language: current catalog, `t()` and static HTML translation.
 //
-// Le catalogue vient du Rust (commande `get_i18n`), source unique partagée avec
-// les messages du backend (`src-tauri/i18n/<langue>.json`, cf. i18n.rs) : il
-// arrive déjà complété par l'anglais, la langue de référence. Une clé absente
-// des deux s'affiche telle quelle (et s'annonce en console), jamais d'exception.
+// The catalog comes from Rust (`get_i18n` command), a single source shared with
+// the backend messages (`src-tauri/i18n/<lang>.json`, cf. i18n.rs): it arrives
+// already completed with English, the reference language. A key missing from
+// both is displayed as is (and announced in the console), never an exception.
 //
-// HTML statique : `data-i18n="clé"` (texte), `data-i18n-html="clé"` (texte
-// à balisage inline — `<code>`, `<kbd>`, `<strong>` : le catalogue est à nous,
-// pas au document), `data-i18n-title`, `data-i18n-placeholder`,
-// `data-i18n-aria-label` (attributs). Le texte écrit
-// dans index.html n'est qu'un repli anglais : `applyLocale` le remplace avant
-// le premier paint (cf. `data-i18n-pending`, app.css).
+// Static HTML: `data-i18n="key"` (text), `data-i18n-html="key"` (text with
+// inline markup — `<code>`, `<kbd>`, `<strong>`: the catalog is ours, not the
+// document's), `data-i18n-title`, `data-i18n-placeholder`,
+// `data-i18n-aria-label` (attributes). The text written in index.html is only
+// an English fallback: `applyLocale` replaces it before the first paint (cf.
+// `data-i18n-pending`, app.css).
 //
-// Textes construits par le JS : appeler `t()` au moment de les écrire, et
-// s'abonner à `onLocaleChange` pour ceux qui restent affichés (indications
-// d'un dialog, libellés générés à l'init).
+// Texts built by JS: call `t()` when writing them, and subscribe to
+// `onLocaleChange` for those that stay displayed (dialog hints, labels
+// generated at init).
 
 import { invoke } from "./app.js";
 
@@ -31,7 +31,7 @@ let plurals = new Intl.PluralRules("en");
 /** @type {Set<(locale: string) => void>} */
 const listeners = new Set();
 
-// [clé dans dataset, attribut traduit]
+// [key in dataset, translated attribute]
 /** @type {[string, string][]} */
 const ATTRS = [
   ["i18nTitle", "title"],
@@ -39,34 +39,34 @@ const ATTRS = [
   ["i18nAriaLabel", "aria-label"],
 ];
 
-// Texte de `key`, paramètres `{nom}` substitués. Une valeur objet est un jeu de
-// formes plurielles CLDR choisi par `params.count`.
+// Text of `key`, `{name}` parameters substituted. An object value is a set of
+// CLDR plural forms chosen by `params.count`.
 /**
  * @param {string} key
  * @param {Record<string, unknown>} [params]
  * @returns {string}
  */
 export function t(key, params) {
-  /** @type {string | Record<string, string> | undefined} — clé absente du catalogue */
+  /** @type {string | Record<string, string> | undefined} — key missing from the catalog */
   let s = messages[key];
   if (s && typeof s === "object") {
     s = s[plurals.select(Number(params?.count ?? 0))] ?? s.other;
   }
   if (typeof s !== "string") {
-    console.warn(`i18n : clé inconnue « ${key} »`);
+    console.warn(`i18n: unknown key "${key}"`);
     return key;
   }
   if (!params) return s;
   return s.replace(/\{(\w+)\}/g, (m, name) => (name in params ? String(params[name]) : m));
 }
 
-// Code de la langue courante (`en`, `fr`) : `Intl`, `localeCompare`, `<html lang>`.
+// Current language code (`en`, `fr`): `Intl`, `localeCompare`, `<html lang>`.
 export function getLocale() {
   return locale;
 }
 
-// Réglage brut (`auto` ou un code) et langues livrées (`{code, name}`, name =
-// endonyme) : dialog Réglages.
+// Raw setting (`auto` or a code) and shipped languages (`{code, name}`, name =
+// endonym): Settings (« Réglages ») dialog.
 export function getLanguageSetting() {
   return setting;
 }
@@ -75,9 +75,9 @@ export function getLanguages() {
   return languages;
 }
 
-// Traduit le sous-arbre `root` (document entier par défaut) : à rappeler sur
-// tout fragment HTML statique inséré après coup. Les sélecteurs garantissent
-// la présence de l'attribut lu, d'où les casts `string`.
+// Translates the `root` subtree (whole document by default): to be called again
+// on any static HTML fragment inserted afterwards. The selectors guarantee the
+// presence of the attribute read, hence the `string` casts.
 /** @param {ParentNode} [root] */
 export function applyLocale(root = document) {
   if (root === document) document.documentElement.lang = locale;
@@ -96,8 +96,8 @@ export function applyLocale(root = document) {
   }
 }
 
-// Recharge le catalogue depuis le backend et retraduit toute la fenêtre.
-// Au boot, puis à chaque changement de langue (cette fenêtre ou une autre).
+// Reloads the catalog from the backend and re-translates the whole window.
+// At boot, then on every language change (this window or another).
 export async function loadLocale() {
   const r = await invoke("get_i18n");
   locale = r.locale;
@@ -110,26 +110,26 @@ export async function loadLocale() {
     try {
       fn(locale);
     } catch (err) {
-      console.error("i18n : abonné en échec :", err);
+      console.error("i18n: subscriber failed:", err);
     }
   }
 }
 
-// `fn(locale)` après chaque changement de langue (pas au boot : les modules
-// écrivent leurs textes à l'init, après `loadLocale`).
+// `fn(locale)` after every language change (not at boot: modules write their
+// texts at init, after `loadLocale`).
 /** @param {(locale: string) => void} fn */
 export function onLocaleChange(fn) {
   listeners.add(fn);
 }
 
-// Premier chargement : la fenêtre reste masquée tant que le HTML statique n'est
-// pas traduit (pas de flash du repli anglais), et réapparaît même en cas
-// d'échec — une interface en anglais vaut mieux qu'une fenêtre vide.
+// First load: the window stays hidden until the static HTML is translated (no
+// flash of the English fallback), and reappears even on failure — an English
+// interface beats an empty window.
 export async function initI18n() {
   try {
     await loadLocale();
   } catch (err) {
-    console.error("i18n : catalogue indisponible :", err);
+    console.error("i18n: catalog unavailable:", err);
   } finally {
     delete document.documentElement.dataset.i18nPending;
   }

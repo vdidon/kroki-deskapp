@@ -1,19 +1,18 @@
 // @ts-check
-// Export du rendu de l'onglet actif en page HTML autonome (bouton de la pile
-// d'actions de vue).
+// Export of the active tab's rendering as a standalone HTML page (button of
+// the view action stack).
 //
-// La page exportée rejoue la mise en page de l'app : toutes les feuilles de
-// style du <head> sont inlinées — vendors, app.css, styles injectés au runtime
-// (Plotly) — en conservant leurs attributs `media` (le forçage de thème via
-// theme.js voyage donc tel quel), et l'attribut [data-theme] de <html> est
-// reproduit. Les diagrammes sont déjà des SVG inline ; une figure Plotly est
-// exportée figée (son SVG au moment de l'export, modebar retirée). Les images
-// locales — réécrites en `asset.localhost` par render.js, protocole interne
-// mort hors de l'app — sont converties en data-URI côté backend
-// (`export_html`) : la CSP interdit leur fetch ici (connect-src), alors que
-// celui des feuilles de style, servies en 'self', passe. Limitation assumée :
-// les polices KaTeX (URLs relatives `fonts/…`) ne sont pas embarquées, les
-// formules retombent sur les polices système.
+// The exported page replays the app's layout: all the <head>'s stylesheets are
+// inlined — vendors, app.css, styles injected at runtime (Plotly) — keeping
+// their `media` attributes (the theme forcing via theme.js therefore travels
+// as is), and <html>'s [data-theme] attribute is reproduced. Diagrams are
+// already inline SVGs; a Plotly figure is exported frozen (its SVG at export
+// time, modebar removed). Local images — rewritten to `asset.localhost` by
+// render.js, an internal protocol dead outside the app — are converted to
+// data-URIs on the backend side (`export_html`): the CSP forbids fetching them
+// here (connect-src), whereas the stylesheets' fetch, served from 'self',
+// passes. Accepted limitation: the KaTeX fonts (relative `fonts/…` URLs) are
+// not embedded, formulas fall back to system fonts.
 
 import { invoke, state, escapeHtml } from "./app.js";
 import { renderDocument } from "./render.js";
@@ -21,8 +20,8 @@ import { t, getLocale } from "./i18n.js";
 
 /** @typedef {import("../../types/app").View} View */
 
-// Neutralise la mise en page « application » (body flex plein cadre, vues
-// empilées en position absolue) : la page exportée défile normalement.
+// Neutralizes the "application" layout (full-frame flex body, views stacked in
+// absolute position): the exported page scrolls normally.
 const EXPORT_CSS = `
 html, body { height: auto; overflow: auto; display: block; }
 .doc-view { position: static; overflow: visible; }
@@ -40,28 +39,28 @@ async function inlineStyles() {
       continue;
     }
     try {
-      // Les `<link>` de feuille de style du <head> (index.html) portent tous un href.
+      // The stylesheet `<link>`s in the <head> (index.html) all carry an href.
       const css = await (await fetch(/** @type {string} */ (node.getAttribute("href")))).text();
       const media = node.media ? ` media="${escapeHtml(node.media)}"` : "";
       parts.push(`<style${media}>\n${css}\n</style>`);
     } catch {
-      /* feuille inaccessible : le style dégrade, l'export reste utilisable */
+      /* unreachable stylesheet: styling degrades, the export stays usable */
     }
   }
   return parts.join("\n");
 }
 
-// Article rendu du document : cloné depuis la vue si elle affiche le preview,
-// sinon (vue source ou dérivée à l'écran) re-rendu dans un conteneur hors
-// écran — largeur réaliste pour les mesures de mise en page (Plotly) — sans
-// toucher à la vue de l'utilisateur.
+// Rendered article of the document: cloned from the view if it shows the
+// preview, otherwise (source or derived view on screen) re-rendered in an
+// offscreen container — realistic width for layout measurements (Plotly) —
+// without touching the user's view.
 /**
- * @param {View} v vue rendue, `markdown` non nul (vérifié par `exportActiveView`)
+ * @param {View} v rendered view, non-null `markdown` (checked by `exportActiveView`)
  * @returns {Promise<Element | null>}
  */
 async function previewArticle(v) {
   if (v.mode !== "source" && v.mode !== "derived") {
-    // cloneNode est typé Node : le clone d'un Element est un Element.
+    // cloneNode is typed Node: the clone of an Element is an Element.
     return /** @type {Element | null} */ (
       v.el.querySelector("article.markdown-body")?.cloneNode(true) ?? null
     );
@@ -72,7 +71,7 @@ async function previewArticle(v) {
     "position:fixed;left:-10000px;top:0;width:996px;height:600px;overflow:auto;";
   document.body.appendChild(host);
   try {
-    // `markdown` et `dir` sont posés ensemble par renderActive (main.js).
+    // `markdown` and `dir` are set together by renderActive (main.js).
     await renderDocument(host, {
       markdown: /** @type {string} */ (v.markdown),
       dir: /** @type {string} */ (v.dir),
@@ -87,9 +86,10 @@ async function previewArticle(v) {
 }
 
 /**
- * Exporte le rendu de l'onglet actif : construit le document HTML autonome
- * puis délègue au backend (data-URI des images locales + dialog « Enregistrer
- * sous » + écriture). Résout `false` si rien à exporter ou export annulé.
+ * Exports the active tab's rendering: builds the standalone HTML document
+ * then delegates to the backend (data-URIs for local images + "Save as"
+ * dialog + write). Resolves `false` if there is nothing to export or the
+ * export is cancelled.
  */
 export async function exportActiveView() {
   const v = state.views.get(state.active);

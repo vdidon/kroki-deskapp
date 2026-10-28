@@ -1,14 +1,14 @@
-# Modèle Handlebars du fichier .desktop du paquet .deb (bundle.linux.deb.desktopTemplate
-# de src-tauri/tauri.deb.conf.json). Il remplace celui du bundler Tauri pour une seule
-# raison, mais elle est décisive : le modèle par défaut écrit `Exec={{exec}}` **sans
-# indicateur d'argument**, si bien que le lanceur n'a aucun endroit où passer le fichier —
-# double-cliquer un document ouvrirait l'application vide. `%F` (liste de chemins locaux,
-# pas `%U` : l'application prend des chemins, pas des URL) est ce qui rend les
-# associations opérantes ; tout le reste est repris du modèle upstream.
+# Handlebars template of the .deb package's .desktop file (bundle.linux.deb.desktopTemplate
+# of src-tauri/tauri.deb.conf.json). It replaces the Tauri bundler's for a single
+# reason, but a decisive one: the default template writes `Exec={{exec}}` **without an
+# argument flag**, so the launcher has nowhere to pass the file —
+# double-clicking a document would open the empty application. `%F` (list of local paths,
+# not `%U`: the application takes paths, not URLs) is what makes the
+# associations operative; everything else is taken from the upstream template.
 #
-# Variables fournies par le bundler : name, comment (optionnelle), exec, icon,
-# categories, mime_type (optionnelle, = les mimeType de bundle.fileAssociations
-# joints par « ; »). Aucune autre n'est disponible — le texte hors variables est figé.
+# Variables provided by the bundler: name, comment (optional), exec, icon,
+# categories, mime_type (optional, = the mimeTypes of bundle.fileAssociations
+# joined by "; "). No others are available — the text outside variables is fixed.
 [Desktop Entry]
 Type=Application
 Version=1.5

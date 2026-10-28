@@ -54,7 +54,7 @@ pub fn read_document(state: State<AppState>, doc_id: u64) -> Result<DocPayload, 
     })
 }
 
-/// Rend un diagramme : moteurs intégrés par défaut, serveur Kroki externe si configuré.
+/// Renders a diagram: built-in engines by default, external Kroki server if configured.
 #[tauri::command]
 pub async fn render_diagram(
     app: AppHandle,
@@ -100,8 +100,8 @@ pub async fn render_diagram(
             Ok(svg)
         }
         Err(e) => {
-            // Affichée dans le document ; journalisée pour le diagnostic (le
-            // cache ne garde que les succès : chaque nouvel essai est tracé).
+            // Shown in the document; logged for diagnostics (the cache
+            // only keeps successes: every new attempt is traced).
             let via = if external.is_empty() {
                 "built-in".to_string()
             } else {
@@ -113,7 +113,7 @@ pub async fn render_diagram(
     }
 }
 
-/// Appelée par la webview de rendu quand ses moteurs sont chargés.
+/// Called by the render webview when its engines are loaded.
 #[tauri::command]
 pub fn renderer_ready(app: AppHandle, window: WebviewWindow) {
     if window.label() == engine::RENDERER_LABEL {
@@ -121,7 +121,7 @@ pub fn renderer_ready(app: AppHandle, window: WebviewWindow) {
     }
 }
 
-/// Réponse d'un job de rendu par la webview dédiée.
+/// Response to a render job from the dedicated webview.
 #[tauri::command]
 pub fn render_job_done(
     app: AppHandle,
@@ -136,7 +136,7 @@ pub fn render_job_done(
     let result = match (svg, error) {
         (Some(s), _) => Ok(s),
         (None, Some(e)) => Err(e),
-        // Erreur vide : `engine::render_js` la traduit sur le thread qui attend.
+        // Empty error: `engine::render_js` translates it on the waiting thread.
         (None, None) => Err(String::new()),
     };
     engine::complete_job(&app, id, result);
@@ -149,8 +149,8 @@ pub fn open_paths(app: AppHandle, window: WebviewWindow, paths: Vec<String>) {
     manager::open_file_args(&app, window.label(), &resolved);
 }
 
-/// Références (`doc.tex#eq:x`, `doc.md#L42`) passées en ligne de commande et
-/// destinées à cette fenêtre (cf. `manager::open_file_args`).
+/// References (`doc.tex#eq:x`, `doc.md#L42`) passed on the command line and
+/// intended for this window (see `manager::open_file_args`).
 #[tauri::command]
 pub fn take_pending_anchors(window: WebviewWindow) -> Vec<manager::PendingAnchor> {
     manager::take_pending_anchors(window.label())
@@ -159,7 +159,7 @@ pub fn take_pending_anchors(window: WebviewWindow) -> Vec<manager::PendingAnchor
 #[tauri::command]
 pub fn open_file_dialog(app: AppHandle, window: WebviewWindow) {
     let label = window.label().to_string();
-    // Extensions effectives = natives ∪ plugins actifs (cf. plugins.rs §9.3).
+    // Effective extensions = native ∪ active plugins (see plugins.rs §9.3).
     let exts = crate::plugins::effective_doc_extensions();
     let ext_refs: Vec<&str> = exts.iter().map(|s| s.as_str()).collect();
     app.dialog()
@@ -175,7 +175,7 @@ pub fn open_file_dialog(app: AppHandle, window: WebviewWindow) {
                 .filter_map(|p| dunce::canonicalize(&p).ok())
                 .filter(|p| p.is_file())
                 .collect();
-            // `pick_files` ne fournit pas de handle : on le récupère via la fenêtre.
+            // `pick_files` provides no handle: get it through the window.
             manager::open_mixed_paths(window.app_handle(), &label, &paths);
         });
 }
@@ -197,30 +197,30 @@ pub fn close_tab(app: AppHandle, window: WebviewWindow, doc_id: u64) {
     manager::close_tab(&app, window.label(), doc_id);
 }
 
-/// Menu contextuel d'onglet : `side` = `left` | `right` | `others`.
+/// Tab context menu: `side` = `left` | `right` | `others`.
 #[tauri::command]
 pub fn close_tabs_around(app: AppHandle, window: WebviewWindow, doc_id: u64, side: String) {
     manager::close_tabs_around(&app, window.label(), doc_id, &side);
 }
 
-/// Menu contextuel d'onglet : détache l'onglet dans une nouvelle fenêtre.
-/// Async, comme `finish_tab_drag` : créer une fenêtre depuis une commande
-/// synchrone bloquerait sur le main thread (WebView2).
+/// Tab context menu: detaches the tab into a new window.
+/// Async, like `finish_tab_drag`: creating a window from a synchronous
+/// command would block on the main thread (WebView2).
 #[tauri::command]
 pub async fn detach_tab(app: AppHandle, window: WebviewWindow, doc_id: u64) {
     manager::detach_tab(&app, &window, doc_id);
 }
 
-/// Menu contextuel d'onglet : rouvre le document dans une nouvelle fenêtre,
-/// l'onglet restant en place. Async pour la même raison que `detach_tab`.
+/// Tab context menu: reopens the document in a new window,
+/// the tab staying in place. Async for the same reason as `detach_tab`.
 #[tauri::command]
 pub async fn duplicate_tab(app: AppHandle, window: WebviewWindow, doc_id: u64) {
     manager::duplicate_tab(&app, &window, doc_id);
 }
 
-/// Menu contextuel d'onglet : ouvre le dossier du document dans le gestionnaire
-/// de fichiers, fichier sélectionné. Le chemin est relu dans l'état, pas fourni
-/// par le frontend. Async : l'appel au shell ne bloque pas le main thread.
+/// Tab context menu: opens the document's folder in the file manager,
+/// file selected. The path is re-read from the state, not supplied by the
+/// frontend. Async: the shell call does not block the main thread.
 #[tauri::command]
 pub async fn reveal_tab_file(app: AppHandle, doc_id: u64) -> Result<(), String> {
     let path = {
@@ -256,9 +256,9 @@ pub fn reorder_tab(
     manager::sync_window(&app, &label);
 }
 
-// Les commands qui créent des fenêtres sont async : sur Windows, une command
-// synchrone s'exécute sur le main thread et bloque l'initialisation WebView2
-// de la nouvelle fenêtre (la webview resterait sur about:blank).
+// Commands that create windows are async: on Windows, a synchronous command
+// runs on the main thread and blocks the WebView2 initialization of the new
+// window (the webview would stay on about:blank).
 #[tauri::command]
 pub async fn new_window(app: AppHandle) -> Result<String, String> {
     manager::create_window(&app, None, None).map_err(|e| e.to_string())
@@ -287,8 +287,8 @@ pub async fn finish_tab_drag(app: AppHandle, window: WebviewWindow, doc_id: u64)
     manager::finish_tab_drag(&app, &window, doc_id);
 }
 
-/// Variante de test (builds debug uniquement) : position de relâchement fournie
-/// au lieu d'être lue sur le curseur réel. Inerte en release.
+/// Test variant (debug builds only): release position supplied
+/// instead of being read from the real cursor. Inert in release.
 #[tauri::command]
 #[allow(unused_variables)]
 pub async fn debug_finish_tab_drag_at(
@@ -321,30 +321,30 @@ pub fn get_settings(app: AppHandle, settings: State<SettingsState>) -> SettingsI
     }
 }
 
-/// État des runtimes/moteurs pour la fenêtre d'information (cf. bouton « i »).
+/// Runtime/engine status for the info window (see the « i » button).
 #[tauri::command]
 pub fn get_runtimes(app: AppHandle) -> Vec<engine::RuntimeGroup> {
     engine::runtime_report(&app)
 }
 
-/// `CHANGELOG.md` embarqué à la compilation (dialog « Nouveautés ») : source
-/// unique à la racine du dépôt, toujours en phase avec la version buildée.
+/// `CHANGELOG.md` embedded at compile time (« Nouveautés » dialog): single
+/// source at the repo root, always in sync with the built version.
 #[tauri::command]
 pub fn get_changelog() -> &'static str {
     include_str!("../../CHANGELOG.md")
 }
 
-/// Thème seul (`"auto"|"light"|"dark"`), lu au boot de chaque fenêtre pour appliquer
-/// l'éventuel override avant le premier rendu — sans le coût de `get_settings`.
+/// Theme alone (`"auto"|"light"|"dark"`), read at each window's boot to apply
+/// any override before the first render — without the cost of `get_settings`.
 #[tauri::command]
 pub fn get_theme(settings: State<SettingsState>) -> String {
     settings.0.lock().unwrap().theme.clone()
 }
 
-/// Langue de l'interface pour le frontend : le code résolu (`auto` → langue du
-/// système), le réglage brut, les langues livrées (`{code, name}`) et le catalogue complet de la
-/// langue courante, déjà complété par l'anglais. Lu au boot de chaque fenêtre et
-/// après un changement de réglage (cf. `ui/js/i18n.js`).
+/// Interface language for the frontend: the resolved code (`auto` → system
+/// language), the raw setting, the shipped languages (`{code, name}`) and the full
+/// catalog of the current language, already completed with English. Read at each
+/// window's boot and after a setting change (see `ui/js/i18n.js`).
 #[tauri::command]
 pub fn get_i18n(settings: State<SettingsState>) -> serde_json::Value {
     json!({
@@ -355,16 +355,16 @@ pub fn get_i18n(settings: State<SettingsState>) -> serde_json::Value {
     })
 }
 
-/// Visibilité des icônes, seule (cf. `SettingsData::icons`) : lue au boot de
-/// chaque fenêtre pour masquer les icônes désactivées avant le premier paint —
-/// même motivation que `get_theme`, sans le coût de `get_settings`.
+/// Icon visibility, alone (see `SettingsData::icons`): read at each window's
+/// boot to hide disabled icons before the first paint — same motivation as
+/// `get_theme`, without the cost of `get_settings`.
 #[tauri::command]
 pub fn get_icons(settings: State<SettingsState>) -> BTreeMap<String, bool> {
     settings.0.lock().unwrap().icons.clone()
 }
 
-// Frontière IPC : la liste plate d'arguments est la forme naturelle d'une
-// commande Tauri (les regrouper n'apporterait qu'une struct de transport).
+// IPC boundary: the flat argument list is the natural shape of a Tauri
+// command (grouping them would only add a transport struct).
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn set_settings(
@@ -386,12 +386,12 @@ pub fn set_settings(
     if server_port < 1024 {
         return Err(tr!("error.settings.port_min", min = 1024));
     }
-    // Valeur inconnue → on retombe sur « auto » (tolérant plutôt qu'erreur bloquante).
+    // Unknown value → fall back to « auto » (lenient rather than a blocking error).
     let theme = match theme.as_str() {
         "light" | "dark" => theme,
         _ => "auto".to_string(),
     };
-    // Code inconnu → « auto », même tolérance que le thème.
+    // Unknown code → « auto », same leniency as the theme.
     let language = if i18n::languages().contains(&language.as_str()) {
         language
     } else {
@@ -401,8 +401,8 @@ pub fn set_settings(
     let locale = i18n::set_language(&language);
     {
         let mut s = settings.0.lock().unwrap();
-        // Non exposés au dialog Réglages : préservés tels quels (alimentés par
-        // plugins::install_plugin / uninstall_plugin et updates::check_update).
+        // Not exposed in the Settings (« Réglages ») dialog: preserved as is (fed by
+        // plugins::install_plugin / uninstall_plugin and updates::check_update).
         let removed_plugins = std::mem::take(&mut s.removed_plugins);
         let update_checked_at = s.update_checked_at;
         *s = SettingsData {
@@ -419,18 +419,18 @@ pub fn set_settings(
     }
     save_settings(&app);
     server::apply_settings(&app, server_enabled, server_port);
-    // Réglages globaux : propager thème et icônes à TOUTES les fenêtres. `from`
-    // permet à la fenêtre initiatrice (déjà mise à jour localement) d'ignorer son
-    // propre echo.
+    // Global settings: propagate theme and icons to ALL windows. `from`
+    // lets the initiating window (already updated locally) ignore its
+    // own echo.
     let _ = app.emit(
         "theme-changed",
         json!({ "mode": theme, "from": window.label() }),
     );
-    // Langue : seulement si elle change effectivement (« auto » → « fr » sur un
-    // poste français ne change rien à l'affichage).
+    // Language: only if it actually changes (« auto » → « fr » on a French
+    // workstation changes nothing in the display).
     if locale != previous_locale {
-        // Les statuts et avertissements des plugins sont composés au scan, dans
-        // la langue d'alors : un nouveau scan les recompose (et notifie le dialog).
+        // Plugin statuses and warnings are composed at scan time, in the language
+        // of the moment: a new scan recomposes them (and notifies the dialog).
         crate::plugins::rescan(&app);
         let _ = app.emit(
             "locale-changed",
@@ -444,8 +444,8 @@ pub fn set_settings(
     Ok(())
 }
 
-/// Ouvre un lien du document : URL web → navigateur ; fichier markdown relatif →
-/// nouvel onglet ; autre fichier → application associée.
+/// Opens a link from the document: web URL → browser; relative markdown file →
+/// new tab; other file → associated application.
 #[tauri::command]
 pub fn open_link(app: AppHandle, window: WebviewWindow, base_dir: String, href: String) {
     let href = href.split('#').next().unwrap_or("").trim();
@@ -477,11 +477,11 @@ pub fn open_link(app: AppHandle, window: WebviewWindow, base_dir: String, href: 
     }
 }
 
-/// Lit un fichier de données référencé par le contenu d'un document — spec JSON
-/// Plotly (`src=` d'un bloc ` ```plotly `) — **confiné au dossier du document**,
-/// extension `.json` uniquement. Les lectures des plugins (imports…)
-/// passent par `plugin_read_sibling` (allowlist du manifeste), qui partage le
-/// même confinement via `read_confined`.
+/// Reads a data file referenced by a document's content — Plotly JSON spec
+/// (`src=` of a ` ```plotly ` block) — **confined to the document's folder**,
+/// `.json` extension only. Plugin reads (imports…)
+/// go through `plugin_read_sibling` (manifest allowlist), which shares the
+/// same confinement via `read_confined`.
 #[tauri::command]
 pub fn read_data_file(base_dir: String, rel: String) -> Result<String, String> {
     if !rel.to_ascii_lowercase().ends_with(".json") {
@@ -490,9 +490,9 @@ pub fn read_data_file(base_dir: String, rel: String) -> Result<String, String> {
     read_confined(&base_dir, &rel).map_err(|e| e.message)
 }
 
-/// Échec d'une lecture confinée. `not_found` n'est vrai que pour un chemin
-/// resté dans le dossier : hors du dossier, la réponse est la même que le
-/// fichier existe ou non (cf. `read_confined`).
+/// Failure of a confined read. `not_found` is only true for a path that
+/// stayed inside the folder: outside the folder, the response is the same
+/// whether the file exists or not (see `read_confined`).
 pub struct ConfinedError {
     pub not_found: bool,
     pub message: String,
@@ -507,15 +507,15 @@ impl ConfinedError {
     }
 }
 
-/// Lecture confinée au dossier `base_dir`. Le `rel` provient du contenu d'un
-/// document ou d'un plugin (non fiable) : on rejette d'abord, **sans toucher
-/// au disque**, tout chemin qui sort lexicalement du dossier (absolu, lecteur,
-/// `..` qui remonte au-dessus) — sinon la différence « introuvable » / « hors du
-/// dossier » dirait à l'appelant si un fichier existe ailleurs sur la machine.
-/// Puis on canonicalise **les deux côtés** avant de comparer, contre l'échappée
-/// par symlink. Pas de réseau possible (la CSP borne `connect-src`), la lecture
-/// reste donc locale et bornée. L'allowlist d'extensions est la responsabilité
-/// de l'appelant.
+/// Read confined to the `base_dir` folder. `rel` comes from a document's or a
+/// plugin's content (untrusted): we first reject, **without touching the
+/// disk**, any path that lexically leaves the folder (absolute, drive,
+/// `..` climbing above it) — otherwise the difference between « not found » and
+/// « outside the folder » would tell the caller whether a file exists elsewhere
+/// on the machine. Then we canonicalize **both sides** before comparing, against
+/// symlink escape. No network is possible (the CSP bounds `connect-src`), so the
+/// read stays local and bounded. The extension allowlist is the caller's
+/// responsibility.
 pub fn read_confined(base_dir: &str, rel: &str) -> Result<String, ConfinedError> {
     let p = PathBuf::from(rel);
     if rel.contains('\0') {
@@ -542,9 +542,9 @@ pub fn read_confined(base_dir: &str, rel: &str) -> Result<String, ConfinedError>
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
-/// Message d'erreur si `rel` sort du dossier sans même consulter le disque :
-/// chemin absolu ou à lecteur (`C:x`, `\\srv\x`, `/x`), ou `..` qui remonte
-/// au-dessus du dossier. `sous/../x` reste admis.
+/// Error message if `rel` leaves the folder without even consulting the disk:
+/// absolute or drive path (`C:x`, `\\srv\x`, `/x`), or `..` climbing
+/// above the folder. `sous/../x` stays allowed.
 fn lexical_escape(rel: &Path) -> Option<String> {
     let mut depth = 0usize;
     for c in rel.components() {
@@ -564,15 +564,15 @@ fn lexical_escape(rel: &Path) -> Option<String> {
 }
 
 // --------------------------------------------------------------------------- //
-// Export HTML du rendu (bouton Exporter de la pile d'actions de vue)
+// HTML export of the rendering (Export button of the view action stack)
 // --------------------------------------------------------------------------- //
 
-/// Enregistre le rendu d'un document en page HTML autonome. Le HTML arrive du
-/// frontend (export.js), feuilles de style déjà inlinées ; ici on réécrit les
-/// images locales `asset.localhost` — protocole interne, mort hors de l'app —
-/// en data-URI (la CSP interdit leur fetch côté frontend), puis dialog
-/// « Enregistrer sous » et écriture. Async : `blocking_save_file` est interdit
-/// sur le main thread. Retourne `false` si l'utilisateur annule.
+/// Saves a document's rendering as a standalone HTML page. The HTML comes from
+/// the frontend (export.js), stylesheets already inlined; here we rewrite the
+/// local `asset.localhost` images — internal protocol, dead outside the app —
+/// as data-URIs (the CSP forbids fetching them on the frontend side), then the
+/// « Enregistrer sous » (Save As) dialog and the write. Async: `blocking_save_file`
+/// is forbidden on the main thread. Returns `false` if the user cancels.
 #[tauri::command]
 pub async fn export_html(
     app: AppHandle,
@@ -598,10 +598,10 @@ pub async fn export_html(
     Ok(true)
 }
 
-/// « Enregistrer la session » : sérialise toutes les fenêtres et leurs onglets
-/// dans un fichier `.kdws` (cf. session.rs — la fenêtre appelante passe en
-/// tête, elle sera la cible à la réouverture). Async : `blocking_save_file`
-/// est interdit sur le main thread. Retourne `false` si l'utilisateur annule.
+/// « Enregistrer la session » (save session): serializes all windows and their
+/// tabs into a `.kdws` file (see session.rs — the calling window goes first,
+/// it will be the target on reopening). Async: `blocking_save_file`
+/// is forbidden on the main thread. Returns `false` if the user cancels.
 #[tauri::command]
 pub async fn save_session(app: AppHandle, window: WebviewWindow) -> Result<bool, String> {
     let snap = crate::session::snapshot(&app, window.label());
@@ -625,10 +625,10 @@ pub async fn save_session(app: AppHandle, window: WebviewWindow) -> Result<bool,
     Ok(true)
 }
 
-/// Réécrit chaque attribut `src="…asset.localhost/<chemin>"` (et la forme
-/// Linux `asset://localhost/…`) en data-URI base64. Fichier illisible, trop
-/// gros (> 20 Mo) ou d'extension non-image → repli en URL `file:///` : le
-/// document exporté reste consultable sur le poste d'origine.
+/// Rewrites each `src="…asset.localhost/<path>"` attribute (and the Linux
+/// form `asset://localhost/…`) as a base64 data-URI. Unreadable file, too
+/// big (> 20 MB) or non-image extension → fall back to a `file:///` URL: the
+/// exported document stays viewable on the original workstation.
 fn inline_asset_images(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
     let mut rest = html;
@@ -667,7 +667,7 @@ fn rewrite_asset_url(url: &str) -> String {
     file_url(&path.to_string_lossy())
 }
 
-/// Type MIME d'une image locale, par extension (inlining en data-URI).
+/// MIME type of a local image, by extension (data-URI inlining).
 fn image_mime(path: &std::path::Path) -> Option<&'static str> {
     match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
         "png" => Some("image/png"),
@@ -682,8 +682,8 @@ fn image_mime(path: &std::path::Path) -> Option<&'static str> {
     }
 }
 
-/// URL `file:///` d'un chemin local (séparateurs normalisés, caractères
-/// réservés minimalement échappés) — repli quand l'inlining est impossible.
+/// `file:///` URL of a local path (separators normalized, reserved characters
+/// minimally escaped) — fallback when inlining is impossible.
 fn file_url(path: &str) -> String {
     let p = path.replace('\\', "/");
     let mut enc = String::with_capacity(p.len());
@@ -704,8 +704,8 @@ fn file_url(path: &str) -> String {
 mod confined_tests {
     use super::*;
 
-    /// Dossier temporaire propre au test : `<tmp>/<nom>/doc/` contient
-    /// `data.json` et `sub/`, `<tmp>/<nom>/secret.json` est hors du dossier.
+    /// Temporary folder specific to the test: `<tmp>/<name>/doc/` contains
+    /// `data.json` and `sub/`, `<tmp>/<name>/secret.json` is outside the folder.
     fn fixture(name: &str) -> PathBuf {
         let root = std::env::temp_dir().join(name);
         let doc = root.join("doc");
@@ -802,8 +802,8 @@ mod export_tests {
     }
 }
 
-/// `settings.json`, à côté du dossier des plugins et pour la même raison :
-/// hors du dossier d'identité Tauri, qui suit l'`identifier` du bundle.
+/// `settings.json`, next to the plugins folder and for the same reason:
+/// outside the Tauri identity folder, which follows the bundle's `identifier`.
 pub fn settings_path() -> Option<PathBuf> {
     Some(crate::plugins::app_dir().join("settings.json"))
 }

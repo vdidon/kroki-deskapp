@@ -1,6 +1,6 @@
 // @ts-check
-// Réglages : thème, langue, icônes des barres d'outils, serveur externe optionnel,
-// API Kroki locale et vérification des mises à jour, persistés côté Rust.
+// Settings (« Réglages »): theme, language, toolbar icons, optional external server,
+// local Kroki API and update check, persisted on the Rust side.
 
 import { invoke } from "./app.js";
 import { applyTheme } from "./theme.js";
@@ -10,7 +10,7 @@ import { getLanguages, getLanguageSetting, loadLocale, onLocaleChange, t } from 
 
 /** @typedef {import("../../types/ipc").SettingsInfo} SettingsInfo */
 
-// Éléments d'index.html, présents par construction.
+// Elements from index.html, present by construction.
 const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("settings-dialog"));
 const themeSelect = /** @type {HTMLSelectElement} */ (document.getElementById("theme-select"));
 const languageSelect = /** @type {HTMLSelectElement} */ (document.getElementById("language-select"));
@@ -25,15 +25,15 @@ const errorEl = /** @type {HTMLElement} */ (document.getElementById("settings-er
 
 /** @type {(() => void) | null} */
 let onSaved = null;
-// Choix explicites en cours d'édition (id -> bool). Une case jamais touchée
-// n'entre pas dans cet objet : elle n'est donc pas enregistrée et continue de
-// suivre le défaut du registre (cf. icons.js).
+// Explicit choices being edited (id -> bool). A box never touched does not
+// enter this object: it is therefore not saved and keeps following the
+// registry default (cf. icons.js).
 /** @type {Record<string, boolean>} */
 let iconWork = {};
 /** @type {Map<string, HTMLInputElement>} */
 const iconBoxes = new Map(); // id -> <input type=checkbox>
-// Dernier état reçu de `get_settings` : sert à recalculer l'indication des types
-// pris en charge si la langue change pendant que le dialog est ouvert.
+// Last state received from `get_settings`: used to recompute the supported-types
+// hint if the language changes while the dialog is open.
 /** @type {SettingsInfo | null} */
 let supportedInfo = null;
 
@@ -43,8 +43,8 @@ function updateServerHint() {
     : t("settings.api.hint_off");
 }
 
-// `supported` vient du Rust (déjà dans la langue courante) ; les phrases sur
-// Java et TeX manquants sont ajoutées ici.
+// `supported` comes from Rust (already in the current language); the sentences
+// about missing Java and TeX are added here.
 function updateSupportedHint() {
   if (!supportedInfo) return;
   supportedHint.textContent =
@@ -53,9 +53,9 @@ function updateSupportedHint() {
     (supportedInfo.tex_available ? "" : ` ${t("settings.supported.no_tex")}`);
 }
 
-// Langues livrées, sous leur endonyme (« Français ») : un nom de langue ne se
-// traduit pas, chacun doit pouvoir reconnaître la sienne. L'option « auto »
-// vient d'index.html (traduite par data-i18n).
+// Shipped languages, under their endonym ("Français"): a language name is not
+// translated, everyone must be able to recognize their own. The "auto" option
+// comes from index.html (translated via data-i18n).
 function buildLanguageUi() {
   const current = languageSelect.value;
   const auto = /** @type {HTMLOptionElement} */ (languageSelect.querySelector('option[value="auto"]'));
@@ -70,10 +70,10 @@ function buildLanguageUi() {
   languageSelect.value = current;
 }
 
-// Une case par icône, avec un aperçu cloné du bouton réel : la liste ne peut pas
-// dériver du visuel de la barre, et une icône ajoutée à index.html n'a qu'à être
-// déclarée dans le registre. Reconstruite à chaque changement de langue (les
-// libellés du registre sont des fonctions, résolues ici).
+// One checkbox per icon, with a preview cloned from the real button: the list
+// cannot drift from the bar's visuals, and an icon added to index.html only has
+// to be declared in the registry. Rebuilt on every language change (the
+// registry labels are functions, resolved here).
 function buildIconsUi() {
   iconBoxes.clear();
   const groups = ICON_GROUPS.map((group) => {
@@ -116,10 +116,10 @@ function buildIconsUi() {
     return box;
   });
   iconsBox.replaceChildren(...groups);
-  syncIconBoxes(); // cases sur les défauts dès l'init, avant toute ouverture
+  syncIconBoxes(); // boxes on the defaults from init, before any opening
 }
 
-// Reflète `iconWork` (choix explicites) par-dessus les défauts du registre.
+// Reflects `iconWork` (explicit choices) on top of the registry defaults.
 function syncIconBoxes() {
   for (const group of ICON_GROUPS) {
     for (const it of group.items) {
@@ -155,9 +155,9 @@ export function initSettings(savedCallback) {
   serverEnabled.addEventListener("change", updateServerHint);
   serverPort.addEventListener("input", updateServerHint);
 
-  // Textes écrits par le JS (libellés des icônes, indications du serveur, noms
-  // de langues) : à refaire quand la langue change. Les choix en cours d'édition
-  // vivent dans `iconWork` et `languageSelect.value`, la reconstruction les garde.
+  // Texts written by JS (icon labels, server hints, language names): to be
+  // redone when the language changes. Choices being edited live in `iconWork`
+  // and `languageSelect.value`, the rebuild keeps them.
   onLocaleChange(() => {
     buildLanguageUi();
     buildIconsUi();
@@ -165,15 +165,15 @@ export function initSettings(savedCallback) {
     updateSupportedHint();
   });
 
-  // Gestion des plugins : le dialog Plugins s'empile au-dessus des Réglages
-  // (modales imbriquées, native aux <dialog>).
+  // Plugin management: the Plugins dialog stacks above the Settings (« Réglages »)
+  // one (nested modals, native to <dialog>).
   /** @type {HTMLElement} */ (document.getElementById("settings-plugins")).addEventListener("click", openPlugins);
 
   /** @type {HTMLElement} */ (document.getElementById("settings-reset")).addEventListener("click", () => {
     themeSelect.value = "auto";
     languageSelect.value = "auto";
-    // Oublier les choix d'icônes : toutes repartent de leur défaut, et rien
-    // n'est enregistré tant que l'utilisateur ne recoche pas quelque chose.
+    // Forget the icon choices: all go back to their default, and nothing is
+    // saved until the user ticks something again.
     iconWork = {};
     syncIconBoxes();
     urlInput.value = "";
@@ -197,13 +197,13 @@ export function initSettings(savedCallback) {
         icons: iconWork,
         updateCheck: updateCheck.checked,
       });
-      // Langue : recharger le catalogue AVANT `onSaved`, dont le re-rendu doit
-      // déjà produire les messages dans la nouvelle langue. Aussi quand la
-      // langue effective ne change pas : le réglage brut (auto ↔ code) a pu bouger.
+      // Language: reload the catalog BEFORE `onSaved`, whose re-render must
+      // already produce messages in the new language. Also when the effective
+      // language does not change: the raw setting (auto ↔ code) may have moved.
       if (languageSelect.value !== getLanguageSetting()) await loadLocale();
-      // Feedback immédiat sur la fenêtre initiatrice ; les autres fenêtres reçoivent
-      // les events `theme-changed` / `icons-changed` (cf. main.js). `onSaved`
-      // re-rend avec le thème à jour et réévalue les actions de vue.
+      // Immediate feedback on the originating window; the other windows receive
+      // the `theme-changed` / `icons-changed` events (cf. main.js). `onSaved`
+      // re-renders with the updated theme and re-evaluates the view actions.
       applyTheme(themeSelect.value);
       applyIcons(iconWork);
       dialog.close();

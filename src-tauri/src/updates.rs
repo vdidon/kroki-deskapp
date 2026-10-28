@@ -1,12 +1,12 @@
-//! Vérification des mises à jour : compare la version courante à la dernière
-//! release publiée sur GitHub. **Notification seule** — l'application ne
-//! télécharge ni n'installe rien elle-même : elle propose deux liens, ouverts
-//! dans le navigateur, le fichier de la release qui correspond à cette
-//! installation (`Format`) et la page de la release (notes de version).
+//! Update check: compares the current version to the latest release published
+//! on GitHub. **Notification only** — the application downloads and installs
+//! nothing itself: it offers two links, opened in the browser, the release file
+//! that matches this installation (`Format`) and the release page (release
+//! notes).
 //!
-//! Seul appel réseau que l'application fait d'elle-même : désactivable dans
-//! les Réglages (`SettingsData::update_check`), au plus une fois par jour, et
-//! muet en cas d'échec (réseau filtré, quota de l'API GitHub atteint).
+//! The only network call the application makes on its own: can be disabled in
+//! the Settings (« Réglages », `SettingsData::update_check`), at most once a
+//! day, and silent on failure (filtered network, GitHub API quota reached).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -19,13 +19,13 @@ use crate::kroki::KrokiState;
 use crate::plugins::{self, version_less};
 use crate::state::SettingsState;
 
-/// Dépôt public, source unique : le champ `repository` de `Cargo.toml`.
+/// Public repository, single source: the `repository` field of `Cargo.toml`.
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
-/// Délai minimal entre deux vérifications automatiques.
+/// Minimum delay between two automatic checks.
 const AUTO_INTERVAL_SECS: u64 = 24 * 3600;
 
-/// Une seule vérification automatique par processus : chaque fenêtre appelle
-/// la commande à son boot, seule la première compte.
+/// A single automatic check per process: every window calls the command at
+/// its boot, only the first one counts.
 static AUTO_DONE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize)]
@@ -33,12 +33,12 @@ pub struct UpdateInfo {
     pub current: &'static str,
     pub latest: String,
     pub newer: bool,
-    /// Page de la dernière release (formulée par nous, pas lue dans la réponse).
+    /// Page of the latest release (built by us, not read from the response).
     pub release_url: String,
-    /// Fichier de la release adapté à cette installation ; à défaut (format non
-    /// publié, fichier oublié au téléversement), la page de la release.
+    /// Release file suited to this installation; failing that (format not
+    /// published, file forgotten at upload), the release page.
     pub download_url: String,
-    /// Nom de ce fichier, `None` si `download_url` est la page de la release.
+    /// Name of that file, `None` if `download_url` is the release page.
     pub download_file: Option<String>,
 }
 
@@ -55,7 +55,7 @@ struct Asset {
     browser_download_url: String,
 }
 
-/// Format de cette installation, donc du fichier de release à proposer.
+/// Format of this installation, hence of the release file to offer.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Format {
     Msi,
@@ -66,9 +66,9 @@ enum Format {
 }
 
 impl Format {
-    /// Le dossier `bundled-plugins` est créé par les deux installeurs (MSI,
-    /// `postinst` du `.deb`) et absent des formats portables — même signal
-    /// que le seeding des plugins livrés (`plugins::bundled_plugins_dir`).
+    /// The `bundled-plugins` folder is created by both installers (MSI,
+    /// the `.deb`'s `postinst`) and absent from portable formats — the same
+    /// signal as the seeding of shipped plugins (`plugins::bundled_plugins_dir`).
     fn detect(app: &AppHandle) -> Option<Format> {
         let installed = plugins::bundled_plugins_dir(app).is_some_and(|d| d.is_dir());
         if cfg!(windows) {
@@ -90,9 +90,9 @@ impl Format {
         }
     }
 
-    /// Noms publiés par le xtask (`publish_dist`) : `kroki_deskapp-<version>.msi`,
-    /// `…-<version>-linux-<arch>-<distro>.deb`… Le tag de distro n'est pas
-    /// figé ici : c'est celle du build, il peut changer.
+    /// Names published by the xtask (`publish_dist`): `kroki_deskapp-<version>.msi`,
+    /// `…-<version>-linux-<arch>-<distro>.deb`… The distro tag is not
+    /// hard-coded here: it is the build's, and may change.
     fn matches(self, name: &str) -> bool {
         if !name.starts_with(concat!(env!("CARGO_PKG_NAME"), "-")) {
             return false;
@@ -108,11 +108,11 @@ impl Format {
     }
 }
 
-/// `automatic` (boot d'une fenêtre) : `None` si la vérification n'a pas lieu
-/// (réglage désactivé, déjà faite aujourd'hui ou dans ce processus), si elle
-/// échoue, ou si l'application est à jour — l'appelant n'affiche que le cas
-/// utile. Sinon (bouton du dialog Informations) : toujours une requête, et
-/// l'erreur remonte pour être affichée.
+/// `automatic` (a window's boot): `None` if the check does not take place
+/// (setting disabled, already done today or in this process), if it fails, or
+/// if the application is up to date — the caller only displays the useful
+/// case. Otherwise (Info dialog button, « Informations »): always a request, and
+/// the error bubbles up to be displayed.
 #[tauri::command]
 pub async fn check_update(app: AppHandle, automatic: bool) -> Result<Option<UpdateInfo>, String> {
     if !automatic {
@@ -134,15 +134,15 @@ pub async fn check_update(app: AppHandle, automatic: bool) -> Result<Option<Upda
         if !s.update_check || recent {
             return Ok(None);
         }
-        // Horodaté avant la requête : un réseau qui bloque GitHub ne doit pas
-        // être sollicité à chaque lancement.
+        // Stamped before the request: a network that blocks GitHub must not
+        // be hit at every launch.
         s.update_checked_at = now;
     }
     commands::save_settings(&app);
     Ok(fetch(&app).await.ok().filter(|info| info.newer))
 }
 
-/// `fetch_release` tracé dans le journal (seule requête réseau de l'app).
+/// `fetch_release` traced in the log (the app's only network request).
 async fn fetch(app: &AppHandle) -> Result<UpdateInfo, String> {
     let result = fetch_release(app).await;
     match &result {
@@ -169,7 +169,7 @@ async fn fetch_release(app: &AppHandle) -> Result<UpdateInfo, String> {
         "{}/releases/latest",
         REPOSITORY.replacen("https://github.com/", "https://api.github.com/repos/", 1)
     );
-    // Client partagé : il porte déjà le User-Agent, exigé par l'API GitHub.
+    // Shared client: it already carries the User-Agent, required by the GitHub API.
     let client = app.state::<KrokiState>().client.clone();
     let resp = client
         .get(&api)
@@ -190,8 +190,8 @@ fn update_info(release: &Release, format: Option<Format>) -> UpdateInfo {
     let current = env!("CARGO_PKG_VERSION");
     let latest = release.tag_name.trim().trim_start_matches('v').to_string();
     let release_url = format!("{REPOSITORY}/releases/latest");
-    // Seule URL lue dans la réponse : ouverte dans le navigateur, elle doit
-    // rester un fichier de release de ce dépôt.
+    // The only URL read from the response: opened in the browser, it must
+    // remain a release file of this repository.
     let downloads = format!("{REPOSITORY}/releases/download/");
     let asset = format.and_then(|f| {
         release
@@ -213,7 +213,7 @@ fn update_info(release: &Release, format: Option<Format>) -> UpdateInfo {
 mod tests {
     use super::*;
 
-    /// Les fichiers d'une vraie release (3.27.0), à l'architecture près.
+    /// The files of a real release (3.27.0), architecture aside.
     fn release(tag: &str) -> Release {
         let arch = std::env::consts::ARCH;
         let names = [
@@ -279,17 +279,17 @@ mod tests {
 
     #[test]
     fn repli_sur_la_page_de_release() {
-        // Format inconnu.
+        // Unknown format.
         let info = update_info(&release("v3.27.0"), None);
         assert_eq!(
             (info.download_file, info.download_url),
             (None, info.release_url)
         );
-        // Fichier absent de la release.
+        // File absent from the release.
         let mut r = release("v3.27.0");
         r.assets.retain(|a| !a.name.ends_with(".msi"));
         assert_eq!(update_info(&r, Some(Format::Msi)).download_file, None);
-        // URL hors des releases du dépôt.
+        // URL outside the repository's releases.
         let mut r = release("v3.27.0");
         for a in &mut r.assets {
             a.browser_download_url = format!("https://example.com/{}", a.name);

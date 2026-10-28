@@ -1,17 +1,17 @@
-//! Drag-drop Windows : remplace le `IDropTarget` de wry par le nôtre.
+//! Windows drag-drop: replaces wry's `IDropTarget` with our own.
 //!
-//! wry (`webview2/drag_drop.rs`) installe un `IDropTarget` sur chaque fenêtre
-//! enfant de la webview et n'extrait **que** le format `CF_HDROP` (les fichiers
-//! déposés par l'Explorateur). Les éditeurs basés sur Chromium/Electron
-//! (VS Code, **Cursor**…) ne déposent pas de `CF_HDROP` mais le chemin du
-//! fichier en **texte** (`CF_UNICODETEXT` / `text/uri-list`) — d'où l'absence de
-//! réaction (test révélateur : un drop Cursor → Notepad colle le chemin).
+//! wry (`webview2/drag_drop.rs`) installs an `IDropTarget` on every child
+//! window of the webview and extracts **only** the `CF_HDROP` format (files
+//! dropped from Explorer). Chromium/Electron-based editors (VS Code,
+//! **Cursor**…) do not drop `CF_HDROP` but the file's path as **text**
+//! (`CF_UNICODETEXT` / `text/uri-list`) — hence the lack of reaction (telltale
+//! test: a Cursor → Notepad drop pastes the path).
 //!
-//! On reproduit l'énumération des enfants de wry, on révoque son target et on
-//! enregistre le nôtre, qui gère `CF_HDROP` **et** le texte. L'ouverture est
-//! faite directement côté Rust (`manager::open_mixed_paths`, qui trie documents,
-//! sessions `.kdws` et archives `.kdext`) ; l'overlay de dépôt est piloté via
-//! l'événement `drop-overlay` (cf. `ui/js/filedrop.js`).
+//! We reproduce wry's enumeration of the children, revoke its target and
+//! register ours, which handles `CF_HDROP` **and** text. Opening is done
+//! directly on the Rust side (`manager::open_mixed_paths`, which sorts
+//! documents, `.kdws` sessions and `.kdext` archives); the drop overlay is
+//! driven via the `drop-overlay` event (cf. `ui/js/filedrop.js`).
 
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::{c_void, OsString};
@@ -33,22 +33,22 @@ use windows::Win32::UI::Shell::{DragFinish, DragQueryFileW, HDROP};
 use windows::Win32::UI::WindowsAndMessaging::EnumChildWindows;
 
 thread_local! {
-    /// `RegisterDragDrop` incrémente le refcount COM du target, mais on garde
-    /// aussi une référence forte ici pour ne dépendre d'aucun détail OLE. Vit
-    /// sur le thread UI ; quelques entrées par fenêtre, jamais purgées (la
-    /// destruction du HWND auto-révoque côté OLE) — négligeable.
+    /// `RegisterDragDrop` increments the target's COM refcount, but we also
+    /// keep a strong reference here so as not to depend on any OLE detail.
+    /// Lives on the UI thread; a few entries per window, never purged (HWND
+    /// destruction auto-revokes on the OLE side) — negligible.
     static TARGETS: RefCell<Vec<IDropTarget>> = const { RefCell::new(Vec::new()) };
 }
 
-/// Installe notre `IDropTarget` sur la fenêtre (et ses enfants webview).
-/// À appeler après `show()` : la fenêtre enfant WebView2 doit déjà exister.
+/// Installs our `IDropTarget` on the window (and its webview children).
+/// To be called after `show()`: the WebView2 child window must already exist.
 pub fn install(window: &WebviewWindow) {
     let win = window.clone();
-    // `RegisterDragDrop` doit s'exécuter sur le thread qui possède le HWND et a
-    // appelé `OleInitialize` (le thread de la boucle d'événements).
+    // `RegisterDragDrop` must run on the thread that owns the HWND and called
+    // `OleInitialize` (the event loop's thread).
     let _ = window.run_on_main_thread(move || {
-        // `hwnd()` renvoie le HWND de la version de `windows` tirée par Tauri,
-        // distincte de la nôtre. Même pointeur brut → on reconstruit le type.
+        // `hwnd()` returns the HWND of the `windows` version pulled in by Tauri,
+        // distinct from ours. Same raw pointer → we rebuild the type.
         let Ok(raw) = win.hwnd() else { return };
         let parent = HWND(raw.0);
         let app = win.app_handle().clone();
@@ -58,7 +58,7 @@ pub fn install(window: &WebviewWindow) {
 }
 
 unsafe fn register_on_children(parent: HWND, app: &AppHandle, label: &str) {
-    // Énumère les fenêtres enfants comme wry pour cibler le(s) HWND WebView2.
+    // Enumerates the child windows like wry does, to target the WebView2 HWND(s).
     let mut children: Vec<HWND> = Vec::new();
     {
         let mut callback = |hwnd: HWND| -> bool {
@@ -88,9 +88,9 @@ unsafe fn register_on_children(parent: HWND, app: &AppHandle, label: &str) {
             valid: UnsafeCell::new(false),
         }
         .into();
-        // Révoque le target de wry puis enregistre le nôtre. La condition
-        // (≠ INVALIDHWND) filtre les HWND qui n'acceptent pas de drop target,
-        // comme le fait wry.
+        // Revokes wry's target then registers ours. The condition
+        // (≠ INVALIDHWND) filters out HWNDs that do not accept a drop target,
+        // as wry does.
         if unsafe { RevokeDragDrop(child) } != Err(DRAGDROP_E_INVALIDHWND.into())
             && unsafe { RegisterDragDrop(child, &target) }.is_ok()
         {
@@ -103,8 +103,8 @@ unsafe fn register_on_children(parent: HWND, app: &AppHandle, label: &str) {
 struct DropTarget {
     app: AppHandle,
     label: String,
-    /// Le drag courant contient-il au moins un fichier supporté ? Évite de
-    /// re-scanner le disque dans `DragOver` (appelé en rafale).
+    /// Does the current drag contain at least one supported file? Avoids
+    /// re-scanning the disk in `DragOver` (called in bursts).
     valid: UnsafeCell<bool>,
 }
 
@@ -179,17 +179,17 @@ impl IDropTarget_Impl for DropTarget_Impl {
             .as_ref()
             .map(|o| unsafe { extract_paths(o) })
             .unwrap_or_default();
-        // Documents, sessions `.kdws` et archives `.kdext` : le tri et le
-        // routage (onglets / `session::open_session` / flux d'installation)
-        // sont faits une fois pour toutes par `open_mixed_paths`, partagé avec
-        // le CLI et la seconde instance.
+        // Documents, `.kdws` sessions and `.kdext` archives: sorting and
+        // routing (tabs / `session::open_session` / install flow) are done
+        // once and for all by `open_mixed_paths`, shared with the CLI and the
+        // second instance.
         crate::manager::open_mixed_paths(&self.app, &self.label, &paths);
         Ok(())
     }
 }
 
-/// Extrait les chemins de fichiers supportés d'un drag, quel qu'en soit le
-/// format : d'abord `CF_HDROP` (Explorateur), sinon le texte (Cursor/VS Code).
+/// Extracts the supported file paths from a drag, whatever its format: first
+/// `CF_HDROP` (Explorer), otherwise text (Cursor/VS Code).
 unsafe fn extract_paths(obj: &IDataObject) -> Vec<PathBuf> {
     if let Some(paths) = unsafe { hdrop_paths(obj) } {
         return filter_supported(paths);
@@ -200,7 +200,7 @@ unsafe fn extract_paths(obj: &IDataObject) -> Vec<PathBuf> {
     Vec::new()
 }
 
-/// Lit `CF_HDROP` (format fichier-shell). `None` si absent.
+/// Reads `CF_HDROP` (shell file format). `None` if absent.
 unsafe fn hdrop_paths(obj: &IDataObject) -> Option<Vec<PathBuf>> {
     let format = FORMATETC {
         cfFormat: CF_HDROP.0,
@@ -211,7 +211,7 @@ unsafe fn hdrop_paths(obj: &IDataObject) -> Option<Vec<PathBuf>> {
     };
     let medium = unsafe { obj.GetData(&format) }.ok()?;
     let hdrop = HDROP(unsafe { medium.u.hGlobal }.0 as _);
-    // 0xFFFFFFFF → nombre d'éléments.
+    // 0xFFFFFFFF → number of items.
     let count = unsafe { DragQueryFileW(hdrop, 0xFFFF_FFFF, None) };
     let mut paths = Vec::with_capacity(count as usize);
     for i in 0..count {
@@ -224,7 +224,7 @@ unsafe fn hdrop_paths(obj: &IDataObject) -> Option<Vec<PathBuf>> {
     Some(paths)
 }
 
-/// Lit `CF_UNICODETEXT` (chemin déposé en texte par Cursor/VS Code). `None` si
+/// Reads `CF_UNICODETEXT` (path dropped as text by Cursor/VS Code). `None` if
 /// absent.
 unsafe fn text_payload(obj: &IDataObject) -> Option<String> {
     let format = FORMATETC {
@@ -241,7 +241,7 @@ unsafe fn text_payload(obj: &IDataObject) -> Option<String> {
         unsafe { ReleaseStgMedium(&mut medium) };
         return None;
     }
-    let max = unsafe { GlobalSize(hglobal) } / 2; // octets → u16
+    let max = unsafe { GlobalSize(hglobal) } / 2; // bytes → u16
     let mut len = 0usize;
     while len < max && unsafe { *ptr.add(len) } != 0 {
         len += 1;
@@ -252,8 +252,8 @@ unsafe fn text_payload(obj: &IDataObject) -> Option<String> {
     Some(text)
 }
 
-/// Découpe un payload texte en chemins. Gère le format `text/uri-list`
-/// (lignes `file://…`, commentaires `#`) comme les chemins bruts.
+/// Splits a text payload into paths. Handles the `text/uri-list` format
+/// (`file://…` lines, `#` comments) as well as raw paths.
 fn parse_text_paths(text: &str) -> Vec<PathBuf> {
     text.lines()
         .map(str::trim)
@@ -265,14 +265,14 @@ fn parse_text_paths(text: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-/// Convertit le reste d'une URI `file://` en chemin Windows. `dunce::canonicalize`
-/// validera ensuite ; une conversion approximative est filtrée par `is_file`.
+/// Converts the remainder of a `file://` URI into a Windows path. `dunce::canonicalize`
+/// will validate afterwards; an approximate conversion is filtered out by `is_file`.
 fn file_uri_to_path(rest: &str) -> PathBuf {
     let decoded = percent_decode(rest);
     match decoded.strip_prefix('/') {
-        // "/C:/dir/x.md" → lecteur local
+        // "/C:/dir/x.md" → local drive
         Some(drive) => PathBuf::from(drive.replace('/', "\\")),
-        // "serveur/partage/x" → UNC
+        // "server/share/x" → UNC
         None => PathBuf::from(format!("\\\\{}", decoded.replace('/', "\\"))),
     }
 }
@@ -304,10 +304,10 @@ fn hex_val(b: u8) -> Option<u8> {
     }
 }
 
-/// Canonicalise et développe les chemins déposés en documents ouvrables :
-/// un fichier supporté est gardé, un **dossier** est développé en ses fichiers
-/// Markdown directs (cf. `manager::expand_dropped_docs`). Couvre Explorateur
-/// (`CF_HDROP`) et Cursor/VS Code (texte) de façon identique.
+/// Canonicalizes and expands the dropped paths into openable documents:
+/// a supported file is kept, a **folder** is expanded into its direct Markdown
+/// files (cf. `manager::expand_dropped_docs`). Covers Explorer
+/// (`CF_HDROP`) and Cursor/VS Code (text) identically.
 fn filter_supported(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     crate::manager::expand_dropped_docs(&paths)
 }

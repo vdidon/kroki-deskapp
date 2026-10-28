@@ -9,16 +9,16 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::{path_key, AppState};
 
-/// Surveille les dossiers parents des fichiers ouverts (plus robuste que de surveiller
-/// les fichiers eux-mêmes : les éditeurs qui sauvegardent par renommage cassent un watch direct).
+/// Watches the parent folders of open files (more robust than watching the files
+/// themselves: editors that save by renaming break a direct watch).
 #[derive(Default)]
 pub struct WatcherState {
     watcher: Mutex<Option<RecommendedWatcher>>,
-    /// refcount par fichier ouvert (clé insensible à la casse).
+    /// refcount per open file (case-insensitive key).
     file_refs: Mutex<HashMap<String, usize>>,
-    /// refcount par dossier surveillé.
+    /// refcount per watched folder.
     dir_refs: Mutex<HashMap<PathBuf, usize>>,
-    /// génération d'événement par fichier, pour le debounce « trailing edge ».
+    /// event generation per file, for the "trailing edge" debounce.
     pending: Mutex<HashMap<String, u64>>,
 }
 
@@ -46,8 +46,8 @@ fn on_fs_event(app: &AppHandle, path: &Path) {
     if !ws.file_refs.lock().unwrap().contains_key(&key) {
         return;
     }
-    // Debounce 250 ms côté fin de rafale : seule la dernière génération émet,
-    // pour ne jamais rendre un fichier écrit à moitié.
+    // 250 ms debounce on the end of the burst: only the last generation emits,
+    // so that a half-written file is never rendered.
     let generation = {
         let mut pend = ws.pending.lock().unwrap();
         let g = pend.entry(key.clone()).or_insert(0);

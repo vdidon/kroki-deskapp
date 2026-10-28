@@ -1,25 +1,24 @@
 // @ts-check
-// Icônes des barres d'outils : registre, défauts, visibilité effective.
+// Toolbar icons: registry, defaults, effective visibility.
 //
-// Réglage global (persisté par le backend dans `settings.json`) mais
-// **partiel** : la map ne contient que les icônes explicitement cochées ou
-// décochées par l'utilisateur. Toute icône absente suit le `def` ci-dessous —
-// un défaut qui changerait dans une version ultérieure s'appliquerait donc aux
-// postes qui n'y ont jamais touché, sans jamais écraser un choix fait.
+// Global setting (persisted by the backend in `settings.json`) but
+// **partial**: the map only contains the icons explicitly checked or
+// unchecked by the user. Any absent icon follows the `def` below — a default
+// that changed in a later version would therefore apply to the workstations
+// that never touched it, without ever overwriting a choice made.
 //
-// Les icônes de la barre de fenêtre sont masquées ici même ; celles de la pile
-// d'actions de vue dépendent en plus du document affiché (cf.
-// `updateViewActions` dans main.js), qui interroge `iconEnabled`.
+// The window bar's icons are hidden right here; those of the view action stack
+// additionally depend on the displayed document (cf. `updateViewActions` in
+// main.js), which queries `iconEnabled`.
 
 import { t } from "./i18n.js";
 
-// Libellés, indications et titres de groupe sont des fonctions : résolus au
-// moment d'afficher (dialog Réglages, reconstruit à chaque changement de
-// langue), jamais figés à l'import. `locked` : indication commune
-// (`icons.locked_hint`, ajoutée par settings.js).
+// Labels, hints and group titles are functions: resolved at display time
+// (Settings dialog, rebuilt on every language change), never frozen at import.
+// `locked`: common hint (`icons.locked_hint`, added by settings.js).
 /**
  * @typedef {object} IconItem
- * @property {string} id  id du bouton dans index.html
+ * @property {string} id  button id in index.html
  * @property {() => string} label
  * @property {() => string} [hint]
  * @property {boolean} def
@@ -34,7 +33,7 @@ import { t } from "./i18n.js";
 export const ICON_GROUPS = [
   {
     title: () => t("icons.group.window"),
-    // Le conteneur dont les boutons sont pilotés directement par applyIcons.
+    // The container whose buttons are driven directly by applyIcons.
     container: "tabbar-actions",
     items: [
       {
@@ -73,8 +72,8 @@ export const ICON_GROUPS = [
   },
   {
     title: () => t("icons.group.document"),
-    // Pile flottante : la visibilité finale se décide dans updateViewActions
-    // (un bouton activé reste caché si le document ne s'y prête pas).
+    // Floating stack: final visibility is decided in updateViewActions (an
+    // enabled button stays hidden if the document does not suit it).
     container: null,
     items: [
       { id: "btn-toc", label: () => t("icons.toc.label"), def: true },
@@ -104,24 +103,24 @@ export const ICON_GROUPS = [
 const BY_ID = new Map(ICON_GROUPS.flatMap((g) => g.items.map((it) => [it.id, it])));
 
 /** @type {Record<string, boolean>} */
-let overrides = {}; // id -> bool, uniquement les choix explicites de l'utilisateur
+let overrides = {}; // id -> bool, only the user's explicit choices
 
 /**
- * Visibilité voulue pour une icône : choix explicite, sinon défaut du registre.
+ * Wanted visibility for an icon: explicit choice, otherwise the registry default.
  * @param {string} id
  * @returns {boolean}
  */
 export function iconEnabled(id) {
   const it = BY_ID.get(id);
-  if (!it) return true; // icône hors registre : jamais masquée par ce réglage
+  if (!it) return true; // icon outside the registry: never hidden by this setting
   if (it.locked) return true;
   return overrides[id] ?? it.def;
 }
 
 /**
- * Applique une map de choix explicites : mémorise, puis masque/affiche les
- * boutons des barres à conteneur fixe. Les actions de vue sont réévaluées par
- * l'appelant (updateViewActions), qui seul connaît l'état du document.
+ * Applies a map of explicit choices: stores it, then hides/shows the buttons of
+ * the bars with a fixed container. The view actions are re-evaluated by the
+ * caller (updateViewActions), which alone knows the document's state.
  * @param {Record<string, boolean> | null | undefined} map
  */
 export function applyIcons(map) {

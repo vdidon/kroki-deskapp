@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Textes de l'installeur en espagnol : mêmes Id que en-US.wxl. -->
+<!-- Installer texts in Spanish: same Ids as en-US.wxl. -->
 <WixLocalization Culture="es-es" Codepage="1252" xmlns="http://schemas.microsoft.com/wix/2006/localization">
   <String Id="LaunchApp">Iniciar Kroki Desk</String>
   <String Id="DowngradeErrorMessage">Ya hay instalada una versión más reciente de Kroki Desk.</String>

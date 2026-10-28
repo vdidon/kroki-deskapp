@@ -1,6 +1,6 @@
-// Captures statiques : accroche (clair/sombre) + tuiles de la galerie.
+// Static captures: hero (light/dark) + gallery tiles.
 import { connect, viewport, shot, sleep } from "./lib.mjs";
-const OUT = "raw"; // captures brutes, composées par compose.py
+const OUT = "raw"; // raw captures, composed by compose.py
 const c = await connect();
 const activate = async (name) => {
   await c.evaluate(`(()=>{const t=[...document.querySelectorAll('.tab')].find(t=>t.textContent.includes(${JSON.stringify(name)})); return window.__TAURI__.core.invoke('activate_tab',{docId:Number(t.dataset.id)})})()`);

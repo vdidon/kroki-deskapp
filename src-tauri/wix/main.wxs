@@ -1,8 +1,8 @@
-<!-- Copie du template WiX de tauri-bundler (tauri-cli 2.11.4) avec DEUX écarts :
-     le raccourci du menu Démarrer n'a plus d'Icon="ProductIcon", et le ProductCode
-     vient de TAURI_KROKI_DESK_PRODUCT_CODE quand le xtask le fournit (MSI multilingue : un même
-     ProductCode pour les MSI de chaque langue). Cf. CLAUDE.md, § Installeur
-     Windows. À re-synchroniser lors d'une montée de tauri-cli. -->
+<!-- Copy of the tauri-bundler WiX template (tauri-cli 2.11.4) with TWO deviations:
+     the Start menu shortcut no longer has Icon="ProductIcon", and the ProductCode
+     comes from TAURI_KROKI_DESK_PRODUCT_CODE when the xtask provides it (multilingual MSI: one
+     ProductCode shared by each language's MSI). Cf. CLAUDE.md, § Windows
+     installer. To be re-synchronized on a tauri-cli upgrade. -->
 <?if $(sys.BUILDARCH)="x86"?>
     <?define Win64 = "no" ?>
     <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
@@ -16,10 +16,10 @@
     <?error Unsupported value of sys.BUILDARCH=$(sys.BUILDARCH)?>
 <?endif?>
 
-<!-- Kroki Desk : `light` résout Id="*" à chaque passage, donc une fois par
-     langue — deux ProductCode, et une transform de langue qui changerait
-     l'identité du produit. Le xtask en tire un par build (TAURI_KROKI_DESK_PRODUCT_CODE),
-     partagé par toutes les langues ; sans lui (tauri build brut), « * ». -->
+<!-- Kroki Desk: `light` resolves Id="*" on every pass, hence once per
+     language — two ProductCodes, and a language transform that would change
+     the product's identity. The xtask draws one per build (TAURI_KROKI_DESK_PRODUCT_CODE),
+     shared by all languages; without it (a bare tauri build), "*". -->
 <?ifdef env.TAURI_KROKI_DESK_PRODUCT_CODE?>
     <?define KdProductCode = "$(env.TAURI_KROKI_DESK_PRODUCT_CODE)" ?>
 <?else?>
@@ -211,11 +211,11 @@
 
         <DirectoryRef Id="ApplicationProgramsFolder">
             <Component Id="ApplicationShortcut" Guid="*">
-                    <!-- Kroki Desk : pas d'Icon="ProductIcon" ici. Il ferait pointer le
-                         raccourci sur %WINDIR%\Installer\{ProductCode}\, dossier supprimé à
-                         chaque mise à jour majeure (ProductCode neuf) : l'épingle de la barre
-                         des tâches, copie figée du .lnk, perdait son icône. Sans attribut,
-                         l'icône est lue dans l'exe, chemin stable. -->
+                    <!-- Kroki Desk: no Icon="ProductIcon" here. It would make the
+                         shortcut point to %WINDIR%\Installer\{ProductCode}\, a folder deleted on
+                         every major update (new ProductCode): the taskbar pin, a frozen
+                         copy of the .lnk, lost its icon. Without the attribute, the
+                         icon is read from the exe, a stable path. -->
                 <Shortcut Id="ApplicationStartMenuShortcut"
                     Name="{{product_name}}"
                     Description="Runs {{product_name}}"

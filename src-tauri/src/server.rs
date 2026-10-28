@@ -1,6 +1,6 @@
-//! Serveur HTTP local compatible avec l'API Kroki, adossé aux moteurs intégrés.
-//! Permet à d'autres outils (extensions VS Code, scripts…) d'utiliser le rendu
-//! de l'application : POST /, POST /{type}/svg, GET /{type}/svg/{deflate+base64url}.
+//! Local HTTP server compatible with the Kroki API, backed by the built-in engines.
+//! Lets other tools (VS Code extensions, scripts…) use the application's
+//! rendering: POST /, POST /{type}/svg, GET /{type}/svg/{deflate+base64url}.
 
 use std::io::Read;
 use std::sync::{Arc, Mutex};
@@ -20,7 +20,7 @@ pub fn apply_settings(app: &AppHandle, enabled: bool, port: u16) {
     let st = app.state::<ServerState>();
     let mut cur = st.current.lock().unwrap();
     match (&*cur, enabled) {
-        (Some((p, _)), true) if *p == port => return, // déjà dans le bon état
+        (Some((p, _)), true) if *p == port => return, // already in the right state
         _ => {}
     }
     if let Some((old, server)) = cur.take() {
@@ -42,10 +42,10 @@ pub fn apply_settings(app: &AppHandle, enabled: bool, port: u16) {
             std::thread::spawn(move || {
                 for req in server.incoming_requests() {
                     let app = app.clone();
-                    // Un thread par requête : les rendus peuvent être longs (JVM…).
-                    // API technique lue par des outils : toujours en anglais, quelle
-                    // que soit la langue de l'interface (la surcharge est par thread,
-                    // d'où son installation ici, sur le thread qui sert la requête).
+                    // One thread per request: renders can be long (JVM…).
+                    // Technical API read by tools: always in English, whatever
+                    // the interface language (the override is per thread, hence
+                    // installed here, on the thread that serves the request).
                     std::thread::spawn(move || {
                         crate::i18n::in_reference_language(|| handle(&app, req))
                     });
@@ -64,10 +64,10 @@ fn cors() -> Vec<Header> {
     ]
 }
 
-/// Corps JSON compatible avec `/health` de Kroki :
+/// JSON body compatible with Kroki's `/health`:
 /// `{"status":"pass","version":{"kroki":"…","mermaid":"…", …}}`.
-/// L'extension markdown-kroki lit `Object.keys(version)` (en retirant "kroki")
-/// pour connaître les types à rendre — d'où l'inclusion des alias.
+/// The markdown-kroki extension reads `Object.keys(version)` (dropping "kroki")
+/// to learn which types to render — hence the inclusion of the aliases.
 fn health_body() -> String {
     let mut version = serde_json::Map::new();
     version.insert("kroki".into(), env!("CARGO_PKG_VERSION").into());
@@ -86,7 +86,7 @@ fn respond(req: tiny_http::Request, status: u16, ctype: &str, body: String) {
     let _ = req.respond(resp);
 }
 
-/// Décode le format GET de Kroki : deflate (zlib) puis base64 url-safe.
+/// Decodes Kroki's GET format: deflate (zlib) then url-safe base64.
 fn decode_get_payload(payload: &str) -> Result<String, String> {
     let bytes = base64::engine::general_purpose::URL_SAFE
         .decode(payload)
@@ -161,10 +161,10 @@ fn handle(app: &AppHandle, mut req: tiny_http::Request) {
             );
             return;
         }
-        // Compat Kroki : /health et /v1/health renvoient l'état + la liste des
-        // types. L'extension markdown-kroki (Cursor/VS Code) appelle /v1/health à
-        // l'activation et n'enregistre son plugin que si la réponse est exploitable
-        // (elle lit Object.keys(version) pour savoir quels fences rendre).
+        // Kroki compat: /health and /v1/health return the status + the list of
+        // types. The markdown-kroki extension (Cursor/VS Code) calls /v1/health on
+        // activation and only registers its plugin if the response is usable
+        // (it reads Object.keys(version) to know which fences to render).
         (Method::Get, 1) if segments[0] == "health" => {
             respond(req, 200, "application/json", health_body());
             return;

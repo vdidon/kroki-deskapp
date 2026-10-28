@@ -1,31 +1,30 @@
-//! Sessions `.kdws` (Kroki Desk WorkSpace) : un fichier JSON qui liste des
-//! documents à rouvrir, groupés par fenêtre, dans l'ordre des onglets.
+//! `.kdws` sessions (Kroki Desk WorkSpace): a JSON file that lists documents
+//! to reopen, grouped by window, in tab order.
 //!
-//! Format v1 (portable Windows/Linux) :
+//! Format v1 (portable Windows/Linux):
 //! ```json
 //! {
 //!   "version": 1,
 //!   "windows": [
 //!     { "files": ["notes/a.md", "../spec/b.tex"], "active": 0 },
-//!     { "files": ["D:/data/rapport.tex"] }
+//!     { "files": ["D:/data/report.tex"] }
 //!   ]
 //! }
 //! ```
 //!
-//! Règles de chemins : séparateur `/` à l'écriture (les `\` sont tolérés à la
-//! lecture), chemins relatifs résolus par rapport au **dossier du `.kdws`**
-//! (jamais au cwd), chemins absolus acceptés mais machine-spécifiques. À la
-//! sauvegarde, tout chemin partageant un préfixe avec la destination est
-//! relativisé automatiquement.
+//! Path rules: `/` separator when writing (`\` is tolerated when reading),
+//! relative paths resolved against the **`.kdws`'s folder** (never the cwd),
+//! absolute paths accepted but machine-specific. On save, any path sharing a
+//! prefix with the destination is made relative automatically.
 //!
-//! À l'ouverture, une session arrive **toujours dans au moins une fenêtre
-//! neuve** : la fenêtre cible (celle du drop / la première fenêtre pour le CLI)
-//! n'est reprise que si elle est encore vide — au démarrage sur un `.kdws`, ou
-//! sur une fenêtre « déposer un fichier ». Dès qu'elle contient un onglet, la
-//! session s'ouvre à côté sans se mélanger au travail en cours ; les fenêtres
-//! suivantes de la session sont neuves dans tous les cas. Les entrées invalides
-//! (introuvable, extension non prise en charge, `.kdws` imbriqué) sont sautées
-//! et signalées via l'événement `session-report` (toast côté frontend).
+//! On opening, a session **always arrives in at least one new window**: the
+//! target window (the drop's / the first window for the CLI) is only reused if
+//! it is still empty — at startup on a `.kdws`, or on a "drop a file"
+//! (« déposer un fichier ») window. As soon as it holds a tab, the session
+//! opens alongside without mixing with ongoing work; the session's following
+//! windows are new in every case. Invalid entries (not found, unsupported
+//! extension, nested `.kdws`) are skipped and reported via the `session-report`
+//! event (a toast on the frontend side).
 
 use std::path::{Component, Path, PathBuf};
 
@@ -37,10 +36,10 @@ use crate::state::{path_key, AppState};
 
 pub const SESSION_EXT: &str = "kdws";
 const SESSION_VERSION: u32 = 1;
-/// Nombre max de chemins ignorés détaillés dans le toast.
+/// Max number of skipped paths detailed in the toast.
 const REPORT_DETAIL_MAX: usize = 3;
 
-/// Le chemin est-il un fichier de session `.kdws` ?
+/// Is the path a `.kdws` session file?
 pub fn is_session_file(p: &Path) -> bool {
     p.extension()
         .and_then(|e| e.to_str())
@@ -56,12 +55,12 @@ struct SessionFile {
 #[derive(Serialize, Deserialize)]
 struct SessionWindow {
     files: Vec<String>,
-    /// Index (dans `files`) de l'onglet actif. Absent = dernier ouvert.
+    /// Index (in `files`) of the active tab. Absent = last opened.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     active: Option<usize>,
 }
 
-/// Toast côté frontend (fenêtre cible uniquement).
+/// Toast on the frontend side (target window only).
 #[derive(Serialize, Clone)]
 struct SessionReport {
     message: String,
@@ -73,13 +72,12 @@ fn report(app: &AppHandle, label: &str, message: String, error: bool) {
 }
 
 // ---------------------------------------------------------------------------
-// Ouverture
+// Opening
 // ---------------------------------------------------------------------------
 
-/// Ouvre une session dans des fenêtres neuves — `target_label` n'est repris
-/// pour la fenêtre n°1 que s'il n'a aucun onglet. Ne renvoie rien : tout
-/// problème (parse, entrées sautées) est signalé à l'utilisateur via
-/// `session-report`.
+/// Opens a session in new windows — `target_label` is only reused for
+/// window no. 1 if it has no tab. Returns nothing: any problem (parse,
+/// skipped entries) is reported to the user via `session-report`.
 pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
     let name = path
         .file_name()
@@ -118,15 +116,15 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
 
     let mut opened = 0usize;
     let mut skipped: Vec<String> = Vec::new();
-    // Reprise de la fenêtre cible seulement si elle est vide : une session ne se
-    // greffe jamais sur des onglets déjà ouverts, elle arrive dans les siennes.
+    // Reuse the target window only if it is empty: a session never grafts
+    // itself onto already-open tabs, it arrives in its own.
     let mut reusable = window_is_empty(app, target_label);
-    // Première fenêtre effectivement utilisée : destinataire du focus final et
-    // du rapport (ce n'est plus forcément `target_label`).
+    // First window actually used: recipient of the final focus and of the
+    // report (no longer necessarily `target_label`).
     let mut first_label: Option<String> = None;
     for (i, win) in parsed.windows.iter().enumerate() {
-        // Résolution alignée sur `files` : l'index `active` reste valable même
-        // si des entrées sont sautées.
+        // Resolution aligned with `files`: the `active` index stays valid even
+        // if entries are skipped.
         let resolved: Vec<Option<PathBuf>> = win
             .files
             .iter()
@@ -167,8 +165,8 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
             activate_doc_by_path(app, &label, &p);
         }
     }
-    // Les fenêtres suivantes ont pris le focus à leur création : on le rend à la
-    // première fenêtre de la session (la cible quand elle a été reprise).
+    // The following windows took focus when created: hand it back to the
+    // session's first window (the target when it was reused).
     let front = first_label.as_deref().unwrap_or(target_label);
     if let Some(w) = app.get_webview_window(front) {
         let _ = w.unminimize();
@@ -176,7 +174,7 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
     }
 
     if skipped.is_empty() {
-        return; // succès total : pas de bruit.
+        return; // total success: no noise.
     }
     let mut detail: Vec<String> = skipped.iter().take(REPORT_DETAIL_MAX).cloned().collect();
     if skipped.len() > REPORT_DETAIL_MAX {
@@ -199,13 +197,13 @@ pub fn open_session(app: &AppHandle, target_label: &str, path: &Path) {
     );
 }
 
-/// Résout une entrée de session en chemin canonique ouvrable.
+/// Resolves a session entry to an openable canonical path.
 fn resolve_entry(raw: &str, base: &Path) -> Result<PathBuf, String> {
     let raw = raw.trim();
     if raw.is_empty() {
         return Err(tr!("sessionfile.reason.empty"));
     }
-    // `\` toléré à la lecture (fichier écrit à la main sous Windows).
+    // `\` tolerated when reading (file written by hand on Windows).
     let normalized = raw.replace('\\', "/");
     let p = PathBuf::from(&normalized);
     let abs = if p.is_absolute() { p } else { base.join(p) };
@@ -222,15 +220,15 @@ fn resolve_entry(raw: &str, base: &Path) -> Result<PathBuf, String> {
     Ok(canon)
 }
 
-/// La fenêtre `label` est-elle sans aucun onglet ? (fenêtre fraîchement créée,
-/// ou vidée de ses onglets — état « déposer un fichier »).
+/// Does window `label` have no tab at all? (freshly created window, or one
+/// emptied of its tabs — the "drop a file" (« déposer un fichier ») state).
 fn window_is_empty(app: &AppHandle, label: &str) -> bool {
     let st = app.state::<AppState>();
     let st = st.0.lock().unwrap();
     st.tabs.get(label).is_none_or(|ids| ids.is_empty())
 }
 
-/// Active l'onglet d'une fenêtre pointant sur `path` (comparaison `path_key`).
+/// Activates the window's tab pointing at `path` (`path_key` comparison).
 fn activate_doc_by_path(app: &AppHandle, label: &str, path: &Path) {
     let key = path_key(path);
     {
@@ -249,13 +247,13 @@ fn activate_doc_by_path(app: &AppHandle, label: &str, path: &Path) {
 }
 
 // ---------------------------------------------------------------------------
-// Sauvegarde
+// Saving
 // ---------------------------------------------------------------------------
 
-/// Instantané des fenêtres à sérialiser : la fenêtre `first_label` (celle où
-/// l'utilisateur a cliqué « Enregistrer la session ») passe en tête — c'est
-/// elle qui deviendra la fenêtre cible à la réouverture — puis les autres dans
-/// l'ordre de création. Les fenêtres sans onglet sont omises.
+/// Snapshot of the windows to serialize: the `first_label` window (the one
+/// where the user clicked "Save session" (« Enregistrer la session »)) goes
+/// first — it is the one that will become the target window on reopening —
+/// then the others in creation order. Windows with no tab are omitted.
 pub fn snapshot(app: &AppHandle, first_label: &str) -> Vec<(Vec<PathBuf>, Option<usize>)> {
     let st = app.state::<AppState>();
     let st = st.0.lock().unwrap();
@@ -282,8 +280,8 @@ pub fn snapshot(app: &AppHandle, first_label: &str) -> Vec<(Vec<PathBuf>, Option
         .collect()
 }
 
-/// Sérialise un instantané vers `dest` : chemins relativisés par rapport au
-/// dossier de destination quand c'est possible, séparateur `/` partout.
+/// Serializes a snapshot to `dest`: paths made relative to the destination
+/// folder when possible, `/` separator everywhere.
 pub fn write_session(
     snapshot: &[(Vec<PathBuf>, Option<usize>)],
     dest: &Path,
@@ -304,16 +302,16 @@ pub fn write_session(
         .map_err(|e| tr!("error.file.write", path = dest.display(), error = e))
 }
 
-/// Chemin portable : relatif au dossier du `.kdws` si un préfixe est commun
-/// (même volume), absolu sinon ; toujours avec `/`.
+/// Portable path: relative to the `.kdws`'s folder if a prefix is shared
+/// (same volume), absolute otherwise; always with `/`.
 fn portable_string(target: &Path, base: &Path) -> String {
     let p = relativize(target, base).unwrap_or_else(|| target.to_path_buf());
     p.to_string_lossy().replace('\\', "/")
 }
 
-/// Équivalent minimal de `pathdiff` : préfixe commun composant par composant
-/// (insensible à la casse sous Windows), `..` pour remonter. `None` si aucun
-/// composant commun (autre lecteur Windows) → le chemin restera absolu.
+/// Minimal equivalent of `pathdiff`: common prefix component by component
+/// (case-insensitive on Windows), `..` to go up. `None` if no component is
+/// shared (another Windows drive) → the path will stay absolute.
 fn relativize(target: &Path, base: &Path) -> Option<PathBuf> {
     fn eq(a: &Component, b: &Component) -> bool {
         if cfg!(windows) {

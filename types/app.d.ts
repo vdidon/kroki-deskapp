@@ -1,40 +1,40 @@
-// État partagé de la fenêtre principale (`state` de `ui/js/app.js`).
+// Shared state of the main window (`state` of `ui/js/app.js`).
 
 import type { Anchor, TabInfo } from "./ipc";
 
-/** Mode d'affichage d'un document. */
+/** Display mode of a document. */
 export type ViewMode = "preview" | "source" | "derived";
 
-/** Vue d'un document (une par onglet, cf. `ensureViews` dans `main.js`). */
+/** View of a document (one per tab, cf. `ensureViews` in `main.js`). */
 export interface View {
   el: HTMLElement;
-  /** Contenu déjà rendu au moins une fois. */
+  /** Content already rendered at least once. */
   rendered: boolean;
-  /** Numéro de rendu : un rendu obsolète (seq dépassé) n'écrit plus rien. */
+  /** Render number: a stale render (seq exceeded) no longer writes anything. */
   seq: number;
-  /** Rendu en cours : pas de saut d'ancre dans un DOM en chantier. */
+  /** Render in progress: no anchor jump into a DOM under construction. */
   rendering?: boolean;
-  /** Chemin absolu du document. */
+  /** Absolute path of the document. */
   path?: string;
-  /** Dossier du document (résolution des liens et images relatifs). */
+  /** Document folder (resolution of relative links and images). */
   dir?: string;
-  /** `html` = page statique en iframe, hors pipeline markdown. */
+  /** `html` = static page in an iframe, outside the markdown pipeline. */
   kind?: "doc" | "html";
-  /** Markdown affiché (dérivé par un plugin le cas échéant) ; `null` pour une page HTML. */
+  /** Displayed markdown (derived by a plugin where applicable); `null` for an HTML page. */
   markdown?: string | null;
-  /** Source réel (markdown ou format servi par un plugin), pour la vue source. */
+  /** Actual source (markdown or format served by a plugin), for the source view. */
   sourceText?: string | null;
-  /** Ancres du markdown dérivé ; non nul = document transformé par un plugin. */
+  /** Anchors of the derived markdown; non-null = document transformed by a plugin. */
   lineMap?: Anchor[] | null;
-  /** Absent sur une vue neuve : se comporte comme `"preview"`. */
+  /** Absent on a fresh view: behaves like `"preview"`. */
   mode?: ViewMode;
-  /** DOM mémorisé par mode (cf. `renderMode`). */
+  /** DOM cached per mode (cf. `renderMode`). */
   domCache?: Partial<Record<ViewMode, Element | null>> | null;
 }
 
 /**
- * Vues par id de document. `get` accepte `null` : le code lit partout
- * `state.views.get(state.active)`, qui vaut `undefined` sans onglet actif.
+ * Views by document id. `get` accepts `null`: the code reads
+ * `state.views.get(state.active)` everywhere, which is `undefined` with no active tab.
  */
 export interface ViewMap extends Map<number, View> {
   get(key: number | null): View | undefined;
@@ -42,9 +42,9 @@ export interface ViewMap extends Map<number, View> {
 
 export interface AppState {
   tabs: TabInfo[];
-  /** Document actif ou `null`. */
+  /** Active document or `null`. */
   active: number | null;
   views: ViewMap;
-  /** Documents modifiés sur disque, à re-rendre à l'activation. */
+  /** Documents modified on disk, to re-render on activation. */
   stale: Set<number>;
 }

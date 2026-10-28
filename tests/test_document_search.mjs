@@ -1,13 +1,13 @@
-// Test de la recherche dans le document affiché (ui/js/docsearch.js) et des
-// options `Aa` / `ab` / `.*` communes aux deux recherches (ui/js/searchopts.js).
-// Usage : node tests/test_document_search.mjs [port]
-// Prérequis : app lancée avec WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
-// Autonome : crée son document de test dans un dossier temporaire, l'ouvre via
-// les commandes Tauri, referme son onglet à la fin.
+// Test of the search in the displayed document (ui/js/docsearch.js) and of the
+// `Aa` / `ab` / `.*` options shared by both searches (ui/js/searchopts.js).
+// Usage: node tests/test_document_search.mjs [port]
+// Prerequisite: app launched with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
+// Standalone: creates its test document in a temporary folder, opens it via
+// the Tauri commands, closes its tab at the end.
 //
-// Angle mort assumé : que la barre de recherche NATIVE de la webview ne s'ouvre
-// plus sur Ctrl+F ne se vérifie pas d'ici (elle vit hors du DOM de la page) —
-// contrôle visuel.
+// Acknowledged blind spot: that the webview's NATIVE search bar no longer
+// opens on Ctrl+F cannot be checked from here (it lives outside the page's
+// DOM) — visual check.
 
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,7 +18,7 @@ const port = process.argv[2] ?? "9222";
 const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const page = targets.find((t) => t.type === "page" && !t.url.includes("renderer"));
 if (!page) {
-  console.error("page principale introuvable:", targets.map((t) => t.title).join(" | "));
+  console.error("main page not found:", targets.map((t) => t.title).join(" | "));
   process.exit(1);
 }
 
@@ -60,7 +60,7 @@ function check(name, cond, detail = "") {
   if (!cond) failures++;
 }
 
-// --- Fixture : casses mélangées, mots partiels, accents (pour « mot entier »)
+// --- Fixture: mixed cases, partial words, accents (for "whole word")
 const dir = mkdtempSync(join(tmpdir(), "kroki-find-test-"));
 const docPath = join(dir, "recherche_doc.md");
 writeFileSync(
@@ -80,9 +80,9 @@ writeFileSync(
     "",
   ].join("\n"),
 );
-// « zoxitron » insensible à la casse : titre + 3 dans le corps = 4.
-// Sensible à la casse (« zoxitron ») : ligne 3 + zoxitronique = 2.
-// Mot entier + insensible : 4 - 1 (zoxitronique) = 3.
+// "zoxitron" case-insensitive: title + 3 in the body = 4.
+// Case-sensitive ("zoxitron"): line 3 + zoxitronique = 2.
+// Whole word + insensitive: 4 - 1 (zoxitronique) = 3.
 
 const esc = (s) => JSON.stringify(s);
 await evaluate(
@@ -117,75 +117,75 @@ const key = (k, mods = {}) =>
   );
 
 try {
-  // 1. Ctrl+F ouvre la barre
+  // 1. Ctrl+F opens the bar
   await key("f", { ctrlKey: true });
   await sleep(200);
   let st = await state();
-  check("Ctrl+F ouvre la barre", st.hidden === false);
-  check("champ focus à l'ouverture", st.focused === true);
+  check("Ctrl+F opens the bar", st.hidden === false);
+  check("field focused on open", st.focused === true);
 
-  // 2. Recherche insensible à la casse : 4 occurrences, la 1ʳᵉ courante
+  // 2. Case-insensitive search: 4 occurrences, the 1st one current
   await setQuery("zoxitron");
   st = await state();
-  check("4 occurrences, compteur 1/4", st.count === "1/4", st.count);
-  check("toutes les occurrences surlignées", st.all === 4, `all=${st.all}`);
-  check("occurrence courante distincte", st.current === 1, `current=${st.current}`);
+  check("4 occurrences, counter 1/4", st.count === "1/4", st.count);
+  check("all occurrences highlighted", st.all === 4, `all=${st.all}`);
+  check("current occurrence distinct", st.current === 1, `current=${st.current}`);
 
-  // 3. Navigation : Entrée avance, Maj+Entrée recule, F3 avance, bouclage
+  // 3. Navigation: Enter goes forward, Shift+Enter goes back, F3 goes forward, wrap-around
   await evaluate(`document.getElementById('find-input').dispatchEvent(
     new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
   await sleep(150);
-  check("Entrée → occurrence suivante", (await state()).count === "2/4");
+  check("Enter → next occurrence", (await state()).count === "2/4");
   await evaluate(`document.getElementById('find-input').dispatchEvent(
     new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }))`);
   await sleep(150);
-  check("Maj+Entrée → occurrence précédente", (await state()).count === "1/4");
+  check("Shift+Enter → previous occurrence", (await state()).count === "1/4");
   await key("F3", { shiftKey: true });
   await sleep(150);
-  check("Maj+F3 boucle sur la dernière", (await state()).count === "4/4");
+  check("Shift+F3 wraps to the last", (await state()).count === "4/4");
   await key("F3");
   await sleep(150);
-  check("F3 reboucle sur la première", (await state()).count === "1/4");
+  check("F3 wraps to the first", (await state()).count === "1/4");
 
-  // 4. Option « respecter la casse »
+  // 4. "Match case" option
   await toggle("find", "case");
-  check("Aa : 2 occurrences", (await state()).count === "1/2", (await state()).count);
+  check("Aa: 2 occurrences", (await state()).count === "1/2", (await state()).count);
   await toggle("find", "case");
 
   // 5. Option « mot entier » (zoxitronique exclu)
   await toggle("find", "word");
-  check("ab : 3 occurrences (zoxitronique exclu)", (await state()).count === "1/3",
+  check("ab: 3 occurrences (zoxitronique excluded)", (await state()).count === "1/3",
     (await state()).count);
-  // …et sur un mot accentué, là où `\b` d'ASCII échouerait
+  // …and on an accented word, where ASCII `\b` would fail
   await setQuery("été");
-  check("ab : accents reconnus (2 « été » sur 3 formes)", (await state()).count === "1/2",
+  check("ab: accents handled (2 'été' out of 3 forms)", (await state()).count === "1/2",
     (await state()).count);
   await toggle("find", "word");
 
-  // 6. Expression régulière (valide puis invalide)
+  // 6. Regular expression (valid then invalid)
   await toggle("find", "regex");
   await setQuery("[a-f]{2}[0-9]{2}");
-  check(".* : 3 codes trouvés", (await state()).count === "1/3", (await state()).count);
+  check(".*: 3 codes found", (await state()).count === "1/3", (await state()).count);
   await setQuery("a(");
   st = await state();
-  // Indépendant de la langue de l'interface : « invalide » (fr) ou « Invalid » (en).
-  check("motif invalide : message d'erreur", /invalid/i.test(st.count), st.count);
-  check("motif invalide : champ en rouge", st.invalid === true);
-  check("motif invalide : surlignage effacé", st.all === 0);
+  // Independent of the interface language: "invalide" (fr) or "Invalid" (en).
+  check("invalid pattern: error message", /invalid/i.test(st.count), st.count);
+  check("invalid pattern: field in red", st.invalid === true);
+  check("invalid pattern: highlight cleared", st.all === 0);
   await toggle("find", "regex");
   await setQuery("zoxitron");
 
-  // 7. Exclusivité avec la recherche multi-documents (même ancre à l'écran)
+  // 7. Mutual exclusion with the multi-document search (same on-screen anchor)
   await key("F", { ctrlKey: true, shiftKey: true });
   await sleep(300);
   const excl = await evaluate(`(() => ({
     find: document.getElementById('find-bar').hidden,
     panel: document.getElementById('search-panel').hidden,
   }))()`);
-  check("Ctrl+Maj+F ferme la barre Ctrl+F", excl.find === true && excl.panel === false,
+  check("Ctrl+Shift+F closes the Ctrl+F bar", excl.find === true && excl.panel === false,
     JSON.stringify(excl));
 
-  // 8. Options du panneau multi-documents : casse + bouton de fermeture
+  // 8. Multi-document panel options: case + close button
   await evaluate(`(() => {
     const i = document.getElementById('search-input');
     i.value = 'zoxitron';
@@ -195,31 +195,31 @@ try {
   const insensible = await evaluate(
     `document.querySelector('.search-group .search-count')?.textContent`,
   );
-  check("panneau : 4 occurrences sans option", insensible === "4", String(insensible));
+  check("panel: 4 occurrences without options", insensible === "4", String(insensible));
   await toggle("search", "case");
   await sleep(700);
   const sensible = await evaluate(
     `document.querySelector('.search-group .search-count')?.textContent`,
   );
-  check("panneau : Aa → 2 occurrences", sensible === "2", String(sensible));
+  check("panel: Aa → 2 occurrences", sensible === "2", String(sensible));
   await toggle("search", "case");
   await sleep(700);
 
   await evaluate(`document.getElementById('search-close').click()`);
   await sleep(200);
-  check("panneau : bouton de fermeture", await evaluate(
+  check("panel: close button", await evaluate(
     `document.getElementById('search-panel').hidden`,
   ));
 
-  // 9. Échap ferme la barre et efface les surlignages
+  // 9. Escape closes the bar and clears the highlights
   await key("f", { ctrlKey: true });
   await sleep(200);
   await setQuery("zoxitron");
   await key("Escape");
   await sleep(200);
   st = await state();
-  check("Échap ferme la barre", st.hidden === true);
-  check("surlignages effacés à la fermeture", st.all === 0 && st.current === 0,
+  check("Escape closes the bar", st.hidden === true);
+  check("highlights cleared on close", st.all === 0 && st.current === 0,
     `all=${st.all} current=${st.current}`);
 } finally {
   await evaluate(`(async () => {
@@ -233,5 +233,5 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log(failures === 0 ? "\nTOUS LES TESTS PASSENT" : `\n${failures} ÉCHEC(S)`);
+console.log(failures === 0 ? "\nALL TESTS PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

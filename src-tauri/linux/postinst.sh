@@ -1,23 +1,24 @@
 #!/bin/sh
-# postinst du paquet .deb (bundle.linux.deb.postInstallScript).
+# postinst of the .deb package (bundle.linux.deb.postInstallScript).
 #
-# Rafraîchit les trois caches que l'installation vient d'invalider : la base MIME
-# (le paquet dépose /usr/share/mime/packages/kroki-desk.xml), l'index des
-# applications qui associe un type MIME à un .desktop, et le cache d'icônes.
+# Refreshes the three caches the installation has just invalidated: the MIME
+# database (the package drops /usr/share/mime/packages/kroki-desk.xml), the
+# applications index that maps a MIME type to a .desktop, and the icon cache.
 #
-# Redondant en théorie — shared-mime-info et desktop-file-utils posent des
-# déclencheurs dpkg qui font ce travail — mais ces déclencheurs n'existent que si
-# les paquets correspondants sont installés, et ils ne sont que « recommandés ».
-# D'où les gardes `command -v` : sur un système qui n'a ni l'un ni l'autre, il n'y
-# a de toute façon pas de base MIME à mettre à jour, et l'absence ne doit pas
-# faire échouer l'installation. Le `|| true` couvre le même cas de figure pour un
-# outil présent mais en échec : un cache non régénéré ne justifie pas de laisser
-# le paquet à demi configuré.
+# Redundant in theory — shared-mime-info and desktop-file-utils set dpkg
+# triggers that do this work — but those triggers only exist if the
+# corresponding packages are installed, and they are merely "recommended".
+# Hence the `command -v` guards: a system with neither has no MIME database to
+# update anyway, and their absence must not make the installation fail. The
+# `|| true` covers the same case for a tool that is present but failing: a
+# cache that was not regenerated is no reason to leave the package half
+# configured.
 #
-# Il crée aussi le dossier des plugins livrés, qui n'existe que si l'un d'eux est
-# coché dans la stratégie d'embarquement : sa seule présence, même vide, dit à
-# l'application qu'un installeur a choisi (plugins::seed_bundled) — sans lui,
-# elle installerait au premier lancement le plugin embarqué dans le binaire.
+# It also creates the shipped-plugins folder, which only exists if one of them
+# is checked in the bundling strategy: its mere presence, even empty, tells the
+# application that an installer made a choice (plugins::seed_bundled) — without
+# it, the application would install the plugin embedded in the binary at first
+# launch.
 set -e
 
 if [ "$1" = "configure" ]; then

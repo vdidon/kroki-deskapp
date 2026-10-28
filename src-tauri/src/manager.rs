@@ -12,17 +12,17 @@ use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, WindowFromPoint, GA_R
 use crate::state::{path_key, title_for, AppState, Document};
 use crate::watcher;
 
-/// Extensions de documents gérées **nativement**. Le filtre effectif (dialogue
-/// d'ouverture, liens internes, drag-drop Rust + JS) est natives ∪ extensions
-/// revendiquées par les plugins actifs (cf. `plugins::effective_doc_extensions`).
-/// `.tex`, par exemple, est servi par le plugin `latex-doc`.
-/// `.html`/`.htm` (pages statiques, dont les exports de l'app) ne passent pas
-/// par le pipeline markdown : affichés dans une iframe sandboxée (cf.
+/// Document extensions handled **natively**. The effective filter (open
+/// dialog, internal links, Rust + JS drag-drop) is native ∪ extensions
+/// claimed by active plugins (see `plugins::effective_doc_extensions`).
+/// `.tex`, for example, is served by the `latex-doc` plugin.
+/// `.html`/`.htm` (static pages, including the app's exports) do not go
+/// through the markdown pipeline: displayed in a sandboxed iframe (see
 /// `renderHtmlDocument`, `ui/js/render.js`).
 pub const DOC_EXTENSIONS: &[&str] = &["md", "markdown", "mdown", "mkd", "txt", "html", "htm"];
 
-/// Un chemin pointe-t-il vers un document ouvrable (extension native ou
-/// revendiquée par un plugin actif) ?
+/// Does a path point to an openable document (native extension or one
+/// claimed by an active plugin)?
 pub fn is_supported_doc(p: &Path) -> bool {
     p.extension()
         .and_then(|e| e.to_str())
@@ -33,20 +33,20 @@ pub fn is_supported_doc(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Développe une liste de chemins déposés en éléments réellement acceptables :
-/// - un **fichier** supporté est gardé tel quel ;
-/// - une **archive de plugin** `.kdext` est gardée telle quelle (routée vers le
-///   flux d'installation par l'appelant, cf. `drop_target.rs` / `filedrop.js`) ;
-/// - une **session** `.kdws` est gardée telle quelle (routée vers
-///   `session::open_session` par `open_mixed_paths`) ;
-/// - un **dossier** est développé en ses fichiers documents *directs* (non
-///   récursif), triés par nom pour un ordre d'onglets déterministe ;
-/// - tout le reste est ignoré.
+/// Expands a list of dropped paths into genuinely acceptable items:
+/// - a supported **file** is kept as is;
+/// - a `.kdext` **plugin archive** is kept as is (routed to the install flow
+///   by the caller, see `drop_target.rs` / `filedrop.js`);
+/// - a `.kdws` **session** is kept as is (routed to
+///   `session::open_session` by `open_mixed_paths`);
+/// - a **folder** is expanded into its *direct* document files (non
+///   recursive), sorted by name for a deterministic tab order;
+/// - everything else is ignored.
 ///
-/// Chaque chemin est canonicalisé (`dunce`) afin que la déduplication par
-/// `path_key` et le watcher restent cohérents avec les ouvertures par fichier.
-/// Partagé par le drag-drop Windows (Explorateur + Cursor, cf. `drop_target.rs`),
-/// son seul appelant : d'où le `cfg`, sans quoi le build Linux le signale mort.
+/// Each path is canonicalized (`dunce`) so that deduplication by
+/// `path_key` and the watcher stay consistent with per-file opens.
+/// Shared by the Windows drag-drop (Explorer + Cursor, see `drop_target.rs`),
+/// its only caller: hence the `cfg`, without which the Linux build flags it as dead.
 #[cfg(windows)]
 pub fn expand_dropped_docs(paths: &[PathBuf]) -> Vec<PathBuf> {
     let mut out = Vec::new();
@@ -68,8 +68,8 @@ pub fn expand_dropped_docs(paths: &[PathBuf]) -> Vec<PathBuf> {
     out
 }
 
-/// Fichiers documents directs d'un dossier (non récursif), triés par nom
-/// (insensible à la casse, comme l'Explorateur Windows).
+/// Direct document files of a folder (non recursive), sorted by name
+/// (case-insensitive, like Windows Explorer).
 #[cfg(windows)]
 fn docs_in_dir(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -88,8 +88,8 @@ fn docs_in_dir(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// Pousse l'état des onglets d'une fenêtre vers le frontend.
-/// Émis globalement, chaque fenêtre filtre sur `payload.window`.
+/// Pushes a window's tab state to the frontend.
+/// Emitted globally, each window filters on `payload.window`.
 pub fn sync_window(app: &AppHandle, label: &str) {
     let payload = {
         let st = app.state::<AppState>();
@@ -99,7 +99,7 @@ pub fn sync_window(app: &AppHandle, label: &str) {
     let _ = app.emit("tabs-updated", payload);
 }
 
-/// Crée une fenêtre vide et l'enregistre. Position/taille physiques optionnelles.
+/// Creates an empty window and registers it. Optional physical position/size.
 pub fn create_window(
     app: &AppHandle,
     at: Option<PhysicalPosition<f64>>,
@@ -138,15 +138,15 @@ pub fn create_window(
     }
     let _ = win.show();
     let _ = win.set_focus();
-    // Drag-drop : remplace le target wry (CF_HDROP seul) pour gérer aussi les
-    // drags texte (Cursor/VS Code). Après `show()` : la webview enfant existe.
+    // Drag-drop: replaces the wry target (CF_HDROP only) to also handle
+    // text drags (Cursor/VS Code). After `show()`: the child webview exists.
     #[cfg(windows)]
     crate::drop_target::install(&win);
     Ok(label)
 }
 
-/// Ouvre des fichiers dans une fenêtre. Si un fichier y est déjà ouvert, active
-/// son onglet au lieu de créer un doublon. Le dernier fichier ouvert devient actif.
+/// Opens files in a window. If a file is already open there, activates
+/// its tab instead of creating a duplicate. The last opened file becomes active.
 pub fn open_paths_in_window(app: &AppHandle, label: &str, paths: &[PathBuf]) {
     if paths.is_empty() {
         return;
@@ -192,14 +192,13 @@ pub fn open_paths_in_window(app: &AppHandle, label: &str, paths: &[PathBuf]) {
     sync_window(app, label);
 }
 
-/// Ouvre un mélange de documents, de sessions `.kdws` et d'archives de plugins
-/// `.kdext` dans une fenêtre : les documents en onglets, chaque session
-/// appliquée avec cette fenêtre comme cible de sa première fenêtre (cf.
-/// `session::open_session`), chaque archive routée vers le flux d'installation
-/// (dialog de confiance côté frontend, spec §9.2). Entonnoir commun du CLI, de
-/// la seconde instance, des drops et du dialogue d'ouverture — d'où le routage
-/// des `.kdext` ici et non dans `drop_target.rs` : une archive arrive aussi par
-/// double-clic quand l'installeur a associé l'extension.
+/// Opens a mix of documents, `.kdws` sessions and `.kdext` plugin archives
+/// in a window: documents as tabs, each session applied with this window as
+/// the target of its first window (see `session::open_session`), each archive
+/// routed to the install flow (trust dialog on the frontend side, spec §9.2).
+/// Common funnel for the CLI, the second instance, drops and the open dialog —
+/// hence the `.kdext` routing here and not in `drop_target.rs`: an archive also
+/// arrives by double-click when the installer associated the extension.
 pub fn open_mixed_paths(app: &AppHandle, label: &str, paths: &[PathBuf]) {
     let (archives, rest): (Vec<PathBuf>, Vec<PathBuf>) = paths
         .iter()
@@ -217,7 +216,7 @@ pub fn open_mixed_paths(app: &AppHandle, label: &str, paths: &[PathBuf]) {
     }
 }
 
-/// La plus ancienne fenêtre encore vivante — cible par défaut des ouvertures externes.
+/// The oldest window still alive — default target of external opens.
 pub fn first_window(app: &AppHandle) -> Option<WebviewWindow> {
     let labels: Vec<String> = {
         let st = app.state::<AppState>();
@@ -229,15 +228,15 @@ pub fn first_window(app: &AppHandle) -> Option<WebviewWindow> {
         .find_map(|label| app.get_webview_window(label))
 }
 
-/// Relance de l'exe sans fichier (re-clic) : ouvre une nouvelle fenêtre vide.
-/// `create_window` se charge de `show()` + `set_focus()`.
+/// Relaunch of the exe without a file (re-click): opens a new empty window.
+/// `create_window` takes care of `show()` + `set_focus()`.
 pub fn open_new_window(app: &AppHandle) {
     if let Err(e) = create_window(app, None, None) {
         crate::journal::error("window", format!("cannot create window: {e}"));
     }
 }
 
-/// Point d'entrée des fichiers venant du CLI ou d'une seconde instance.
+/// Entry point for files coming from the CLI or a second instance.
 pub fn open_in_first_window(app: &AppHandle, args: &[FileArg]) {
     let win = match first_window(app) {
         Some(w) => w,
@@ -257,7 +256,7 @@ pub fn open_in_first_window(app: &AppHandle, args: &[FileArg]) {
     let _ = win.set_focus();
 }
 
-/// Nettoyage quand une fenêtre est détruite : libère ses documents et leurs watchers.
+/// Cleanup when a window is destroyed: frees its documents and their watchers.
 pub fn cleanup_window(app: &AppHandle, label: &str) {
     let removed_paths: Vec<PathBuf> = {
         let st = app.state::<AppState>();
@@ -274,7 +273,7 @@ pub fn cleanup_window(app: &AppHandle, label: &str) {
     }
 }
 
-/// Ferme un onglet. La fenêtre reste ouverte même sans onglet (état « déposer un fichier »).
+/// Closes a tab. The window stays open even without a tab (« déposer un fichier » state).
 pub fn close_tab(app: &AppHandle, label: &str, doc_id: u64) {
     let removed_path: Option<PathBuf> = {
         let st = app.state::<AppState>();
@@ -303,10 +302,10 @@ pub fn close_tab(app: &AppHandle, label: &str, doc_id: u64) {
     sync_window(app, label);
 }
 
-/// Ferme en un seul passage les onglets à gauche (`left`), à droite (`right`) ou
-/// autour (`others`) de `doc_id`, qui reste ouvert. L'ordre est lu ici et non
-/// fourni par le frontend : un réordonnancement concurrent ne fait rien fermer
-/// de travers. Si l'onglet actif est fermé, `doc_id` le remplace.
+/// Closes in one pass the tabs to the left (`left`), to the right (`right`) or
+/// around (`others`) `doc_id`, which stays open. The order is read here and not
+/// supplied by the frontend: a concurrent reorder cannot make it close the
+/// wrong tabs. If the active tab is closed, `doc_id` replaces it.
 pub fn close_tabs_around(app: &AppHandle, label: &str, doc_id: u64, side: &str) {
     let removed_paths: Vec<PathBuf> = {
         let st = app.state::<AppState>();
@@ -340,8 +339,8 @@ pub fn close_tabs_around(app: &AppHandle, label: &str, doc_id: u64, side: &str) 
     sync_window(app, label);
 }
 
-/// Retire un onglet d'une fenêtre sans libérer le document (transfert en cours).
-/// Retourne `false` si l'onglet n'y était pas, et indique si la fenêtre est maintenant vide.
+/// Removes a tab from a window without freeing the document (transfer in progress).
+/// Returns `None` if the tab was not there, and tells whether the window is now empty.
 fn take_tab(app: &AppHandle, label: &str, doc_id: u64) -> Option<bool> {
     let st = app.state::<AppState>();
     let mut st = st.0.lock().unwrap();
@@ -372,13 +371,13 @@ fn give_tab(app: &AppHandle, label: &str, doc_id: u64) -> bool {
     }
 }
 
-/// Transfère un onglet d'une fenêtre vers une autre. Ferme la source si elle se vide.
+/// Transfers a tab from one window to another. Closes the source if it becomes empty.
 pub fn transfer_tab(app: &AppHandle, from: &str, to: &str, doc_id: u64) {
     let Some(from_empty) = take_tab(app, from, doc_id) else {
         return;
     };
     if !give_tab(app, to, doc_id) {
-        // La cible a disparu entre-temps : on restaure l'onglet dans la source.
+        // The target disappeared in the meantime: restore the tab in the source.
         give_tab(app, from, doc_id);
         sync_window(app, from);
         return;
@@ -396,7 +395,7 @@ pub fn transfer_tab(app: &AppHandle, from: &str, to: &str, doc_id: u64) {
     }
 }
 
-/// Détache un onglet dans une nouvelle fenêtre positionnée sous le curseur.
+/// Detaches a tab into a new window positioned under the cursor.
 pub fn detach_to_new_window(
     app: &AppHandle,
     source: &WebviewWindow,
@@ -408,11 +407,11 @@ pub fn detach_to_new_window(
     move_tab_to_new_window(app, source, doc_id, pos);
 }
 
-/// Menu contextuel d'onglet : détache l'onglet dans une nouvelle fenêtre de
-/// même taille, décalée en cascade depuis la fenêtre source. Sans effet si
-/// l'onglet n'est plus dans cette fenêtre ou s'il y est seul (recréer la même
-/// fenêtre n'aurait pas de sens) — le menu le désactive déjà, mais l'état a
-/// pu changer entre-temps.
+/// Tab context menu: detaches the tab into a new window of the same
+/// size, cascaded from the source window. No effect if the tab is no longer
+/// in this window or is alone there (recreating the same window would make no
+/// sense) — the menu already disables it, but the state may have changed in
+/// the meantime.
 pub fn detach_tab(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
     let detachable = {
         let st = app.state::<AppState>();
@@ -427,11 +426,10 @@ pub fn detach_tab(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
     move_tab_to_new_window(app, source, doc_id, cascade_position(source));
 }
 
-/// Menu contextuel d'onglet : rouvre le document de l'onglet dans une nouvelle
-/// fenêtre (même taille, en cascade), l'onglet d'origine restant en place.
-/// Permis même sur un onglet seul. Le duplicata est un document à part entière
-/// (son propre `doc_id`) : le watcher est compté par chemin, fermer l'un ne
-/// coupe pas le rechargement de l'autre.
+/// Tab context menu: reopens the tab's document in a new window (same size,
+/// cascaded), the original tab staying in place. Allowed even on a lone tab.
+/// The duplicate is a full document of its own (its own `doc_id`): the watcher
+/// is counted per path, so closing one does not cut the other's reloading.
 pub fn duplicate_tab(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
     let path = {
         let st = app.state::<AppState>();
@@ -448,8 +446,8 @@ pub fn duplicate_tab(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
     }
 }
 
-/// Position d'une fenêtre ouverte depuis le menu d'onglet : décalée en cascade
-/// depuis la fenêtre source.
+/// Position of a window opened from the tab menu: cascaded from the
+/// source window.
 fn cascade_position(source: &WebviewWindow) -> PhysicalPosition<f64> {
     let scale = source.scale_factor().unwrap_or(1.0);
     let origin = source.outer_position().unwrap_or_default();
@@ -459,7 +457,7 @@ fn cascade_position(source: &WebviewWindow) -> PhysicalPosition<f64> {
     )
 }
 
-/// Crée une fenêtre à `pos` (de la taille de la source) et y déplace l'onglet.
+/// Creates a window at `pos` (the source's size) and moves the tab there.
 fn move_tab_to_new_window(
     app: &AppHandle,
     source: &WebviewWindow,
@@ -483,8 +481,8 @@ fn move_tab_to_new_window(
     sync_window(app, &label);
 }
 
-/// Fenêtre de l'application située sous le curseur (coordonnées physiques écran),
-/// en respectant l'ordre Z réel grâce à Win32 `WindowFromPoint`.
+/// Application window under the cursor (physical screen coordinates),
+/// honoring the real Z order thanks to Win32 `WindowFromPoint`.
 #[cfg(windows)]
 pub fn window_under_cursor(app: &AppHandle, pos: PhysicalPosition<f64>) -> Option<WebviewWindow> {
     let point = POINT {
@@ -508,15 +506,15 @@ pub fn window_under_cursor(app: &AppHandle, pos: PhysicalPosition<f64>) -> Optio
         .map(|(_, w)| w)
 }
 
-/// Linux/dégradé : pas de hit-test global inter-fenêtres (interdit sous Wayland,
-/// fragile sous X11). Toujours `None` → un onglet tiré hors de la barre se détache
-/// en nouvelle fenêtre, sans transfert vers une fenêtre existante par drop.
+/// Linux/degraded: no global cross-window hit-test (forbidden under Wayland,
+/// fragile under X11). Always `None` → a tab dragged out of the bar detaches
+/// into a new window, with no transfer to an existing window by drop.
 #[cfg(not(windows))]
 pub fn window_under_cursor(_app: &AppHandle, _pos: PhysicalPosition<f64>) -> Option<WebviewWindow> {
     None
 }
 
-/// Fin d'un drag d'onglet sorti de la barre : transfert, détachement ou déplacement.
+/// End of a tab drag out of the bar: transfer, detach or move.
 pub fn finish_tab_drag(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
     let Ok(cursor) = app.cursor_position() else {
         return;
@@ -524,7 +522,7 @@ pub fn finish_tab_drag(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
     finish_tab_drag_at(app, source, doc_id, cursor);
 }
 
-/// Même logique avec une position fournie (point d'entrée des tests automatisés).
+/// Same logic with a supplied position (entry point for automated tests).
 pub fn finish_tab_drag_at(
     app: &AppHandle,
     source: &WebviewWindow,
@@ -537,7 +535,7 @@ pub fn finish_tab_drag_at(
             transfer_tab(app, &source_label, target.label(), doc_id);
         }
         Some(_) => {
-            // Relâché sur la fenêtre source, hors de la barre d'onglets : annulation.
+            // Released on the source window, outside the tab bar: cancel.
         }
         None => {
             let only_tab = {
@@ -546,8 +544,8 @@ pub fn finish_tab_drag_at(
                 st.tabs.get(&source_label).map(|t| t.len()) == Some(1)
             };
             if only_tab {
-                // Détacher l'unique onglet reviendrait à recréer la même fenêtre :
-                // on déplace simplement la fenêtre sous le curseur, comme Chrome.
+                // Detaching the only tab would amount to recreating the same window:
+                // just move the window under the cursor, like Chrome.
                 let scale = source.scale_factor().unwrap_or(1.0);
                 let pos = PhysicalPosition::new(cursor.x - 120.0 * scale, cursor.y - 16.0 * scale);
                 let _ = source.set_position(pos);
@@ -559,20 +557,20 @@ pub fn finish_tab_drag_at(
     }
 }
 
-/// Argument de fichier résolu : le chemin canonique, et la référence à
-/// atteindre dans le document s'il en porte une (`modele.tex#eq:sigmaU`,
-/// `rapport.md#L42`) — même syntaxe et même résolution que le fragment d'un
-/// lien interne (`jumpToFragment`, `ui/js/main.js`).
+/// Resolved file argument: the canonical path, and the reference to
+/// reach in the document if it carries one (`modele.tex#eq:sigmaU`,
+/// `rapport.md#L42`) — same syntax and same resolution as the fragment of an
+/// internal link (`jumpToFragment`, `ui/js/main.js`).
 pub struct FileArg {
     pub path: PathBuf,
     pub fragment: Option<String>,
 }
 
-/// Résout les arguments CLI en fichiers existants, fragment éventuel compris.
+/// Resolves CLI arguments into existing files, optional fragment included.
 ///
-/// `#` est un caractère légal dans un nom de fichier : l'argument entier est
-/// donc essayé d'abord comme chemin, et n'est coupé au **dernier** `#` que
-/// s'il ne désigne aucun fichier. `a#b.md` reste ainsi ouvrable tel quel.
+/// `#` is a legal character in a file name: the whole argument is
+/// therefore tried first as a path, and is only split at the **last** `#`
+/// if it names no file. `a#b.md` thus stays openable as is.
 pub fn collect_file_args<I: IntoIterator<Item = String>>(args: I, cwd: &Path) -> Vec<FileArg> {
     let resolve = |s: &str| {
         let p = PathBuf::from(s);
@@ -603,7 +601,7 @@ pub fn collect_file_args<I: IntoIterator<Item = String>>(args: I, cwd: &Path) ->
         .collect()
 }
 
-/// Référence en attente de saut, pour une fenêtre donnée.
+/// Reference waiting to be jumped to, for a given window.
 #[derive(Clone, serde::Serialize)]
 pub struct PendingAnchor {
     #[serde(skip)]
@@ -612,15 +610,15 @@ pub struct PendingAnchor {
     fragment: String,
 }
 
-/// Références venues de la ligne de commande, en attente d'être récupérées
-/// par leur fenêtre. Même détour que `plugins::request_install` : un argument
-/// passé au lancement est traité dans le `setup`, **avant** que la webview ait
-/// enregistré son écouteur — un événement porteur de la référence serait perdu.
+/// References coming from the command line, waiting to be picked up
+/// by their window. Same detour as `plugins::request_install`: an argument
+/// passed at launch is handled in `setup`, **before** the webview has
+/// registered its listener — an event carrying the reference would be lost.
 static PENDING_ANCHORS: std::sync::Mutex<Vec<PendingAnchor>> = std::sync::Mutex::new(Vec::new());
 
-/// Ouvre des arguments de fichier dans une fenêtre et y programme le saut vers
-/// leur fragment. Seuls les documents en portent un : un fragment sur une
-/// session ou une archive de plugin est ignoré.
+/// Opens file arguments in a window and schedules the jump to their
+/// fragment. Only documents carry one: a fragment on a session or a plugin
+/// archive is ignored.
 pub fn open_file_args(app: &AppHandle, label: &str, args: &[FileArg]) {
     let anchors: Vec<PendingAnchor> = args
         .iter()
@@ -634,8 +632,8 @@ pub fn open_file_args(app: &AppHandle, label: &str, args: &[FileArg]) {
         })
         .collect();
     let has_anchor = !anchors.is_empty();
-    // Empilé avant l'ouverture : la fenêtre peut réclamer la file dès qu'elle
-    // voit ses onglets changer.
+    // Queued before opening: the window may claim the queue as soon as it
+    // sees its tabs change.
     PENDING_ANCHORS.lock().unwrap().extend(anchors);
     let paths: Vec<PathBuf> = args.iter().map(|a| a.path.clone()).collect();
     open_mixed_paths(app, label, &paths);
@@ -644,7 +642,7 @@ pub fn open_file_args(app: &AppHandle, label: &str, args: &[FileArg]) {
     }
 }
 
-/// Retire et renvoie les références en attente pour la fenêtre `label`.
+/// Removes and returns the pending references for window `label`.
 pub fn take_pending_anchors(label: &str) -> Vec<PendingAnchor> {
     let mut q = PENDING_ANCHORS.lock().unwrap();
     let (mine, rest): (Vec<_>, Vec<_>) = q.drain(..).partition(|a| a.window == label);
@@ -682,9 +680,9 @@ mod file_arg_tests {
             resolve(&dir, "doc.md#eq:sigmaU"),
             [("doc.md".into(), Some("eq:sigmaU".into()))]
         );
-        // `#` dans le nom : le fichier existe tel quel, aucune coupe.
+        // `#` in the name: the file exists as is, no split.
         assert_eq!(resolve(&dir, "a#b.md"), [("a#b.md".into(), None)]);
-        // Coupe au dernier `#`, fragment vide ignoré.
+        // Splits at the last `#`, empty fragment ignored.
         assert_eq!(
             resolve(&dir, "a#b.md#L3"),
             [("a#b.md".into(), Some("L3".into()))]

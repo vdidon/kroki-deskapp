@@ -1,26 +1,26 @@
 // @ts-check
-// Recherche dans le document affiché (Ctrl+F) — remplace la barre de recherche
-// native de la webview, qui n'était ni thémée, ni traduite de la même façon, ni
-// cohérente avec la recherche multi-documents (globalsearch.js). Même mise en
-// forme que celle-ci : champ, options `Aa` `ab` `.*` collées à droite du champ,
-// bouton de fermeture.
+// Search in the displayed document (Ctrl+F) — replaces the webview's native
+// find bar, which was neither themed, nor translated the same way, nor
+// consistent with the multi-document search (globalsearch.js). Same layout as
+// that one: field, `Aa` `ab` `.*` options stuck to the right of the field,
+// close button.
 //
-// La recherche porte sur ce qui est RENDU (le DOM de la vue active), pas sur le
-// source : elle suit donc le mode d'affichage courant (preview, code source,
-// markdown intermédiaire) sans rien relire du disque. Le surlignage passe par la
-// CSS Custom Highlight API (aucune modification du DOM, cf. findword.js) sous
-// deux noms : toutes les occurrences, et l'occurrence courante par-dessus.
+// The search runs on what is RENDERED (the active view's DOM), not on the
+// source: it therefore follows the current display mode (preview, source code,
+// intermediate markdown) without re-reading anything from disk. Highlighting
+// goes through the CSS Custom Highlight API (no DOM change, cf. findword.js)
+// under two names: all occurrences, and the current one on top.
 //
-// L'occurrence courante est mémorisée PAR DOCUMENT (`positions`) : revenir sur
-// un onglet retrouve celle qu'on y avait atteinte, au lieu d'hériter du rang
-// atteint dans l'onglet précédent. Le contenu replié (accordéons `<details>`
-// fermés) n'est pas cherché (cf. textmatch.js) ; ouvrir ou fermer un accordéon
-// relance donc la recherche, en restant sur la même occurrence.
+// The current occurrence is remembered PER DOCUMENT (`positions`): going back to
+// a tab finds the one reached there, instead of inheriting the rank reached in
+// the previous tab. Folded content (closed `<details>` accordions) is not
+// searched (cf. textmatch.js); opening or closing an accordion therefore
+// re-runs the search, staying on the same occurrence.
 //
-// Repères (à la VS Code) : un trait par occurrence sur la barre de défilement
-// de la vue (`#find-ruler`), à la hauteur relative de l'occurrence dans le
-// document. Superposé à la barre, `pointer-events: none` : le pouce reste
-// saisissable au travers.
+// Markers (VS Code style): one tick per occurrence on the view's scrollbar
+// (`#find-ruler`), at the occurrence's relative height in the document.
+// Overlaid on the bar, `pointer-events: none`: the thumb stays grabbable
+// through it.
 
 import { state } from "./app.js";
 import { t, onLocaleChange } from "./i18n.js";
@@ -33,16 +33,16 @@ import { buildMatcher, initSearchToggles } from "./searchopts.js";
 const ALL_NAME = "find-occurrences";
 const CURRENT_NAME = "find-current";
 const DEBOUNCE_MS = 120;
-const MAX_SEED_LEN = 120; // sélection reprise comme requête à l'ouverture
-const RULER_MIN_W = 8; // largeur des repères sans barre de défilement classique
+const MAX_SEED_LEN = 120; // selection taken as the query on open
+const RULER_MIN_W = 8; // marker width without a classic scrollbar
 
 const hlSupported =
   typeof window.CSS !== "undefined" &&
   !!window.CSS.highlights &&
   typeof window.Highlight !== "undefined";
 
-// Éléments d'index.html, renseignés par initDocSearch. Avant elle, `bar` et
-// `ruler` sont undefined : les points d'entrée les testent (`!bar`, `!ruler`).
+// Elements from index.html, set by initDocSearch. Before it runs, `bar` and
+// `ruler` are undefined: the entry points test for them (`!bar`, `!ruler`).
 /** @type {HTMLElement} */
 let bar;
 /** @type {HTMLInputElement} */
@@ -60,15 +60,15 @@ let ruler;
 /** @type {SearchOptions} */
 let opts = { caseSensitive: false, wholeWord: false, regex: false };
 /** @type {(() => void) | null} */
-let onBeforeOpen = null; // hook de main.js : ferme les panneaux de la même ancre
+let onBeforeOpen = null; // main.js hook: closes the panels sharing the same anchor
 let debounceTimer = 0;
 /** @type {Range[]} */
-let matches = []; // Range, dans l'ordre du document
+let matches = []; // Ranges, in document order
 let current = -1;
 /** @type {View | null} */
-let matchesView = null; // vue sur laquelle portent `matches`
-// Occurrence courante de chaque document : vue → { sig, index }. N'est reprise
-// que pour la même requête et les mêmes options (`sig`).
+let matchesView = null; // view that `matches` belongs to
+// Current occurrence of each document: view → { sig, index }. Only reused for
+// the same query and the same options (`sig`).
 /** @type {WeakMap<View, { sig: string, index: number }>} */
 const positions = new WeakMap();
 /** @type {ResizeObserver | null} */
@@ -90,12 +90,12 @@ function clearHighlights() {
   window.CSS.highlights.delete(CURRENT_NAME);
 }
 
-// La vue de l'onglet actif, si elle est cherchable. Les documents HTML sont
-// rendus dans une iframe sandboxée : son contenu est inaccessible d'ici (et la
-// recherche multi-documents les exclut déjà).
+// The active tab's view, if it is searchable. HTML documents are rendered in a
+// sandboxed iframe: its content is unreachable from here (and the
+// multi-document search already excludes them).
 /** @returns {View | null} */
 function searchableView() {
-  // `active` null : `get` rend undefined, écarté juste après.
+  // `active` null: `get` returns undefined, discarded right after.
   const v = state.views.get(/** @type {number} */ (state.active));
   if (!v || !v.rendered || v.kind === "html") return null;
   return v;
@@ -111,14 +111,14 @@ function paint() {
   const cur = matches[current];
   if (cur) {
     const hl = new window.Highlight(cur);
-    hl.priority = 1; // peinte par-dessus le surlignage général
+    hl.priority = 1; // painted on top of the general highlight
     window.CSS.highlights.set(CURRENT_NAME, hl);
   } else {
     window.CSS.highlights.delete(CURRENT_NAME);
   }
 }
 
-// « 3/12 » : rang de l'occurrence courante sur le total.
+// "3/12": rank of the current occurrence out of the total.
 function counter() {
   return t("docsearch.counter", { current: current + 1, total: matches.length });
 }
@@ -133,10 +133,10 @@ function setStatus(text, error = false) {
   input.classList.toggle("invalid", error);
 }
 
-// Repères des occurrences. Rects en pixels écran, `scrollTop`/`scrollHeight`
-// en pixels logiques (zoom CSS sur `#views`, cf. revealCurrent) : la position
-// d'une occurrence est ramenée au repère logique avant d'être rapportée à la
-// hauteur totale du document, puis à celle de la piste.
+// Occurrence markers. Rects are in screen pixels, `scrollTop`/`scrollHeight`
+// in logical pixels (CSS zoom on `#views`, cf. revealCurrent): an occurrence's
+// position is brought back to logical coordinates before being related to the
+// document's total height, then to the track's.
 function drawRuler() {
   rulerFrame = 0;
   const v = matchesView;
@@ -150,20 +150,20 @@ function drawRuler() {
   const box = el.getBoundingClientRect();
   const host = /** @type {HTMLElement} */ (ruler.parentElement).getBoundingClientRect(); // #content
   const scale = box.height / el.offsetHeight || 1;
-  const barW = box.width - el.clientWidth * scale; // 0 : barre en surimpression
+  const barW = box.width - el.clientWidth * scale; // 0: overlay scrollbar
   const width = barW >= 4 ? barW : RULER_MIN_W;
-  const trackH = el.clientHeight * scale; // hors barre horizontale (zoom de page)
+  const trackH = el.clientHeight * scale; // excluding the horizontal bar (page zoom)
   ruler.style.top = `${box.top - host.top}px`;
   ruler.style.left = `${box.right - host.left - width}px`;
   ruler.style.width = `${width}px`;
   ruler.style.height = `${trackH}px`;
   const full = el.scrollHeight || 1;
   /** @type {Set<number>} */
-  const rows = new Set(); // un trait par pixel de piste, pas par occurrence
+  const rows = new Set(); // one tick per track pixel, not per occurrence
   /** @type {HTMLElement[]} */
   const ticks = [];
   /** @type {HTMLElement | null} */
-  let currentTick = null; // posé en dernier : par-dessus un trait de même rangée
+  let currentTick = null; // placed last: on top of a tick in the same row
   matches.forEach((range, i) => {
     const r = range.getBoundingClientRect();
     if (!r.height && !r.width) return;
@@ -197,9 +197,9 @@ function scheduleRuler() {
   if (!rulerFrame) rulerFrame = requestAnimationFrame(drawRuler);
 }
 
-// Les repères suivent la mise en page : redimensionnement de la fenêtre, zooms,
-// figures hydratées après coup, accordéons. La vue est observée avec ses enfants
-// directs — sa propre boîte ne change pas quand le contenu grandit.
+// The markers follow the layout: window resize, zooms, figures hydrated
+// afterwards, accordions. The view is observed along with its direct children
+// — its own box does not change when the content grows.
 function watchRuler() {
   rulerObserver?.disconnect();
   if (!matchesView || !matches.length) {
@@ -211,10 +211,10 @@ function watchRuler() {
   for (const child of matchesView.el.children) rulerObserver.observe(child);
 }
 
-// Rang de départ après une recherche. `anchor` (accordéon ouvert ou fermé, DOM
-// inchangé) : la même occurrence, ou la suivante si elle vient d'être repliée.
-// `keepIndex` (changement d'onglet, re-rendu) : celle mémorisée pour ce
-// document, si la requête n'a pas changé depuis.
+// Starting rank after a search. `anchor` (accordion opened or closed, DOM
+// unchanged): the same occurrence, or the next one if it was just folded.
+// `keepIndex` (tab switch, re-render): the one remembered for this document,
+// if the query has not changed since.
 /**
  * @param {View} v
  * @param {{ keepIndex?: boolean, anchor?: Range | null }} options
@@ -229,11 +229,11 @@ function startIndex(v, { keepIndex, anchor }) {
   return saved && saved.sig === signature() ? Math.min(saved.index, matches.length - 1) : 0;
 }
 
-// Amène l'occurrence courante au centre de la vue si elle n'y est pas déjà.
-// `#views` porte un `zoom` CSS : les rects sont en pixels écran, `scrollTop` en
-// pixels logiques — d'où le facteur d'échelle mesuré sur la vue elle-même.
-// Les deux axes sont traités : sous zoom de page (Maj+molette) la vue défile
-// aussi horizontalement, et une occurrence peut être hors champ à droite.
+// Brings the current occurrence to the center of the view if it is not already
+// there. `#views` carries a CSS `zoom`: rects are in screen pixels, `scrollTop`
+// in logical pixels — hence the scale factor measured on the view itself.
+// Both axes are handled: under page zoom (Shift+wheel) the view also scrolls
+// horizontally, and an occurrence can be out of view on the right.
 /** @param {HTMLElement} viewEl */
 function revealCurrent(viewEl) {
   const range = matches[current];
@@ -254,9 +254,9 @@ function revealCurrent(viewEl) {
   }
 }
 
-// Relance la recherche sur la vue active. `keepIndex` reprend l'occurrence
-// mémorisée pour ce document (changement d'onglet, re-rendu), `anchor` reste
-// sur une occurrence donnée (cf. startIndex) ; sinon on repart de la 1ʳᵉ.
+// Re-runs the search on the active view. `keepIndex` reuses the occurrence
+// remembered for this document (tab switch, re-render), `anchor` stays on a
+// given occurrence (cf. startIndex); otherwise we restart from the 1st.
 /** @param {{ keepIndex?: boolean, reveal?: boolean, anchor?: Range | null }} [options] */
 function run({ keepIndex = false, reveal = true, anchor = null } = {}) {
   if (!bar || bar.hidden) return;
@@ -304,7 +304,7 @@ function updateNav() {
   nextBtn.disabled = !on;
 }
 
-/** @param {number} dir  1 suivante, -1 précédente */
+/** @param {number} dir  1 next, -1 previous */
 function step(dir) {
   if (!matches.length) {
     run();
@@ -335,8 +335,8 @@ export function openDocSearch() {
     onBeforeOpen?.();
     bar.hidden = false;
   }
-  // Sélection courante comme requête, à la façon d'un éditeur : un seul
-  // fragment de ligne, jamais un paragraphe entier.
+  // Current selection as the query, editor-style: a single line fragment,
+  // never a whole paragraph.
   const sel = window.getSelection();
   const picked = sel && !sel.isCollapsed ? sel.toString().trim() : "";
   if (picked && picked.length <= MAX_SEED_LEN && !/[\r\n]/.test(picked)) {
@@ -356,7 +356,7 @@ export function closeDocSearch() {
   matchesView = null;
   watchRuler();
   clearHighlights();
-  // Rend le focus à la vue active : PgUp/PgDn/flèches y défilent à nouveau.
+  // Gives focus back to the active view: PgUp/PgDn/arrows scroll there again.
   state.views.get(/** @type {number} */ (state.active))?.el.focus({ preventScroll: true });
 }
 
@@ -374,8 +374,8 @@ export function findNext(dir = 1) {
   step(dir);
 }
 
-// Le DOM cherché vient d'être remplacé (changement d'onglet, bascule de mode,
-// re-rendu) : les `Range` mémorisés pointent des nœuds détachés, on recalcule.
+// The searched DOM was just replaced (tab switch, mode toggle, re-render): the
+// stored `Range`s point to detached nodes, so we recompute.
 export function refreshDocSearch() {
   if (!isDocSearchOpen()) return;
   run({ keepIndex: true, reveal: false });
@@ -404,12 +404,12 @@ export function initDocSearch({ beforeOpen } = {}) {
   prevBtn.addEventListener("click", () => step(-1));
   nextBtn.addEventListener("click", () => step(1));
   closeBtn.addEventListener("click", closeDocSearch);
-  // Le statut affiché (« Aucun résultat »…) suit la langue : on relance la
-  // recherche sur la même occurrence plutôt que de mémoriser un message figé.
+  // The displayed status ("No result"…) follows the language: we re-run the
+  // search on the same occurrence rather than memorizing a frozen message.
   onLocaleChange(() => refreshDocSearch());
-  // Accordéon ouvert ou fermé dans la vue : l'ensemble cherchable a changé.
-  // `toggle` ne remonte pas, d'où la capture ; regroupé par frame, plusieurs
-  // `<details>` pouvant basculer d'un coup.
+  // Accordion opened or closed in the view: the searchable set has changed.
+  // `toggle` does not bubble, hence the capture; batched per frame, since
+  // several `<details>` may flip at once.
   document.addEventListener(
     "toggle",
     (e) => {
@@ -418,7 +418,7 @@ export function initDocSearch({ beforeOpen } = {}) {
       if (!searchableView()?.el.contains(e.target)) return;
       toggleFrame = requestAnimationFrame(() => {
         toggleFrame = 0;
-        // Ancre détachée (re-rendu dans l'intervalle) : rang mémorisé à la place.
+        // Detached anchor (re-render in the meantime): remembered rank instead.
         const anchor = matches[current];
         run({ reveal: false, keepIndex: true, anchor: anchor?.startContainer.isConnected ? anchor : null });
       });

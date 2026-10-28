@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Textes de l'installeur en chinois simplifié : mêmes Id que en-US.wxl. -->
+<!-- Installer texts in Simplified Chinese: same Ids as en-US.wxl. -->
 <WixLocalization Culture="zh-cn" Codepage="936" xmlns="http://schemas.microsoft.com/wix/2006/localization">
   <String Id="LaunchApp">启动 Kroki Desk</String>
   <String Id="DowngradeErrorMessage">已安装更新版本的 Kroki Desk。</String>

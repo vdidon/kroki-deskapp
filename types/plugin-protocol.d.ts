@@ -1,38 +1,38 @@
-// Protocole de plugins v1 : messages échangés entre l'hôte (fenêtre principale,
-// `ui/js/plugins.js`) et le worker d'un plugin (runtime `kd`,
-// `ui/js/kd_runtime.js`). Référence normative : `doc/plugin-protocol.md` — les
-// renvois `§n` ci-dessous pointent vers ses sections. Ce fichier décrit ce que
-// la spec **et** le code de l'hôte font réellement ; quand ils divergent, le
-// commentaire du champ le dit.
+// Plugin protocol v1: messages exchanged between the host (main window,
+// `ui/js/plugins.js`) and a plugin's worker (`kd` runtime,
+// `ui/js/kd_runtime.js`). Normative reference: `doc/plugin-protocol.md` — the
+// `§n` references below point to its sections. This file describes what
+// the spec **and** the host code actually do; where they diverge, the
+// field's comment says so.
 //
-// Pour un auteur de plugin (JS + JSDoc, sans bundler) : le runtime expose un
-// global `kd` (§12) dont `KdApi` est le type. Dans le dépôt du plugin, un
-// `.d.ts` local suffit pour le typer :
+// For a plugin author (JS + JSDoc, no bundler): the runtime exposes a
+// `kd` global (§12) whose type is `KdApi`. In the plugin's repo, a local
+// `.d.ts` is enough to type it:
 //
-//   import type { KdApi } from "<chemin>/types/plugin-protocol";
+//   import type { KdApi } from "<path>/types/plugin-protocol";
 //   declare global { const kd: KdApi }
 //
-// puis `kd.onRequest("document/transform", ({ text, title }) => …)` reçoit des
-// paramètres typés et doit retourner le `result` attendu. Ne pas mettre ce
-// `declare global` dans `types/` de l'application : il ferait de `kd` un global
-// de la fenêtre principale, où il n'existe pas.
+// then `kd.onRequest("document/transform", ({ text, title }) => …)` receives
+// typed parameters and must return the expected `result`. Do not put this
+// `declare global` in the application's `types/`: it would make `kd` a global
+// of the main window, where it does not exist.
 //
-// Conventions :
-// - Champs inconnus ignorés des deux côtés (§5) : un plugin peut recevoir plus
-//   de champs que décrit ici, et l'hôte ignore ceux qu'il ne connaît pas dans
-//   un `result`.
-// - Tout ce qui vient de l'autre bord est **non fiable** tant qu'il n'a pas été
-//   validé : à la réception, l'hôte lit l'enveloppe brute (`KdWireMessage`) et
-//   ne fait confiance aux résultats qu'après validation (`pluginTransformDocument`,
+// Conventions:
+// - Unknown fields are ignored on both sides (§5): a plugin may receive more
+//   fields than described here, and the host ignores those it does not know in
+//   a `result`.
+// - Everything coming from the other side is **untrusted** until it has been
+//   validated: on receipt, the host reads the raw envelope (`KdWireMessage`) and
+//   trusts results only after validation (`pluginTransformDocument`,
 //   `pluginRenderFence`, `pluginHighlight`).
 
 import type { Anchor } from "./ipc";
 
-// --- Enveloppe (§5) ------------------------------------------------------------
+// --- Envelope (§5) -------------------------------------------------------------
 
 /**
- * Codes d'erreur (§5), extensibles. `timeout` n'est jamais envoyé au plugin :
- * l'hôte le constate lui-même (§7.1) et tue le worker.
+ * Error codes (§5), extensible. `timeout` is never sent to the plugin:
+ * the host detects it itself (§7.1) and kills the worker.
  */
 export type KdErrorCode =
   | "internal"
@@ -48,7 +48,7 @@ export interface KdError {
   message: string;
 }
 
-/** Requête (dans les deux sens) : `id` corrèle la réponse, un espace d'id par côté. */
+/** Request (in both directions): `id` correlates the response, one id space per side. */
 export interface KdRequest<M extends string = string, P = unknown> {
   kd: 1;
   id: number;
@@ -56,12 +56,12 @@ export interface KdRequest<M extends string = string, P = unknown> {
   params: P;
 }
 
-/** Réponse : exactement l'un de `result` / `error`. */
+/** Response: exactly one of `result` / `error`. */
 export type KdResponse<R = unknown> =
   | { kd: 1; id: number; result: R }
   | { kd: 1; id: number; error: KdError };
 
-/** Notification : pas d'`id`, jamais de réponse. */
+/** Notification: no `id`, never answered. */
 export interface KdNotification<M extends string = string, P = unknown> {
   kd: 1;
   method: M;
@@ -69,10 +69,10 @@ export interface KdNotification<M extends string = string, P = unknown> {
 }
 
 /**
- * Message tel qu'il arrive par `postMessage`, **avant toute validation** :
- * seuls les champs lus par les deux bords sont déclarés. Les index
- * `Record<string, unknown>` laissent lire une propriété sans la croire typée —
- * sur une primitive ou `null` la lecture optionnelle (`?.`) donne `undefined`.
+ * Message as it arrives via `postMessage`, **before any validation**:
+ * only the fields read by both sides are declared. The
+ * `Record<string, unknown>` indexes let a property be read without trusting it
+ * as typed — on a primitive or `null`, the optional read (`?.`) gives `undefined`.
  */
 export interface KdWireMessage {
   kd?: unknown;
@@ -84,18 +84,18 @@ export interface KdWireMessage {
 }
 
 /**
- * Objet reçu non validé (`params`, `result`, `error`) : chaque propriété est
- * `unknown`. En v1 tous ces champs sont des objets ; une autre valeur se lit
- * sans erreur (`?.x` → `undefined`).
+ * Unvalidated received object (`params`, `result`, `error`): each property is
+ * `unknown`. In v1 all these fields are objects; any other value reads
+ * without error (`?.x` → `undefined`).
  */
 export type KdWireObject = Readonly<Record<string, unknown>> | null | undefined;
 
-// --- Valeurs communes ----------------------------------------------------------
+// --- Common values -------------------------------------------------------------
 
-/** Thème **effectif** de l'application, réglage auto/clair/sombre déjà résolu (§12.2). */
+/** **Effective** theme of the application, auto/light/dark setting already resolved (§12.2). */
 export type KdTheme = "light" | "dark";
 
-/** Capacités (§4). `document:html` et `*:webview` sont réservées, non servies (§10). */
+/** Capabilities (§4). `document:html` and `*:webview` are reserved, not served (§10). */
 export type KdCapability =
   | "document:markdown"
   | "fence:svg"
@@ -107,33 +107,33 @@ export type KdCapability =
   | "document:webview"
   | "fence:webview";
 
-// --- Hôte → plugin : requêtes (§6.1 à §6.4) -------------------------------------
+// --- Host → plugin: requests (§6.1 to §6.4) --------------------------------------
 
-/** `initialize` (§6.1) — délai 10 s, chargement de l'entry compris. */
+/** `initialize` (§6.1) — 10 s timeout, entry loading included. */
 export interface InitializeParams {
   apiVersion: "1";
-  /** `CARGO_PKG_VERSION` ; chaîne vide si l'hôte n'a pas pu la lire. */
+  /** `CARGO_PKG_VERSION`; empty string if the host could not read it. */
   hostVersion: string;
-  /** Ce que **cet** hôte sait servir. */
+  /** What **this** host can serve. */
   capabilities: KdCapability[];
   theme: KdTheme;
-  /** Langue de l'interface (depuis 3.25.0) ; absente d'un hôte plus ancien = anglais. */
+  /** Interface language (since 3.25.0); absent from an older host = English. */
   locale: string;
 }
 
-/** La spec montre `{ ok: true }` ; l'hôte n'en lit rien (toute réponse non-erreur vaut succès). */
+/** The spec shows `{ ok: true }`; the host reads nothing from it (any non-error response counts as success). */
 export interface InitializeResult {
   ok?: boolean;
 }
 
-/** `document/transform` (§6.2), capacité `document:markdown` — délai 30 s. */
+/** `document/transform` (§6.2), capability `document:markdown` — 30 s timeout. */
 export interface DocumentTransformParams {
   text: string;
-  /** Chemin absolu du document (deep links inter-fichiers). */
+  /** Absolute path of the document (cross-file deep links). */
   path: string;
-  /** Dossier du document : base de `host/readFile`. */
+  /** Document folder: base of `host/readFile`. */
   dir: string;
-  /** Nom du fichier sans extension. */
+  /** File name without extension. */
   title: string;
   theme: KdTheme;
   locale: string;
@@ -141,47 +141,47 @@ export interface DocumentTransformParams {
 
 export interface DocumentTransformResult {
   markdown: string;
-  /** Triées par ligne markdown ; absentes/invalides → `[[0, 0]]` (`sanitizeAnchors`). */
+  /** Sorted by markdown line; absent/invalid → `[[0, 0]]` (`sanitizeAnchors`). */
   anchors?: Anchor[];
-  /** Affichés dans un bandeau en fin de document. */
+  /** Displayed in a banner at the end of the document. */
   warnings?: string[];
 }
 
-/** `fence/render` (§6.3), capacités `fence:svg|html|markdown` — délai 30 s. */
+/** `fence/render` (§6.3), capabilities `fence:svg|html|markdown` — 30 s timeout. */
 export interface FenceRenderParams {
   lang: string;
-  /** Contenu du bloc ; peut être vide si `options.src`. */
+  /** Block content; may be empty if `options.src`. */
   source: string;
-  /** Paires `clé=valeur` de l'info string (`parseDiagramOptions`, render.js). */
+  /** `key=value` pairs of the info string (`parseDiagramOptions`, render.js). */
   options: Record<string, string>;
-  /** Dossier du document ; chaîne vide s'il est inconnu. */
+  /** Document folder; empty string if unknown. */
   dir: string;
   theme: KdTheme;
   locale: string;
 }
 
 export interface FenceRenderResult {
-  /** `svg` inséré tel quel, `html` assaini par DOMPurify, `markdown` repassé dans le pipeline. */
+  /** `svg` inserted as is, `html` sanitized by DOMPurify, `markdown` fed back through the pipeline. */
   format: "svg" | "html" | "markdown";
   content: string;
 }
 
 /**
- * `highlight/render` (§6.4), capacité `highlight:code` — délai 5 s. Pas de
- * `theme`/`locale` ici. Pour la vue « Code source », `code` est le document
- * entier.
+ * `highlight/render` (§6.4), capability `highlight:code` — 5 s timeout. No
+ * `theme`/`locale` here. For the "Source code" (« Code source ») view, `code`
+ * is the whole document.
  */
 export interface HighlightRenderParams {
   lang: string;
   code: string;
 }
 
-/** HTML `<span class="hljs-…">` ; l'hôte ne garde que `span` + `class`. */
+/** HTML `<span class="hljs-…">`; the host keeps only `span` + `class`. */
 export interface HighlightRenderResult {
   html: string;
 }
 
-/** Requêtes hôte → plugin : méthode → `{ params, result }`. */
+/** Host → plugin requests: method → `{ params, result }`. */
 export interface HostToPluginRequests {
   initialize: { params: InitializeParams; result: InitializeResult };
   "document/transform": { params: DocumentTransformParams; result: DocumentTransformResult };
@@ -189,11 +189,11 @@ export interface HostToPluginRequests {
   "highlight/render": { params: HighlightRenderParams; result: HighlightRenderResult };
 }
 
-// --- Hôte → plugin : notifications (§6.6) ---------------------------------------
+// --- Host → plugin: notifications (§6.6) -----------------------------------------
 
 /**
- * `shutdown` figure au §6.1 mais l'hôte actuel ne l'envoie jamais : il tue le
- * worker sans préavis (`PluginHost.stop`), ce que la spec autorise aussi.
+ * `shutdown` appears in §6.1 but the current host never sends it: it kills the
+ * worker without notice (`PluginHost.stop`), which the spec also allows.
  */
 export interface HostToPluginNotifications {
   "theme/changed": { theme: KdTheme };
@@ -201,17 +201,17 @@ export interface HostToPluginNotifications {
   shutdown: undefined;
 }
 
-// --- Plugin → hôte : services (§6.5) --------------------------------------------
+// --- Plugin → host: services (§6.5) ----------------------------------------------
 
 /**
- * `host/readFile`, capacité `read:siblings`. Erreurs : `denied` (hors
- * confinement, hors allowlist `siblingExtensions`, ou hors traitement d'une
- * requête) / `not-found`.
+ * `host/readFile`, capability `read:siblings`. Errors: `denied` (outside
+ * confinement, outside the `siblingExtensions` allowlist, or outside the
+ * handling of a request) / `not-found`.
  *
- * `dir` : le `dir` reçu avec la requête `document/transform`/`fence/render`
- * en cours — recommandé. Facultatif : sans lui, l'hôte prend le dossier du
- * seul document en cours de traitement, et répond `denied` si des requêtes
- * pour plusieurs dossiers sont en vol (§6.5).
+ * `dir`: the `dir` received with the current `document/transform`/`fence/render`
+ * request — recommended. Optional: without it, the host takes the folder of the
+ * only document being processed, and answers `denied` if requests
+ * for several folders are in flight (§6.5).
  */
 export interface HostReadFileParams {
   rel: string;
@@ -222,51 +222,51 @@ export interface HostReadFileResult {
   text: string;
 }
 
-/** Requêtes plugin → hôte. */
+/** Plugin → host requests. */
 export interface PluginToHostRequests {
   "host/readFile": { params: HostReadFileParams; result: HostReadFileResult };
 }
 
 export type HostLogLevel = "debug" | "info" | "warn" | "error";
 
-/** Notifications plugin → hôte. */
+/** Plugin → host notifications. */
 export interface PluginToHostNotifications {
-  /** Journal de l'application (« Journal », §6.5) : `level` inconnu → `info`. */
+  /** Application log ("Journal" / « Journal », §6.5): unknown `level` → `info`. */
   "host/log": { level: HostLogLevel; message: string };
 }
 
 /**
- * Signaux internes du runtime `kd` (hors spec) : fin de l'import de l'entry,
- * réussi ou non. Attendus par l'hôte avant `initialize`.
+ * Internal signals of the `kd` runtime (outside the spec): end of the entry
+ * import, successful or not. Awaited by the host before `initialize`.
  */
 export interface RuntimeNotifications {
   "worker/ready": undefined;
   "worker/error": { message: string };
 }
 
-// --- Le global `kd` du worker (§12) -----------------------------------------------
+// --- The worker's `kd` global (§12) ------------------------------------------------
 
 type Awaitable<T> = T | Promise<T>;
 
-/** Handler d'une requête entrante : son retour devient `result`, une exception `error`. */
+/** Handler of an incoming request: its return value becomes `result`, an exception becomes `error`. */
 export type KdRequestHandler<M extends keyof HostToPluginRequests> = (
   params: HostToPluginRequests[M]["params"],
 ) => Awaitable<HostToPluginRequests[M]["result"]>;
 
-/** Handler d'une notification entrante : best effort, ses exceptions sont avalées. */
+/** Handler of an incoming notification: best effort, its exceptions are swallowed. */
 export type KdNotificationHandler<M extends keyof HostToPluginNotifications> = (
   params: HostToPluginNotifications[M],
 ) => Awaitable<void>;
 
 /**
- * Erreur levée par `kd.request` quand l'hôte répond `error` ; un handler peut
- * aussi en lever une pour choisir le `code` renvoyé (défaut `internal`).
+ * Error thrown by `kd.request` when the host answers `error`; a handler may
+ * also throw one to choose the returned `code` (default `internal`).
  */
 export interface KdRequestError extends Error {
   code?: KdErrorCode;
 }
 
-/** API du global `kd`, vue d'un auteur de plugin. */
+/** API of the `kd` global, as seen by a plugin author. */
 export interface KdApi {
   onRequest<M extends keyof HostToPluginRequests>(method: M, handler: KdRequestHandler<M>): void;
   onRequest<M extends keyof HostToPluginNotifications>(
@@ -283,12 +283,12 @@ export interface KdApi {
   ): void;
 }
 
-// --- Côté runtime (kd_runtime.js) -------------------------------------------------
+// --- Runtime side (kd_runtime.js) ---------------------------------------------------
 
-/** Handler tel que stocké par le runtime : il ne valide pas `params`, l'hôte est la source. */
+/** Handler as stored by the runtime: it does not validate `params`, the host is the source. */
 export type KdRawHandler = (params: unknown) => unknown;
 
-/** Implémentation de `kd` dans le runtime : non générique, plus `__load` (appelé par le blob). */
+/** Implementation of `kd` in the runtime: non-generic, plus `__load` (called by the blob). */
 export interface KdRuntimeApi {
   onRequest(method: string, handler: KdRawHandler): void;
   request(method: string, params?: unknown): Promise<unknown>;
@@ -297,25 +297,25 @@ export interface KdRuntimeApi {
 }
 
 /**
- * `globalThis` du worker vu par le runtime. La config TypeScript du projet
- * charge la lib `DOM` (fenêtres) et non `WebWorker` — les deux sont
- * incompatibles dans un même programme. `postMessage(msg)` et `self.onmessage`
- * compilent déjà sous `DOM` (surcharge `Window.postMessage(message, options?)`) ;
- * seul `kd`, propriété ajoutée au global, demande ce type, appliqué par cast à
- * `globalThis` dans `kd_runtime.js` (sans code ajouté). Les messages postés
- * sont vérifiés par `@satisfies KdOutgoingFromWorker`.
+ * The worker's `globalThis` as seen by the runtime. The project's TypeScript
+ * config loads the `DOM` lib (windows) and not `WebWorker` — the two are
+ * incompatible in the same program. `postMessage(msg)` and `self.onmessage`
+ * already compile under `DOM` (overload `Window.postMessage(message, options?)`);
+ * only `kd`, a property added to the global, needs this type, applied by cast to
+ * `globalThis` in `kd_runtime.js` (no code added). The posted messages
+ * are checked by `@satisfies KdOutgoingFromWorker`.
  */
 export interface KdGlobal {
   kd: KdRuntimeApi;
 }
 
-/** Tout message qu'un worker peut poster à l'hôte. */
+/** Any message a worker may post to the host. */
 export type KdOutgoingFromWorker =
   | KdRequest
   | KdResponse
   | KdNotification;
 
-/** Tout message que l'hôte peut poster au worker. */
+/** Any message the host may post to the worker. */
 export type KdOutgoingFromHost =
   | KdRequest<keyof HostToPluginRequests>
   | KdResponse

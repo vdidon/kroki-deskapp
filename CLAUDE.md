@@ -499,22 +499,34 @@ anywhere other than the single place in `Cargo.toml`.
 Incrementing a component resets those to its right to **zero** (`1.4.1` → `1.5.0`
 for a feature; → `2.0.0` for an overhaul).
 
+**A version stays open until it is published**, and changes accumulate in
+it. Published = a GitHub release / tag `v<version>` exists (`git tag -l
+v<version>` after a fetch, or `gh release view v<version>`). The version in
+`Cargo.toml` with no such tag is the **open** version.
+
 **Expected agent procedure** — as soon as a change meant to be
 built alters the user-visible behavior, the agent takes the initiative,
 in the **same commit** as the change:
 
-1. determine the component from the nature of the change (bug → `z`,
-   feature → `y`, overhaul → `x`);
-2. update `version` in `src-tauri/Cargo.toml`;
-3. add an entry dated today at the top of `CHANGELOG.md` (*Keep a Changelog*
-   sections: "Fixed", "Added"… + the link line at the bottom; entries are
-   written in English) —
+1. **open version** (not yet published): no bump — add the entry to its
+   existing `CHANGELOG.md` section, under the right heading ("Added",
+   "Fixed"…). Only raise the number if the change outranks it (a feature
+   landing in an open `3.29.1` makes it `3.30.0`: rename the section, update
+   `Cargo.toml`/`Cargo.lock` and the link line);
+2. **last version already published**: determine the component from the
+   nature of the change (bug → `z`, feature → `y`, overhaul → `x`), update
+   `version` in `src-tauri/Cargo.toml`, and open a new section dated today at
+   the top of `CHANGELOG.md` (*Keep a Changelog* sections + the link line at
+   the bottom; entries are written in English) —
    this file is **embedded in the binary** via `include_str!` (command
    `get_changelog`, the What's new dialog « Nouveautés », reachable from the
    Info dialog « Informations »): it is therefore always
    in sync with the built version, with no effect before a rebuild;
-4. mark the fix/feature commit with the 🔖 emoji (see history
-   `🐛🔖 fix… → 1.4.1`, `✨🔖 feat… → 1.4.0`).
+3. **no commit about the version number while it is open**: no 🔖, no
+   `chore(release)` — feature/fix commits carry their own CHANGELOG entry and
+   that is all. The 🔖 marker (history: `🐛🔖 fix… → 1.4.1`,
+   `✨🔖 feat… → 1.4.0`) is only for the commit that closes the version at
+   publication time (e.g. updating the section's date), and only then.
 
 Propose the chosen number and **ask for confirmation** if the category is
 ambiguous (e.g. fix vs. small feature); otherwise proceed. **No

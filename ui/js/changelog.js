@@ -1,18 +1,18 @@
 // @ts-check
-// Dialog « Nouveautés » : affiche un changelog markdown rendu par une
-// instance markdown-it dédiée — sans la fence Kroki de render.js : un
-// changelog est de la prose, un moteur de diagrammes n'y a rien à hydrater —
-// puis assaini par DOMPurify. Deux sources : le CHANGELOG.md de l'application
-// embarqué dans le binaire (commande `get_changelog`) et le CHANGELOG.md
-// optionnel d'un plugin installé (commande `plugin_changelog`, spec §3.1) —
-// même dialog, en-tête ajusté.
+// "What's new" (« Nouveautés ») dialog: displays a markdown changelog rendered by
+// a dedicated markdown-it instance — without render.js's Kroki fence: a
+// changelog is prose, a diagram engine has nothing to hydrate in it — then
+// sanitized by DOMPurify. Two sources: the application's CHANGELOG.md embedded
+// in the binary (`get_changelog` command) and the optional CHANGELOG.md of an
+// installed plugin (`plugin_changelog` command, spec §3.1) — same dialog,
+// adjusted header.
 
 import { invoke } from "./app.js";
 import { onLocaleChange, t } from "./i18n.js";
 
 /** @typedef {import("../../types/ipc").PluginInfo} PluginInfo */
 
-// Éléments statiques de ui/index.html.
+// Static elements of ui/index.html.
 const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("changelog-dialog"));
 const title = /** @type {HTMLHeadingElement} */ (document.getElementById("changelog-title"));
 const hint = /** @type {HTMLParagraphElement} */ (document.getElementById("changelog-hint"));
@@ -20,16 +20,16 @@ const body = /** @type {HTMLDivElement} */ (document.getElementById("changelog-b
 
 const md = window.markdownit({ linkify: true });
 
-// Clé de la source actuellement rendue dans le corps ("app" ou
-// "plugin:<id>") : le changelog de l'app est figé à la compilation, ceux des
-// plugins peuvent changer à chaque installation — on ne cache que le dernier
-// rendu, suffisant pour les réouvertures successives du même contenu.
+// Key of the source currently rendered in the body ("app" or "plugin:<id>"):
+// the app's changelog is frozen at compile time, the plugins' can change on
+// every install — we only cache the last render, enough for successive
+// reopenings of the same content.
 /** @type {string | null} */
 let shownKey = null;
 
-// Source dont l'en-tête (titre + indication) est affiché : `null` pour
-// l'application, l'entrée `list_plugins` pour un plugin. Le titre et
-// l'indication sont dans la langue courante, refaits si elle change.
+// Source whose header (title + hint) is displayed: `null` for the application,
+// the `list_plugins` entry for a plugin. The title and hint are in the current
+// language, redone if it changes.
 /** @type {PluginInfo | null} */
 let headerPlugin = null;
 
@@ -43,13 +43,12 @@ function setHeader() {
   }
 }
 
-// Prépare le markdown de l'application : le titre et le préambule (déjà
-// portés par l'en-tête du dialog) sont coupés — la liste démarre à la
-// première section de version — et les définitions de liens de référence en
-// pied (`[2.2.2]: #222--…`, ancres internes au fichier) sont retirées : sans
-// cible dans le dialog, elles ne feraient que casser la navigation. `[2.2.2]`
-// redevient du texte littéral dans les titres, fidèle au format
-// Keep a Changelog.
+// Prepares the application's markdown: the title and preamble (already carried
+// by the dialog header) are cut — the list starts at the first version
+// section — and the reference link definitions at the bottom
+// (`[2.2.2]: #222--…`, anchors internal to the file) are removed: with no
+// target in the dialog, they would only break navigation. `[2.2.2]` becomes
+// literal text again in the headings, faithful to the Keep a Changelog format.
 /**
  * @param {string} src
  * @returns {string}
@@ -60,9 +59,9 @@ function prepareApp(src) {
   return versions.replace(/^\[[^\]]+\]:\s*#.*$/gm, "");
 }
 
-// Prépare le markdown d'un plugin : plus conservateur que `prepareApp` (un
-// préambule peut porter du contenu), on ne coupe que le titre `# …` de tête
-// — redondant avec l'en-tête du dialog — et les liens de référence en pied.
+// Prepares a plugin's markdown: more conservative than `prepareApp` (a
+// preamble may carry content), we only cut the leading `# …` title —
+// redundant with the dialog header — and the reference links at the bottom.
 /**
  * @param {string} src
  * @returns {string}
@@ -78,7 +77,7 @@ function render(markdown) {
   });
 }
 
-/** @param {unknown} err rejet d'`invoke` (chaîne d'erreur Rust) */
+/** @param {unknown} err `invoke` rejection (Rust error string) */
 function renderError(err) {
   body.replaceChildren();
   const error = document.createElement("p");
@@ -108,7 +107,7 @@ export async function openChangelog() {
 }
 
 /**
- * Changelog d'un plugin installé (`p` = entrée `list_plugins`).
+ * Changelog of an installed plugin (`p` = `list_plugins` entry).
  * @param {PluginInfo} p
  * @returns {Promise<void>}
  */
@@ -134,10 +133,10 @@ export function initChangelog() {
     "click",
     () => dialog.close(),
   );
-  // Liens éventuels du corps (URL citées dans une entrée) : navigateur système
-  // via le backend, jamais de navigation de la webview elle-même.
+  // Any links in the body (URLs quoted in an entry): system browser via the
+  // backend, never navigation of the webview itself.
   body.addEventListener("click", (e) => {
-    // Cible d'un clic : toujours un élément (jamais un nœud texte).
+    // Click target: always an element (never a text node).
     const a = /** @type {Element} */ (e.target).closest("a");
     if (!a) return;
     e.preventDefault();

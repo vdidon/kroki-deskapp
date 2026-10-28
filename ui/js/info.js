@@ -1,11 +1,11 @@
 // @ts-check
-// Dialog « Informations » : version de l'app, état des runtimes/moteurs sur
-// le poste courant, accès au changelog (« Nouveautés ») et vérification des
-// mises à jour à la demande (updates.js), accès au journal (journal.js) et aux
-// licences tierces (notices.js). Les données des
-// moteurs viennent du backend (`get_runtimes`) ; chaque groupe porte un
-// statut : ok (app + système), blocked (app, prérequis système manquant),
-// unsupported (pas pris en charge par l'application).
+// Info (« Informations ») dialog: app version, state of the runtimes/engines on
+// the current machine, access to the changelog (« Nouveautés ») and on-demand
+// update check (updates.js), access to the log (journal.js) and to the
+// third-party licenses (notices.js). The engine data comes from the backend
+// (`get_runtimes`); each group carries a status: ok (app + system), blocked
+// (app, missing system prerequisite), unsupported (not supported by the
+// application).
 
 import { invoke } from "./app.js";
 import { openChangelog } from "./changelog.js";
@@ -17,7 +17,7 @@ import { checkForUpdate, openDownload, openRelease } from "./updates.js";
 /** @typedef {import("../../types/ipc").UpdateInfo} UpdateInfo */
 /** @typedef {import("../../types/ipc").RuntimeGroup} RuntimeGroup */
 
-// Éléments d'index.html, présents par construction.
+// Elements of index.html, present by construction.
 const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("info-dialog"));
 const groupsEl = /** @type {HTMLElement} */ (document.getElementById("info-groups"));
 const versionEl = /** @type {HTMLElement} */ (document.getElementById("info-version"));
@@ -26,7 +26,7 @@ const downloadBtn = /** @type {HTMLButtonElement} */ (document.getElementById("i
 const releaseBtn = /** @type {HTMLButtonElement} */ (document.getElementById("info-update-release"));
 const updateStatus = /** @type {HTMLElement} */ (document.getElementById("info-update-status"));
 /** @type {UpdateInfo | null} */
-let updateInfo = null; // dernier résultat, cible des boutons « Télécharger » / « Notes de version »
+let updateInfo = null; // last result, target of the Download (« Télécharger ») / Release notes (« Notes de version ») buttons
 
 /**
  * @param {string} text
@@ -63,7 +63,7 @@ async function checkUpdate() {
   }
 }
 
-// Libellé d'un statut, traduit à l'affichage (le dialog est rendu à chaque ouverture).
+// Label of a status, translated at display time (the dialog is rendered on every open).
 /**
  * @param {string} status
  * @returns {string}
@@ -131,7 +131,7 @@ function renderGroup(g) {
 }
 
 export async function openInfo() {
-  // Résultat d'une ouverture précédente : périmé (et dans l'ancienne langue).
+  // Result of a previous open: stale (and in the old language).
   showUpdateLinks(false);
   setUpdateStatus("");
   try {
@@ -158,17 +158,17 @@ export async function openInfo() {
 
 export function initInfo() {
   /** @type {HTMLElement} */ (document.getElementById("info-close")).addEventListener("click", () => dialog.close());
-  // Le changelog s'empile au-dessus du dialog (modales imbriquées, comme le
-  // dialog de confiance au-dessus du dialog Plugins).
+  // The changelog stacks above the dialog (nested modals, like the trust
+  // dialog above the Plugins dialog).
   /** @type {HTMLElement} */ (document.getElementById("info-changelog")).addEventListener("click", openChangelog);
-  // Journal complet (application + plugins) ; filtré par plugin depuis le
-  // dialog Plugins.
+  // Full log (application + plugins); filtered by plugin from the Plugins
+  // dialog.
   /** @type {HTMLElement} */ (document.getElementById("info-journal")).addEventListener("click", () => openJournal());
-  // Mentions de licence des composants tiers (notices.js), même empilement.
+  // License notices of third-party components (notices.js), same stacking.
   /** @type {HTMLElement} */ (document.getElementById("info-notices")).addEventListener("click", openNotices);
   updateBtn.addEventListener("click", checkUpdate);
-  // Boutons masqués tant qu'aucune vérification n'a abouti : `updateInfo` est
-  // alors renseigné (cf. checkUpdate).
+  // Buttons hidden until a check has succeeded: `updateInfo` is then set
+  // (cf. checkUpdate).
   downloadBtn.addEventListener("click", () => openDownload(/** @type {UpdateInfo} */ (updateInfo)));
   releaseBtn.addEventListener("click", () => openRelease(/** @type {UpdateInfo} */ (updateInfo)));
 }

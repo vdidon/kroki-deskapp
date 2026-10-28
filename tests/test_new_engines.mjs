@@ -1,5 +1,5 @@
-// Teste les nouveaux moteurs (d2, dbml, bpmn) via l'API Kroki locale.
-// Usage : lancer l'app, puis `node tests/test_new_engines.mjs`.
+// Tests the new engines (d2, dbml, bpmn) via the local Kroki API.
+// Usage: launch the app, then `node tests/test_new_engines.mjs`.
 const BASE = process.env.KROKI_URL || "http://127.0.0.1:8442";
 
 const D2 = `direction: right
@@ -76,9 +76,9 @@ for (const [type, src] of cases) {
     const r = await fetch(`${BASE}/${type}/svg`, { method: "POST", body: src });
     const txt = await r.text();
     const ok = r.ok && txt.includes("<svg");
-    console.log(`${type.padEnd(6)} : ${ok ? "OK" : "ÉCHEC"}  (HTTP ${r.status}, ${txt.length} car.)`);
+    console.log(`${type.padEnd(6)} : ${ok ? "OK" : "FAIL"}  (HTTP ${r.status}, ${txt.length} chars)`);
     if (!ok) console.log("   →", txt.slice(0, 300).replace(/\n/g, " "));
   } catch (e) {
-    console.log(`${type.padEnd(6)} : ÉCHEC réseau — ${e.message}`);
+    console.log(`${type.padEnd(6)} : network FAIL — ${e.message}`);
   }
 }

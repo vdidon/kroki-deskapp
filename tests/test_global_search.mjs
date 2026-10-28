@@ -1,10 +1,10 @@
-// Test de la recherche dans tous les documents ouverts (ui/js/globalsearch.js).
-// Usage : node tests/test_global_search.mjs [port]
-// Prérequis : app lancée avec WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
-// Autonome : crée ses documents de test dans un dossier temporaire, les ouvre via
-// les commandes Tauri (aucune simulation souris/clavier globale), referme leurs
-// onglets à la fin. Les onglets déjà ouverts de l'app ne sont pas touchés (le
-// panneau cherchera aussi dedans : les assertions ciblent les seuls documents test).
+// Test of the search across all open documents (ui/js/globalsearch.js).
+// Usage: node tests/test_global_search.mjs [port]
+// Prerequisite: app launched with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
+// Standalone: creates its test documents in a temporary folder, opens them via
+// the Tauri commands (no global mouse/keyboard simulation), closes their
+// tabs at the end. The app's already-open tabs are left untouched (the
+// panel will search them too: the assertions target only the test documents).
 
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,7 +15,7 @@ const port = process.argv[2] ?? "9222";
 const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const page = targets.find((t) => t.type === "page" && !t.url.includes("renderer"));
 if (!page) {
-  console.error("page principale introuvable:", targets.map((t) => t.title).join(" | "));
+  console.error("main page not found:", targets.map((t) => t.title).join(" | "));
   process.exit(1);
 }
 
@@ -57,7 +57,7 @@ function check(name, cond, detail = "") {
   if (!cond) failures++;
 }
 
-// --- Fixtures : un doc court (alpha) et un doc long (beta, cible en fin de fichier)
+// --- Fixtures: a short doc (alpha) and a long doc (beta, target at the end of the file)
 const dir = mkdtempSync(join(tmpdir(), "kroki-search-test-"));
 const alphaPath = join(dir, "recherche_alpha.md");
 const betaPath = join(dir, "recherche_beta.md");
@@ -72,7 +72,7 @@ const filler = Array.from(
 ).join("\n\n");
 const betaContent = `# Beta\n\n${filler}\n\n## Zone cible\n\nLa ligne cible contient ZoXiTron en casse mélangée.\n`;
 writeFileSync(betaPath, betaContent);
-// Lignes 1-based attendues : alpha 3 et 9 ; beta dérivée du contenu (robuste).
+// Expected 1-based lines: alpha 3 and 9; beta derived from the content (robust).
 const betaTargetLine = betaContent.split("\n").findIndex((l) => l.includes("ZoXiTron")) + 1;
 
 const esc = (s) => JSON.stringify(s);
@@ -85,16 +85,16 @@ await evaluate(
 await sleep(800);
 
 try {
-  // 1. Ouverture du panneau par le bouton loupe
+  // 1. Opening the panel via the magnifier button
   await evaluate(`document.getElementById('btn-search').click()`);
   const opened = await evaluate(`(() => ({
     hidden: document.getElementById('search-panel').hidden,
     focused: document.activeElement === document.getElementById('search-input'),
   }))()`);
-  check("panneau ouvert au clic sur la loupe", opened.hidden === false);
-  check("champ de recherche focus", opened.focused === true);
+  check("panel opens on magnifier click", opened.hidden === false);
+  check("search field focused", opened.focused === true);
 
-  // 2. Recherche insensible à la casse dans tous les onglets
+  // 2. Case-insensitive search across all tabs
   await evaluate(`(() => {
     const i = document.getElementById('search-input');
     i.value = 'zoxitron';
@@ -112,18 +112,18 @@ try {
     })))()`);
   const alpha = res.find((g) => g.doc === "recherche_alpha.md");
   const beta = res.find((g) => g.doc === "recherche_beta.md");
-  check("alpha : 3 occurrences sur 2 lignes", alpha?.count === "3" && alpha?.hits.length === 2,
+  check("alpha: 3 occurrences on 2 lines", alpha?.count === "3" && alpha?.hits.length === 2,
     JSON.stringify(alpha));
-  check("alpha : lignes 1-based (3 et 9)",
+  check("alpha: 1-based lines (3 and 9)",
     alpha?.hits[0]?.line === "3" && alpha?.hits[1]?.line === "9",
     JSON.stringify(alpha?.hits.map((h) => h.line)));
-  check("alpha : 2 marques sur la ligne double", alpha?.hits[1]?.marks === 2);
-  check("beta : 1 occurrence (casse mélangée)", beta?.count === "1" && beta?.hits.length === 1,
+  check("alpha: 2 marks on the double line", alpha?.hits[1]?.marks === 2);
+  check("beta: 1 occurrence (mixed case)", beta?.count === "1" && beta?.hits.length === 1,
     JSON.stringify(beta));
-  check(`beta : ligne cible ${betaTargetLine}`, beta?.hits[0]?.line === String(betaTargetLine),
+  check(`beta: target line ${betaTargetLine}`, beta?.hits[0]?.line === String(betaTargetLine),
     beta?.hits[0]?.line);
 
-  // 3. Saut vers l'onglet beta (inactif) : activation + scroll + surlignage
+  // 3. Jump to the beta tab (inactive): activation + scroll + highlight
   await evaluate(`(() => {
     const g = [...document.querySelectorAll('.search-group')]
       .find(g => g.querySelector('.search-doc').firstChild.textContent === 'recherche_beta.md');
@@ -137,12 +137,12 @@ try {
     return { active, scrolled: view.scrollTop > 0, highlights: hl ? hl.size : 0,
              panelOpen: !document.getElementById('search-panel').hidden };
   })()`);
-  check("onglet beta activé par le clic", afterJump.active === "recherche_beta.md", afterJump.active);
-  check("vue scrollée vers la cible", afterJump.scrolled === true);
-  check("occurrence surlignée dans la vue", afterJump.highlights === 1, `ranges=${afterJump.highlights}`);
-  check("panneau toujours ouvert après le saut", afterJump.panelOpen === true);
+  check("beta tab activated by the click", afterJump.active === "recherche_beta.md", afterJump.active);
+  check("view scrolled to the target", afterJump.scrolled === true);
+  check("occurrence highlighted in the view", afterJump.highlights === 1, `ranges=${afterJump.highlights}`);
+  check("panel still open after the jump", afterJump.panelOpen === true);
 
-  // 4. Échap : fermeture + surlignage effacé
+  // 4. Escape: closing + highlight cleared
   await evaluate(
     `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
   );
@@ -151,10 +151,10 @@ try {
     hidden: document.getElementById('search-panel').hidden,
     hl: !!CSS.highlights.get('search-occurrences'),
   }))()`);
-  check("Échap ferme le panneau", closed.hidden === true);
-  check("surlignage effacé à la fermeture", closed.hl === false);
+  check("Escape closes the panel", closed.hidden === true);
+  check("highlight cleared on close", closed.hl === false);
 
-  // 5. Ctrl+Maj+F rouvre et relance la recherche mémorisée
+  // 5. Ctrl+Shift+F reopens and relaunches the remembered search
   await evaluate(
     `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true }))`,
   );
@@ -163,15 +163,15 @@ try {
     hidden: document.getElementById('search-panel').hidden,
     groups: [...document.querySelectorAll('.search-doc')].map(d => d.firstChild.textContent),
   }))()`);
-  check("Ctrl+Maj+F rouvre le panneau", reopened.hidden === false);
-  check("recherche relancée à la réouverture",
+  check("Ctrl+Shift+F reopens the panel", reopened.hidden === false);
+  check("search re-run on reopen",
     reopened.groups.includes("recherche_alpha.md") && reopened.groups.includes("recherche_beta.md"),
     JSON.stringify(reopened.groups));
   await evaluate(
     `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
   );
 } finally {
-  // Referme les onglets de test puis supprime les fixtures.
+  // Close the test tabs then delete the fixtures.
   await evaluate(`(async () => {
     const st = await window.__TAURI__.core.invoke('get_window_state');
     for (const t of st.tabs) {
@@ -183,5 +183,5 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log(failures === 0 ? "\nTOUS LES TESTS PASSENT" : `\n${failures} ÉCHEC(S)`);
+console.log(failures === 0 ? "\nALL TESTS PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

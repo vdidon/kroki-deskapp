@@ -53,7 +53,7 @@ function esc(s) {
 }
 
 /**
- * @param {string} cls classes hljs sans préfixe, séparées par une espace
+ * @param {string} cls hljs classes without prefix, separated by a space
  * @param {string} text
  * @returns {string}
  */

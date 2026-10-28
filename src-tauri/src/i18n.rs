@@ -1,17 +1,17 @@
-//! Langue de l'interface : catalogues de messages et langue courante.
+//! Interface language: message catalogs and the current language.
 //!
-//! **Source unique** des textes affichés, front comme back : les catalogues
-//! `src-tauri/i18n/<langue>.json` sont embarqués à la compilation ; le Rust les
-//! lit via [`tr!`], le frontend les reçoit par la commande `get_i18n`.
-//! L'anglais est la langue de référence : toute clé absente d'un autre
-//! catalogue retombe sur lui (puis sur la clé elle-même, jamais de panique).
+//! **Single source** of displayed texts, front and back: the catalogs
+//! `src-tauri/i18n/<language>.json` are embedded at compile time; Rust reads
+//! them via [`tr!`], the frontend receives them through the `get_i18n` command.
+//! English is the reference language: any key missing from another catalog
+//! falls back to it (then to the key itself, never a panic).
 //!
-//! Format : objet JSON plat `clé → texte`, paramètres `{nom}`. Un texte qui
-//! dépend d'un nombre est un objet de formes plurielles CLDR (`one`, `other`)
-//! sélectionné par le paramètre `count`.
+//! Format: flat JSON object `key → text`, parameters `{name}`. A text that
+//! depends on a number is an object of CLDR plural forms (`one`, `other`)
+//! selected by the `count` parameter.
 //!
-//! La langue courante est un état **global** (et non un `State` Tauri) : les
-//! messages d'erreur naissent au fond de modules qui n'ont pas d'`AppHandle`.
+//! The current language is **global** state (not a Tauri `State`): error
+//! messages are born deep in modules that have no `AppHandle`.
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -19,9 +19,9 @@ use std::sync::LazyLock;
 
 use serde_json::{Map, Value};
 
-/// Langues livrées, la référence en tête : `(code, catalogue)`. Le code est la
-/// langue primaire : `pt` (portugais du Brésil) sert aussi le Portugal, `zh`
-/// est le chinois simplifié (cf. [`language_code`] pour le traditionnel).
+/// Shipped languages, the reference first: `(code, catalog)`. The code is the
+/// primary language: `pt` (Brazilian Portuguese) also serves Portugal, `zh`
+/// is Simplified Chinese (cf. [`language_code`] for Traditional).
 const CATALOGS: [(&str, &str); 9] = [
     ("en", include_str!("../i18n/en.json")),
     ("de", include_str!("../i18n/de.json")),
@@ -34,9 +34,9 @@ const CATALOGS: [(&str, &str); 9] = [
     ("zh", include_str!("../i18n/zh.json")),
 ];
 
-/// Catalogues parsés, dans l'ordre de [`CATALOGS`]. Un JSON invalide est une
-/// erreur de développement, attrapée par `tests/test_i18n.mjs` et les tests
-/// ci-dessous avant tout build distribué.
+/// Parsed catalogs, in the order of [`CATALOGS`]. Invalid JSON is a
+/// development error, caught by `tests/test_i18n.mjs` and the tests
+/// below before any distributed build.
 static PARSED: LazyLock<Vec<Map<String, Value>>> = LazyLock::new(|| {
     CATALOGS
         .iter()
@@ -47,19 +47,19 @@ static PARSED: LazyLock<Vec<Map<String, Value>>> = LazyLock::new(|| {
         .collect()
 });
 
-/// Index de la langue courante dans [`CATALOGS`].
+/// Index of the current language in [`CATALOGS`].
 static CURRENT: AtomicUsize = AtomicUsize::new(0);
 
 thread_local! {
-    /// Langue imposée au thread courant, prioritaire sur [`CURRENT`] : cf.
-    /// [`in_reference_language`].
+    /// Language forced on the current thread, taking precedence over [`CURRENT`]:
+    /// cf. [`in_reference_language`].
     static OVERRIDE: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
 }
 
-/// Exécute `f` avec les messages en anglais **sur ce thread**, quelle que soit
-/// la langue de l'interface. Pour l'API HTTP locale (`server.rs`) : une
-/// interface technique lue par des outils doit répondre pareil sur tous les
-/// postes. Ne couvre pas les threads que `f` lancerait.
+/// Runs `f` with messages in English **on this thread**, whatever the
+/// interface language. For the local HTTP API (`server.rs`): a technical
+/// interface read by tools must answer the same on every workstation. Does not
+/// cover threads that `f` might spawn.
 pub fn in_reference_language<R>(f: impl FnOnce() -> R) -> R {
     let previous = OVERRIDE.with(|o| o.replace(Some(0)));
     let out = f();
@@ -67,16 +67,16 @@ pub fn in_reference_language<R>(f: impl FnOnce() -> R) -> R {
     out
 }
 
-/// Index effectif : surcharge du thread, sinon langue de l'interface.
+/// Effective index: the thread's override, otherwise the interface language.
 fn active() -> usize {
     OVERRIDE
         .with(|o| o.get())
         .unwrap_or_else(|| CURRENT.load(Ordering::Relaxed))
 }
 
-/// Résout le réglage `language` (`"auto"`, `"en"`, `"fr"`…) en code de langue
-/// livrée. `auto` — et toute valeur inconnue — suit la langue d'interface du
-/// système, et l'anglais si celle-ci n'est pas livrée.
+/// Resolves the `language` setting (`"auto"`, `"en"`, `"fr"`…) to a shipped
+/// language code. `auto` — and any unknown value — follows the system's
+/// interface language, and English if that one is not shipped.
 pub fn resolve(setting: &str) -> &'static str {
     let wanted = if setting == "auto" || index_of(setting).is_none() {
         system_language()
@@ -86,17 +86,17 @@ pub fn resolve(setting: &str) -> &'static str {
     CATALOGS[index_of(&wanted).unwrap_or(0)].0
 }
 
-/// Langue d'interface du système, réduite à son code primaire (`fr-FR` → `fr`).
-/// Windows : langue d'affichage de l'utilisateur ; Linux : `LC_ALL` /
+/// The system's interface language, reduced to its primary code (`fr-FR` → `fr`).
+/// Windows: the user's display language; Linux: `LC_ALL` /
 /// `LC_MESSAGES` / `LANG`.
 fn system_language() -> String {
     language_code(&sys_locale::get_locale().unwrap_or_default())
 }
 
-/// Code primaire d'une locale (`fr-FR`, `fr_FR.UTF-8` → `fr`). Exception : le
-/// chinois traditionnel (`zh-TW`, `zh-HK`, `zh-MO`, `zh-Hant-…`) devient
-/// `zh-hant`, non livré — l'anglais plutôt que le simplifié du catalogue `zh`,
-/// comme le fait Windows lui-même.
+/// Primary code of a locale (`fr-FR`, `fr_FR.UTF-8` → `fr`). Exception:
+/// Traditional Chinese (`zh-TW`, `zh-HK`, `zh-MO`, `zh-Hant-…`) becomes
+/// `zh-hant`, not shipped — English rather than the Simplified of the `zh`
+/// catalog, as Windows itself does.
 fn language_code(locale: &str) -> String {
     let lower = locale.to_ascii_lowercase();
     let mut parts = lower.split(['-', '_', '.']);
@@ -111,25 +111,25 @@ fn index_of(code: &str) -> Option<usize> {
     CATALOGS.iter().position(|(c, _)| *c == code)
 }
 
-/// Fixe la langue courante à partir du réglage ; renvoie le code retenu.
+/// Sets the current language from the setting; returns the code retained.
 pub fn set_language(setting: &str) -> &'static str {
     let code = resolve(setting);
     CURRENT.store(index_of(code).unwrap_or(0), Ordering::Relaxed);
     code
 }
 
-/// Code de la langue courante (`"en"`, `"fr"`).
+/// Code of the current language (`"en"`, `"fr"`).
 pub fn current() -> &'static str {
     CATALOGS[CURRENT.load(Ordering::Relaxed)].0
 }
 
-/// Codes des langues livrées, référence en tête.
+/// Codes of the shipped languages, reference first.
 pub fn languages() -> Vec<&'static str> {
     CATALOGS.iter().map(|(c, _)| *c).collect()
 }
 
-/// Langues livrées pour le sélecteur des Réglages : `{code, name}`, `name` étant
-/// l'endonyme (« Français »), clé `language.name` de chaque catalogue.
+/// Shipped languages for the Settings (« Réglages ») selector: `{code, name}`, `name` being
+/// the endonym (« Français »), the `language.name` key of each catalog.
 pub fn language_list() -> Vec<Value> {
     CATALOGS
         .iter()
@@ -144,8 +144,8 @@ pub fn language_list() -> Vec<Value> {
         .collect()
 }
 
-/// Catalogue complet de la langue courante, complété par la référence : ce que
-/// reçoit le frontend, qui n'a ainsi jamais à gérer de repli.
+/// Full catalog of the current language, completed by the reference: what the
+/// frontend receives, so it never has to handle a fallback.
 pub fn messages() -> Map<String, Value> {
     let mut out = PARSED[0].clone();
     let cur = CURRENT.load(Ordering::Relaxed);
@@ -157,24 +157,24 @@ pub fn messages() -> Map<String, Value> {
     out
 }
 
-/// Forme plurielle CLDR de `n` pour une langue livrée — le frontend, lui, a
-/// `Intl.PluralRules`. Une langue ajoutée dont les règles ne sont dans aucune
-/// branche (`few`, `many` : russe, polonais…) doit en recevoir une.
+/// CLDR plural form of `n` for a shipped language — the frontend has
+/// `Intl.PluralRules` instead. An added language whose rules are in no
+/// branch (`few`, `many`: Russian, Polish…) must be given one.
 fn plural_category(lang: &str, n: f64) -> &'static str {
     match lang {
-        // fr, pt : 0 et 1 au singulier (« 0 onglet », « 1 onglet »).
+        // fr, pt: 0 and 1 are singular ("0 onglet", "1 onglet").
         "fr" | "pt" if (0.0..2.0).contains(&n.abs()) => "one",
         "fr" | "pt" => "other",
-        // Pas de pluriel grammatical : `other` seul.
+        // No grammatical plural: `other` only.
         "ja" | "ko" | "zh" => "other",
-        // en, de, es, it : singulier pour 1 seulement.
+        // en, de, es, it: singular for 1 only.
         _ if n == 1.0 => "one",
         _ => "other",
     }
 }
 
-/// Texte de `key` dans la langue courante, paramètres substitués. Utiliser la
-/// macro [`tr!`] plutôt que cette fonction.
+/// Text of `key` in the current language, parameters substituted. Use the
+/// [`tr!`] macro rather than this function.
 pub fn text(key: &str, params: &[(&str, String)]) -> String {
     let cur = active();
     let (lang, value) = match PARSED[cur].get(key) {
@@ -203,7 +203,7 @@ pub fn text(key: &str, params: &[(&str, String)]) -> String {
     substitute(template, params)
 }
 
-/// Remplace chaque `{nom}` connu ; un `{…}` sans paramètre reste tel quel.
+/// Replaces each known `{name}`; a `{…}` with no matching parameter is left as is.
 fn substitute(template: &str, params: &[(&str, String)]) -> String {
     if params.is_empty() {
         return template.to_string();
@@ -229,9 +229,9 @@ fn substitute(template: &str, params: &[(&str, String)]) -> String {
     out
 }
 
-/// Message traduit : `tr!("clé")` ou `tr!("clé", nom = valeur, …)` — toute
-/// valeur `Display`. La clé doit être un littéral : `tests/test_i18n.mjs` les
-/// relève dans le source pour vérifier qu'elles existent dans les catalogues.
+/// Translated message: `tr!("<key>")` or `tr!("<key>", name = value, …)` — any
+/// `Display` value. The key must be a literal: `tests/test_i18n.mjs` collects
+/// them from the source to check that they exist in the catalogs.
 #[macro_export]
 macro_rules! tr {
     ($key:literal) => {
@@ -302,7 +302,7 @@ mod tests {
     fn resolution() {
         assert_eq!(resolve("fr"), "fr");
         assert_eq!(resolve("en"), "en");
-        // auto / inconnu : une langue livrée, quelle que soit celle du poste.
+        // auto / unknown: a shipped language, whatever the workstation's.
         assert!(languages().contains(&resolve("auto")));
         assert!(languages().contains(&resolve("xx")));
     }

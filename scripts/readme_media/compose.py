@@ -1,4 +1,4 @@
-"""Compose les médias du README à partir des captures brutes (Pillow)."""
+"""Composes the README media from the raw captures (Pillow)."""
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageChops
@@ -10,11 +10,11 @@ FONT_B = "C:/Windows/Fonts/segoeuib.ttf"
 
 
 def strip_rules(im):
-    """Blanchit les filets horizontaux gris clair (séparateur de la vue) captés avec le SVG."""
+    """Whitens the light grey horizontal rules (the view's separator) captured along with the SVG."""
     import numpy as np
     a = np.array(im.convert("RGB")).astype(int)
     lum = a.mean(axis=2)
-    for y in range(max(8, a.shape[0] // 12)):  # le filet est toujours en tête
+    for y in range(max(8, a.shape[0] // 12)):  # the rule is always at the top
         row = lum[y]
         grey = (row > 200) & (row < 250)
         if grey.mean() > 0.85:
@@ -31,7 +31,7 @@ def trim(im, bg=(255, 255, 255)):
 
 
 def framed(src, dst, radius=22, shadow=40, title=None):
-    """Fenêtre arrondie + ombre douce sur fond transparent."""
+    """Rounded window + soft shadow on a transparent background."""
     im = Image.open(src).convert("RGBA")
     w, h = im.size
     mask = Image.new("L", (w, h), 0)

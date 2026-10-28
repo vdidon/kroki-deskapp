@@ -1,8 +1,8 @@
-// Pas de console en release (l'app reste utilisable en CLI : les arguments
-// fonctionnent sans fenêtre de terminal).
+// No console in release (the app stays usable from the CLI: arguments
+// work without a terminal window).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-// En tête : `tr!` (macro textuelle) doit être définie avant les modules qui l'emploient.
+// First: `tr!` (a textual macro) must be defined before the modules that use it.
 #[macro_use]
 mod i18n;
 mod commands;
@@ -23,16 +23,16 @@ use std::path::PathBuf;
 
 use tauri::{Manager, WindowEvent};
 
-/// Options CLI (courte et longue, comme `docker run -d`) qui relancent
-/// l'application détachée du terminal appelant.
+/// CLI options (short and long, like `docker run -d`) that relaunch the
+/// application detached from the calling terminal.
 const DETACH_FLAGS: [&str; 2] = ["-d", "--detach"];
 
-/// `-d`/`--detach` : relance l'exe sans l'option, détaché du terminal (pas de
-/// console, entrées/sorties nulles, groupe de processus propre), puis quitte —
-/// le shell reprend la main aussitôt, même sous bash, qui attend sinon la
-/// fermeture d'un exe GUI. Fait avant tout le reste : l'instance relancée passe
-/// ensuite par le chemin normal, `single-instance` compris. Si la relance
-/// échoue, on continue au premier plan plutôt que de ne rien ouvrir.
+/// `-d`/`--detach`: relaunches the exe without the option, detached from the
+/// terminal (no console, null stdio, own process group), then exits —
+/// the shell gets control back immediately, even under bash, which otherwise
+/// waits for a GUI exe to close. Done before everything else: the relaunched
+/// instance then goes through the normal path, `single-instance` included. If
+/// the relaunch fails, we carry on in the foreground rather than open nothing.
 fn detach_if_requested() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let is_detach = |a: &std::ffi::OsString| DETACH_FLAGS.iter().any(|f| a == f);
@@ -66,9 +66,9 @@ fn detach_if_requested() {
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
         const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
         let flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
-        // Sortir du job de l'appelant (un terminal ou un agent qui tue son job
-        // à la fermeture emporterait l'app) ; refusé si le job l'interdit,
-        // d'où la seconde tentative sans.
+        // Break away from the caller's job (a terminal or an agent that kills
+        // its job on close would take the app with it); refused if the job
+        // forbids it, hence the second attempt without.
         command()
             .creation_flags(flags | CREATE_BREAKAWAY_FROM_JOB)
             .spawn()
@@ -77,8 +77,8 @@ fn detach_if_requested() {
     #[cfg(unix)]
     let spawned = {
         use std::os::unix::process::CommandExt;
-        // Groupe propre : hors du groupe de premier plan du terminal, donc ni
-        // Ctrl+C ni le SIGHUP de sa fermeture ne l'atteignent.
+        // Own group: outside the terminal's foreground group, so neither
+        // Ctrl+C nor the SIGHUP from its closing reaches it.
         command().process_group(0).spawn()
     };
 
@@ -94,16 +94,16 @@ fn detach_if_requested() {
 fn main() {
     detach_if_requested();
     tauri::Builder::default()
-        // Doit être enregistré en premier : une seconde invocation de l'exe
-        // (`kroki_deskapp.exe fichier.md`) forwarde ses arguments ici.
+        // Must be registered first: a second invocation of the exe
+        // (`kroki_deskapp.exe file.md`) forwards its arguments here.
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             let args = manager::collect_file_args(argv.into_iter().skip(1), &PathBuf::from(cwd));
             if args.is_empty() {
-                // Relance sans fichier (re-clic sur l'exe) → nouvelle fenêtre.
+                // Relaunch with no file (re-click on the exe) → new window.
                 manager::open_new_window(app);
             } else {
-                // Fichiers passés (Explorateur, agent…) → onglets dans la
-                // fenêtre existante, saut vers le fragment éventuel.
+                // Files passed (Explorer, agent…) → tabs in the existing
+                // window, jumping to the fragment if any.
                 manager::open_in_first_window(app, &args);
             }
         }))
@@ -161,21 +161,21 @@ fn main() {
             journal::get_journal,
             journal::plugin_log,
         ])
-        // Sert les fichiers des plugins au worker sandboxé (lecture seule,
-        // confinée au dossier du plugin) : `http://plugin.localhost/<id>/…`
-        // sous Windows, `plugin://localhost/<id>/…` sous Linux.
+        // Serves the plugins' files to the sandboxed worker (read-only,
+        // confined to the plugin's folder): `http://plugin.localhost/<id>/…`
+        // on Windows, `plugin://localhost/<id>/…` on Linux.
         .register_uri_scheme_protocol("plugin", |_ctx, request| plugins::serve(&request))
         .setup(|app| {
             let handle = app.handle().clone();
-            // Avant tout le reste : les entrées du démarrage partent aussi vers
-            // les fenêtres (celles d'avant restent lisibles par `get_journal`).
+            // Before everything else: startup entries also go out to the
+            // windows (earlier ones stay readable through `get_journal`).
             journal::attach(&handle);
             commands::load_settings(&handle);
-            // Langue avant tout message : seeding, scan et fenêtres en émettent.
+            // Language before any message: seeding, scan and windows emit them.
             let language = handle.state::<state::SettingsState>().0.lock().unwrap().language.clone();
             let code = i18n::set_language(&language);
-            // Contexte d'un rapport de bug ; Java et TeX sont tracés quand ils
-            // sont sondés (à la demande : pas de JVM lancée au démarrage).
+            // Bug-report context; Java and TeX are logged when they are
+            // probed (on demand: no JVM launched at startup).
             let external = handle
                 .state::<state::SettingsState>()
                 .0
@@ -197,15 +197,15 @@ fn main() {
                     }
                 ),
             );
-            // Plugins livrés avec l'installeur : installés/mis à jour avant le
-            // scan, pour que le registre parte de l'état final. Lit
-            // `removed_plugins` des réglages — donc après `load_settings`.
+            // Plugins shipped with the installer: installed/updated before the
+            // scan, so the registry starts from the final state. Reads the
+            // settings' `removed_plugins` — hence after `load_settings`.
             plugins::seed_bundled(&handle);
-            // Registre des plugins avant la 1ʳᵉ fenêtre : les extensions
-            // effectives (dialogs, drops, args CLI) en dépendent.
+            // Plugin registry before the 1st window: the effective extensions
+            // (dialogs, drops, CLI args) depend on it.
             plugins::init();
             watcher::init(&handle);
-            // API Kroki locale pour les outils tiers.
+            // Local Kroki API for third-party tools.
             let s = handle
                 .state::<state::SettingsState>()
                 .0
@@ -214,17 +214,17 @@ fn main() {
                 .clone();
             server::apply_settings(&handle, s.server_enabled, s.server_port);
 
-            // Fenêtre principale d'abord : c'est le chemin critique de l'affichage.
+            // Main window first: it is the critical path of the display.
             let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
             let args = manager::collect_file_args(std::env::args().skip(1), &cwd);
             let label = manager::create_window(&handle, None, None)?;
             manager::open_file_args(&handle, &label, &args);
 
-            // Webview cachée des moteurs de rendu : créée hors du chemin critique.
-            // Son `build()` bloque le main thread ~0,85 s (init WebView2) ; on le
-            // diffère après l'affichage de la 1re fenêtre, sinon il retarderait son
-            // apparition d'autant. `ensure_renderer` poste le `build()` sur le main
-            // thread ; le court délai laisse la fenêtre faire son premier rendu.
+            // Hidden webview of the rendering engines: created off the critical path.
+            // Its `build()` blocks the main thread ~0.85 s (WebView2 init); we
+            // defer it until after the 1st window is shown, otherwise it would delay
+            // its appearance by as much. `ensure_renderer` posts the `build()` to the
+            // main thread; the short delay lets the window do its first render.
             let h = handle.clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_millis(300));
@@ -240,7 +240,7 @@ fn main() {
                     return;
                 }
                 manager::cleanup_window(app, window.label());
-                // La webview de rendu cachée ne doit pas maintenir l'app en vie.
+                // The hidden render webview must not keep the app alive.
                 let no_doc_window = {
                     let st = app.state::<state::AppState>();
                     let st = st.0.lock().unwrap();

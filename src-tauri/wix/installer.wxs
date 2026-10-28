@@ -1,118 +1,117 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Les associations de fichiers des formats natifs et la clé App Paths. Les
-  plugins embarqués — archives, associations de leurs formats et page de
-  sélection — sont dans le fragment voisin plugins.generated.wxs (gitignoré),
-  que le xtask génère à chaque build depuis la stratégie d'embarquement
-  (bundled-plugins.txt, sinon bundled-plugins.default.txt ; cf.
-  xtask/src/bundled.rs). Les deux fragments sont branchés par
+  File associations for the native formats and the App Paths key. The
+  embedded plugins — archives, associations for their formats and selection
+  page — are in the neighboring fragment plugins.generated.wxs (gitignored),
+  which the xtask generates on every build from the bundling strategy
+  (bundled-plugins.txt, otherwise bundled-plugins.default.txt; cf.
+  xtask/src/bundled.rs). Both fragments are wired in by
   tauri.msi.conf.json.
 
-  ── Pourquoi les plugins ne passent pas par bundle.resources ─────────────────
-  `bundle.resources` fonctionne, mais Tauri en génère **un composant par
-  fichier**, avec des identifiants aléatoires à chaque build
-  (`<Component Id="I0373392f…">`). Or WiX interdit d'ajouter une condition à un
-  composant déclaré ailleurs : impossible de rendre un plugin décochable tant
-  qu'il vient de là. Les `<File>` sont donc déclarés dans le fragment généré, un
-  composant conditionné par plugin. Les archives restent **toutes** dans le cab
-  du MSI — seules celles qui sont cochées sont écrites sur disque.
+  ── Why the plugins do not go through bundle.resources ───────────────────────
+  `bundle.resources` works, but Tauri generates **one component per file** for
+  it, with random identifiers on every build
+  (`<Component Id="I0373392f…">`). Yet WiX forbids adding a condition to a
+  component declared elsewhere: a plugin cannot be made uncheckable as long as
+  it comes from there. The `<File>`s are therefore declared in the generated
+  fragment, one component conditioned per plugin. The archives all stay in the
+  MSI's cab — only the checked ones are written to disk.
 
-  Le chemin source passe par `$(sys.SOURCEFILEDIR)` (variable intrinsèque de
-  candle = dossier du .wxs) et non par un chemin relatif au répertoire
-  courant : Tauri n'expose pas le cwd avec lequel il lance candle/light.
-  `bundled::stage` (xtask) remplit `src-tauri/bundled-plugins/` avant le
-  bundling et échoue si une archive manque.
+  The source path goes through `$(sys.SOURCEFILEDIR)` (candle intrinsic
+  variable = the .wxs's folder) and not through a path relative to the current
+  directory: Tauri does not expose the cwd it launches candle/light with.
+  `bundled::stage` (xtask) fills `src-tauri/bundled-plugins/` before
+  bundling and fails if an archive is missing.
 
-  Rien à faire côté Rust : `plugins::seed_bundled` installe au premier
-  lancement ce qu'il trouve dans `resource_dir()/bundled-plugins/`, donc
-  exactement les plugins cochés. Décocher un plugin **déjà installé** ne le
-  désinstalle pas pour autant : le seeding n'ajoute et ne met à jour, il ne
-  retire jamais (un plugin posé à la main ne doit pas disparaître).
+  Nothing to do on the Rust side: `plugins::seed_bundled` installs at first
+  launch whatever it finds in `resource_dir()/bundled-plugins/`, hence
+  exactly the checked plugins. Unchecking a plugin **already installed** does
+  not uninstall it: the seeding only adds and updates, it never removes (a
+  plugin placed by hand must not disappear).
 
-  ── Pourquoi les associations ne passent pas par bundle.fileAssociations ─────
-  Même raison, poussée d'un cran : le bundler les génère dans le composant de
-  l'exécutable, où elles suivraient forcément l'application — donc
-  inconditionnelles. Or celles des formats servis par un plugin doivent suivre
-  **le plugin**, pas l'application. D'où la reprise complète en écritures de
-  registre, et `bundle.fileAssociations` volontairement absent de
+  ── Why the associations do not go through bundle.fileAssociations ───────────
+  Same reason, taken one step further: the bundler generates them in the
+  executable's component, where they would necessarily follow the application
+  — hence unconditional. Yet those of the formats served by a plugin must
+  follow **the plugin**, not the application. Hence the complete rewrite as
+  registry writes, and `bundle.fileAssociations` deliberately absent from
   tauri.msi.conf.json.
 
-  ── Deux niveaux d'association ───────────────────────────────────────────────
-  Windows distingue deux écritures :
+  ── Two association levels ───────────────────────────────────────────────────
+  Windows distinguishes two writes:
 
-    Software\Classes\<.ext>\(Default) = ProgID   réclame le handler par DÉFAUT
-    Software\Classes\<.ext>\OpenWithProgids      ajoute à « Ouvrir avec »
+    Software\Classes\<.ext>\(Default) = ProgID   claims the DEFAULT handler
+    Software\Classes\<.ext>\OpenWithProgids      adds to "Open with" (« Ouvrir avec »)
 
-  Réclamer le défaut ne fonctionne que sur une extension **vierge** : dès qu'un
-  `UserChoice` existe (HKCU, protégé par un hash depuis Windows 8), le
-  `(Default)` est ignoré et l'application n'apparaît qu'en suggestion. Il
-  ÉCRASE en revanche la valeur `(Default)` en place, que MSI ne restaure pas à
-  la désinstallation.
+  Claiming the default only works on a **virgin** extension: as soon as a
+  `UserChoice` exists (HKCU, hash-protected since Windows 8), the
+  `(Default)` is ignored and the application only appears as a suggestion. It
+  OVERWRITES, however, the `(Default)` value in place, which MSI does not
+  restore on uninstall.
 
-  - `.kdws .kdext` et les extensions des plugins installés — `(Default)` +
-    `OpenWithProgids` : c'est ce qui fait marcher le double-clic, la raison
-    d'être de l'installeur. Les formats d'un plugin sont revendiqués sans
-    distinction, partagés compris (`.tex`, `.csv`) : installer un plugin est un
-    choix explicite, et le `UserChoice` de qui a déjà choisi une autre
-    application l'emporte de toute façon ;
-  - les formats natifs partagés (`.md`, `.txt`, `.html`…) — `OpenWithProgids`
-    **seul**. Kroki Desk est proposé dans « Ouvrir avec », l'application en
-    place n'est pas touchée (`.html` → `htmlfile`, `.txt` → `txtfilelegacy`),
-    et la désinstallation ne laisse rien.
+  - `.kdws .kdext` and the extensions of the installed plugins — `(Default)` +
+    `OpenWithProgids`: this is what makes the double-click work, the
+    installer's whole purpose. A plugin's formats are claimed without
+    distinction, shared ones included (`.tex`, `.csv`): installing a plugin is
+    an explicit choice, and the `UserChoice` of anyone who already picked
+    another application wins anyway;
+  - the shared native formats (`.md`, `.txt`, `.html`…) — `OpenWithProgids`
+    **alone**. Kroki Desk is offered in "Open with" (« Ouvrir avec »), the
+    application in place is not touched (`.html` → `htmlfile`, `.txt` →
+    `txtfilelegacy`), and uninstalling leaves nothing behind.
 
-  ── Ce qui reste conditionné : les extensions servies par un plugin ──────────
-  Une extension n'a de sens que si le plugin qui la lit est là. Ses composants
-  (un par plugin, ProgID `KrokiDesk.<Plugin>` compris) portent donc la
-  condition du plugin, et eux seuls : les formats natifs ci-dessous
-  s'installent inconditionnellement.
+  ── What stays conditioned: the extensions served by a plugin ────────────────
+  An extension only makes sense if the plugin that reads it is there. Its
+  components (one per plugin, ProgID `KrokiDesk.<Plugin>` included) therefore
+  carry the plugin's condition, and only they do: the native formats below
+  install unconditionally.
 
-  ── Le dialogue (fragment généré) ────────────────────────────────────────────
-  Tauri utilise WixUI_InstallDir (Welcome → InstallDir → VerifyReady), qui n'a
-  pas de page de personnalisation. `PluginDlg` s'insère entre InstallDir et
-  VerifyReady par surcharge des ControlEvent `NewDialog` : pour cet événement
-  c'est le Publish de plus grand `Order` dont la condition est vraie qui
-  l'emporte, d'où Order="5" (WixUI_InstallDir va jusqu'à 4) et la reprise de sa
-  condition de validation du chemin. Le template Tauri joue le même tour en
-  Order="2" pour sauter la page de licence. Sans plugin embarqué, la page
-  n'est pas générée.
+  ── The dialog (generated fragment) ──────────────────────────────────────────
+  Tauri uses WixUI_InstallDir (Welcome → InstallDir → VerifyReady), which has
+  no customization page. `PluginDlg` slips in between InstallDir and
+  VerifyReady by overriding the `NewDialog` ControlEvents: for this event the
+  Publish with the highest `Order` whose condition is true wins, hence
+  Order="5" (WixUI_InstallDir goes up to 4) and the reuse of its path
+  validation condition. The Tauri template plays the same trick at
+  Order="2" to skip the license page. With no embedded plugin, the page is not
+  generated.
 
-  Une case décochée vide sa propriété `PLUGIN_<ID>` : la condition du composant
-  devient fausse, ni l'archive ni ses associations ne sont installées. Les
-  propriétés sont `Secure="yes"` — sans quoi l'UI, qui tourne sous le compte de
-  l'utilisateur, ne les transmettrait pas au serveur d'exécution élevé, et tout
-  serait installé quoi qu'on décoche. Elles sont publiques, donc réglables en
-  installation silencieuse :
+  An unchecked box empties its `PLUGIN_<ID>` property: the component's
+  condition becomes false, neither the archive nor its associations are
+  installed. The properties are `Secure="yes"` — without that, the UI, which
+  runs under the user's account, would not pass them to the elevated execution
+  server, and everything would be installed whatever is unchecked. They are
+  public, hence settable in a silent installation:
   `msiexec /i kroki_deskapp.msi /qn PLUGIN_CSV_TABLES=1 PLUGIN_LATEX_DOC=""`.
 
-  ── App Paths : lancer l'application par son nom ─────────────────────────────
-  Le MSI n'ajoute pas l'application au PATH (un dossier de plus pour chaque
-  commande de chaque terminal, pour un seul exe). La clé
-  `App Paths\kroki_deskapp.exe` suffit à `start kroki_deskapp …` (cmd),
-  `Start-Process kroki_deskapp …` (PowerShell) et Win+R : ce sont les voies de
-  ShellExecute, et ce sont précisément celles qu'un agent ou un script doit
-  prendre (`kroki_deskapp "modele.tex#eq:x"`) : lancé directement depuis bash
-  alors que l'application était fermée, l'exe ne rendrait la main qu'à sa
-  fermeture. CreateProcess et la résolution de commande de bash ne lisent pas
-  cette clé, et n'ont pas à le faire. Inconditionnelle : elle suit
-  l'exécutable, pas un plugin.
+  ── App Paths: launching the application by name ─────────────────────────────
+  The MSI does not add the application to the PATH (one more folder for every
+  command of every terminal, for a single exe). The
+  `App Paths\kroki_deskapp.exe` key is enough for `start kroki_deskapp …` (cmd),
+  `Start-Process kroki_deskapp …` (PowerShell) and Win+R: these are the
+  ShellExecute routes, and precisely the ones an agent or a script should
+  take (`kroki_deskapp "modele.tex#eq:x"`): launched directly from bash while
+  the application was closed, the exe would only hand control back when it
+  exits. CreateProcess and bash's command resolution do not read this key, and
+  need not. Unconditional: it follows the executable, not a plugin.
 
-  Branché par `wix.fragmentPaths` + `wix.componentGroupRefs` : **tous** les
-  ComponentGroup (celui-ci et les deux du fragment généré) doivent être
-  référencés, sinon leurs composants ne sont rattachés à aucune feature.
-  L'exécutable est désigné par `[INSTALLDIR]kroki_deskapp.exe` et non par la
-  référence de fichier `[#Path]` : Tauri injecte les componentGroupRefs dans sa
-  feature `External` alors que l'exe appartient à `MainProgram`, et MSI refuse
-  les références de fichier inter-features (ICE69, erreur de link). Le nom du
-  binaire vient du crate (`BIN_NAME` dans xtask/src/main.rs) : le renommer
-  impose de l'éditer ici.
+  Wired in by `wix.fragmentPaths` + `wix.componentGroupRefs`: **all** the
+  ComponentGroups (this one and the two of the generated fragment) must be
+  referenced, otherwise their components are attached to no feature.
+  The executable is designated by `[INSTALLDIR]kroki_deskapp.exe` and not by the
+  file reference `[#Path]`: Tauri injects the componentGroupRefs into its
+  `External` feature while the exe belongs to `MainProgram`, and MSI refuses
+  cross-feature file references (ICE69, a link error). The binary's name comes
+  from the crate (`BIN_NAME` in xtask/src/main.rs): renaming it requires
+  editing it here.
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
 
     <DirectoryRef Id="TARGETDIR">
 
-      <!-- Les ProgID eux-mêmes, partagés par plusieurs composants. Un ProgID
-           sans extension associée est inerte. -->
+      <!-- The ProgIDs themselves, shared by several components. A ProgID
+           with no associated extension is inert. -->
       <Component Id="AssocProgIds" Guid="11F8BC6C-85C4-45AD-987F-89BE6DF7E36F">
         <RegistryValue Root="HKMU" Key="Software\Kroki Desk\FileAssociations"
                        Name="progids" Type="integer" Value="1" KeyPath="yes" />
@@ -139,7 +138,7 @@
         </RegistryKey>
       </Component>
 
-      <!-- Lancement par le nom (`start kroki_deskapp`), cf. en-tête. -->
+      <!-- Launch by name (`start kroki_deskapp`), cf. header. -->
       <Component Id="AppPath" Guid="5814141A-DECD-4E39-80B9-3316872CB2E2">
         <RegistryKey Root="HKMU" ForceDeleteOnUninstall="yes"
                      Key="Software\Microsoft\Windows\CurrentVersion\App Paths\kroki_deskapp.exe">
@@ -148,10 +147,10 @@
         </RegistryKey>
       </Component>
 
-      <!-- Formats propres à l'application : le `(Default)` mord réellement,
-           et c'est lui qui fait marcher le double-clic. Rien à écraser — ces
-           extensions n'appartiennent à personne d'autre. Celles des plugins
-           suivent le même régime, dans le fragment généré. -->
+      <!-- The application's own formats: the `(Default)` really takes hold,
+           and it is what makes the double-click work. Nothing to overwrite —
+           these extensions belong to no one else. The plugins' extensions
+           follow the same regime, in the generated fragment. -->
       <Component Id="AssocOwnFormats" Guid="875EDF93-7B0C-4D84-9112-1BF9ADBBB599">
         <RegistryValue Root="HKMU" Key="Software\Kroki Desk\FileAssociations"
                        Name="own" Type="integer" Value="1" KeyPath="yes" />
@@ -163,9 +162,9 @@
                        Name="KrokiDesk.Plugin" Type="string" Value="" />
       </Component>
 
-      <!-- Formats partagés, natifs de l'application : « Ouvrir avec » seul.
-           La clé <.ext> préexiste souvent et appartient à quelqu'un d'autre —
-           pas de ForceDeleteOnUninstall, pas de valeur `(Default)` posée. -->
+      <!-- Shared formats, native to the application: "Open with" (« Ouvrir avec ») alone.
+           The <.ext> key often pre-exists and belongs to someone else —
+           no ForceDeleteOnUninstall, no `(Default)` value set. -->
       <Component Id="AssocSharedFormats" Guid="271F5138-DB48-4AAD-87F7-0208A7EA8CCA">
         <RegistryValue Root="HKMU" Key="Software\Kroki Desk\FileAssociations"
                        Name="shared" Type="integer" Value="1" KeyPath="yes" />

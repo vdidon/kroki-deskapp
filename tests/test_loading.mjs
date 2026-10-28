@@ -1,22 +1,22 @@
-// Test du voile de chargement (ui/js/loading.js).
-// Usage : node tests/test_loading.mjs [port]
-// Prérequis : app lancée avec WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
-// Autonome : crée ses documents dans un dossier temporaire, ne referme que ses
-// propres onglets.
+// Test of the loading overlay (ui/js/loading.js).
+// Usage: node tests/test_loading.mjs [port]
+// Prerequisite: app launched with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>
+// Standalone: creates its documents in a temporary folder, only closes its
+// own tabs.
 //
-// Ce qui est vérifié — le voile doit apparaître **seulement** quand l'attente
-// le justifie :
-//   1. gros document          → voile posé puis retiré ;
-//   2. bascule → code source  → aucun voile (cette vue ne traverse ni
-//                               markdown-it ni KaTeX : ~100 ms) ;
-//   3. bascule → preview      → voile (le pipeline complet est rejoué) ;
-//   4. petit document         → aucun voile (délai anti-flash).
-// Plus l'invariant qui rend le voile utile : son animation doit survivre au
-// blocage du thread principal par la phase de rendu synchrone — vérifié par
-// screencast, seule source d'images qui ne dépende pas de ce thread.
+// What is checked — the overlay must appear **only** when the wait
+// justifies it:
+//   1. large document         → overlay shown then removed;
+//   2. switch → source code   → no overlay (this view goes through neither
+//                               markdown-it nor KaTeX: ~100 ms);
+//   3. switch → preview       → overlay (the full pipeline is replayed);
+//   4. small document         → no overlay (anti-flash delay).
+// Plus the invariant that makes the overlay useful: its animation must survive
+// the main thread being blocked by the synchronous render phase — verified by
+// screencast, the only source of frames that does not depend on that thread.
 //
-// Angle mort assumé : l'apparence du voile (couleurs, centrage) ne se vérifie
-// pas d'ici — contrôle visuel.
+// Acknowledged blind spot: the overlay's appearance (colors, centering) cannot
+// be checked from here — visual check.
 
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -28,7 +28,7 @@ const port = process.argv[2] ?? "9222";
 const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const page = targets.find((t) => t.type === "page" && !t.url.includes("renderer"));
 if (!page) {
-  console.error("page principale introuvable:", targets.map((t) => t.title).join(" | "));
+  console.error("main page not found:", targets.map((t) => t.title).join(" | "));
   process.exit(1);
 }
 
@@ -81,9 +81,9 @@ function check(name, cond, detail = "") {
 }
 
 // --- Fixtures ------------------------------------------------------------- //
-// Le gros document doit dépasser le seuil de `beforeHeavyRender` (60 000
-// caractères) ET durer assez pour que le voile s'affiche : ce sont les formules
-// qui coûtent, KaTeX produisant ~20× leur source en DOM.
+// The large document must exceed the `beforeHeavyRender` threshold (60,000
+// characters) AND last long enough for the overlay to show: the formulas are
+// what costs, KaTeX producing ~20× their source in DOM.
 const dir = mkdtempSync(join(tmpdir(), "kd-loading-"));
 const gros = [];
 for (let i = 0; i < 400; i++) {
@@ -106,7 +106,7 @@ const INSTRUMENT = `(() => {
   return "ok";
 })()`;
 
-/** Joue `action` dans la page et rend les transitions du voile qu'elle provoque. */
+/** Plays `action` in the page and returns the overlay transitions it causes. */
 async function probe(action, attente = 12000) {
   await evaluate(`window.__L.reset(), "ok"`);
   const r = await evaluate(`(async () => {
@@ -143,33 +143,33 @@ const closeMine = () => evaluate(`(async () => {
 })()`).catch(() => {});
 
 try {
-  check("overlay présent dans le DOM", (await evaluate(INSTRUMENT)) === "ok");
+  check("overlay present in the DOM", (await evaluate(INSTRUMENT)) === "ok");
 
-  // 1. Gros document : le voile doit se poser puis se retirer.
+  // 1. Large document: the overlay must go up then come down.
   let r = await probe(`window.__TAURI__.core.invoke('open_link', { baseDir: ${esc(dir)}, href: 'gros.md' });`);
-  check("gros document : voile affiché", r.shownAt !== null, `à ${r.shownAt} ms`);
-  check("gros document : voile retiré ensuite", r.hidden === true, `retiré à ${r.hiddenAt} ms`);
-  check("gros document : rendu abouti", r.katex > 500, `${r.katex} formules`);
+  check("large document: overlay shown", r.shownAt !== null, `at ${r.shownAt} ms`);
+  check("large document: overlay removed afterwards", r.hidden === true, `removed at ${r.hiddenAt} ms`);
+  check("large document: render completed", r.katex > 500, `${r.katex} formulas`);
 
-  // 2. Vue source : rapide, aucun voile ne doit clignoter.
+  // 2. Source view: fast, no overlay must flicker.
   r = await probe(`document.getElementById('btn-source-toggle').click();`);
-  check("bascule → source : pas de voile", r.shownAt === null);
-  check("bascule → source : vue source active", r.source === true);
+  check("switch → source: no overlay", r.shownAt === null);
+  check("switch → source: source view active", r.source === true);
 
-  // 3. Retour en preview : pipeline complet, voile attendu.
+  // 3. Back to preview: full pipeline, overlay expected.
   r = await probe(`document.getElementById('btn-source-toggle').click();`);
-  check("bascule → preview : voile affiché", r.shownAt !== null, `à ${r.shownAt} ms`);
-  check("bascule → preview : voile retiré ensuite", r.hidden === true);
+  check("switch → preview: overlay shown", r.shownAt !== null, `at ${r.shownAt} ms`);
+  check("switch → preview: overlay removed afterwards", r.hidden === true);
 
-  // 4. Petit document : sous le délai anti-flash.
+  // 4. Small document: under the anti-flash delay.
   await closeMine();
   r = await probe(`window.__TAURI__.core.invoke('open_link', { baseDir: ${esc(dir)}, href: 'petit.md' });`, 4000);
-  check("petit document : aucun voile", r.shownAt === null);
-  check("aucune erreur JS", r.errors.length === 0, r.errors.join(" | "));
+  check("small document: no overlay", r.shownAt === null);
+  check("no JS errors", r.errors.length === 0, r.errors.join(" | "));
 
-  // 5. L'animation survit-elle au blocage du thread principal ? `getComputedStyle`
-  //    ne peut pas répondre (il lit depuis ce thread) : on échantillonne l'écran
-  //    par screencast, alimenté par le compositeur.
+  // 5. Does the animation survive the main thread being blocked? `getComputedStyle`
+  //    cannot answer (it reads from that thread): we sample the screen
+  //    by screencast, fed by the compositor.
   await closeMine();
   await evaluate(`document.getElementById('loading-overlay').hidden = false, "ok"`);
   await sleep(400);
@@ -184,13 +184,13 @@ try {
   const distincts = new Set(pendant.map((f) => f.hash)).size;
   await send("Page.stopScreencast", {});
   await evaluate(`document.getElementById('loading-overlay').hidden = true, "ok"`);
-  check("spinner animé pendant le blocage du thread principal", distincts >= 3,
-    `${distincts} images distinctes sur ${pendant.length} frames`);
+  check("spinner animated while the main thread is blocked", distincts >= 3,
+    `${distincts} distinct images out of ${pendant.length} frames`);
 } finally {
   await closeMine();
   await evaluate(`document.getElementById('loading-overlay').hidden = true, "ok"`).catch(() => {});
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log(failures === 0 ? "\nTOUS LES TESTS PASSENT" : `\n${failures} ÉCHEC(S)`);
+console.log(failures === 0 ? "\nALL TESTS PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

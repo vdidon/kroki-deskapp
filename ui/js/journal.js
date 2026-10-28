@@ -1,10 +1,10 @@
 // @ts-check
-// Dialog « Journal » : entrées de diagnostic de l'application et des plugins
-// depuis le lancement (journal.rs — un seul journal pour toutes les fenêtres,
-// en mémoire). Ouvert sans filtre depuis « Informations », filtré sur un
-// plugin depuis sa carte du dialog Plugins. Chaque fenêtre garde une copie
-// tenue à jour par `journal-entry`, ce qui donne au dialog Plugins le nombre
-// d'entrées de chaque plugin sans aller-retour IPC.
+// Log (« Journal ») dialog: diagnostic entries from the application and the
+// plugins since launch (journal.rs — a single in-memory log for all windows).
+// Opened unfiltered from the Info (« Informations ») dialog, filtered on a
+// plugin from its card in the Plugins dialog. Each window keeps a copy
+// kept up to date by `journal-entry`, which gives the Plugins dialog each
+// plugin's entry count without an IPC round trip.
 
 import { invoke, listen } from "./app.js";
 import { allPlugins } from "./plugins.js";
@@ -12,20 +12,20 @@ import { onLocaleChange, t } from "./i18n.js";
 
 /** @typedef {import("../../types/ipc").JournalEntry} JournalEntry */
 
-// Éléments statiques de ui/index.html.
+// Static elements of ui/index.html.
 const dialog = /** @type {HTMLDialogElement} */ (document.getElementById("journal-dialog"));
 const filterEl = /** @type {HTMLSelectElement} */ (document.getElementById("journal-filter"));
 const listEl = /** @type {HTMLDivElement} */ (document.getElementById("journal-list"));
 const emptyEl = /** @type {HTMLParagraphElement} */ (document.getElementById("journal-empty"));
 const copyBtn = /** @type {HTMLButtonElement} */ (document.getElementById("journal-copy"));
 
-/** Même plafond que `CAPACITY` (journal.rs). */
+/** Same cap as `CAPACITY` (journal.rs). */
 const CAPACITY = 500;
 
 /** @type {JournalEntry[]} */
 let entries = [];
-let lastSeq = 0; // dernière entrée reçue : écarte un doublon chargement/événement
-// Filtre : "" = tout, "app" = l'application seule, "plugin:<id>" = un plugin.
+let lastSeq = 0; // last entry received: discards a load/event duplicate
+// Filter: "" = everything, "app" = the application alone, "plugin:<id>" = one plugin.
 let filter = "";
 /** @type {Set<() => void>} */
 const subscribers = new Set();
@@ -41,7 +41,7 @@ function matches(e) {
 }
 
 /**
- * Nombre d'entrées d'un plugin (bouton « Journal » de sa carte).
+ * Number of entries of a plugin (the "Log" (« Journal ») button on its card).
  * @param {string} id
  * @returns {number}
  */
@@ -52,7 +52,7 @@ export function pluginEntryCount(id) {
 }
 
 /**
- * Appelé à chaque changement du journal (entrée reçue, rechargement).
+ * Called on every log change (entry received, reload).
  * @param {() => void} fn
  */
 export function onJournalChange(fn) {
@@ -92,9 +92,9 @@ function renderRow(e) {
   return row;
 }
 
-// Options du filtre : tout, l'application, puis chaque plugin installé ou
-// présent dans le journal (un plugin désinstallé n'y figure plus, cf.
-// `forget_plugin`, mais une entrée peut précéder le rechargement du registre).
+// Filter options: everything, the application, then each plugin installed or
+// present in the log (an uninstalled plugin no longer appears there, cf.
+// `forget_plugin`, but an entry may precede the registry reload).
 function renderFilter() {
   /** @type {Map<string, string>} */
   const names = new Map();
@@ -128,7 +128,7 @@ function renderList() {
 }
 
 /**
- * Ouvre le journal ; `pluginId` le restreint d'emblée à ce plugin.
+ * Opens the log; `pluginId` restricts it to that plugin right away.
  * @param {string} [pluginId]
  */
 export function openJournal(pluginId) {
@@ -136,7 +136,7 @@ export function openJournal(pluginId) {
   copyBtn.textContent = t("journal.copy");
   renderFilter();
   dialog.showModal();
-  renderList(); // après showModal : la hauteur du scroller est connue
+  renderList(); // after showModal: the scroller's height is known
 }
 
 /** @param {JournalEntry} e */
@@ -161,8 +161,8 @@ async function reload() {
   } catch {
     fresh = [];
   }
-  // Entrées arrivées par événement pendant la requête : plus récentes que la
-  // réponse, elles s'y ajoutent.
+  // Entries that arrived by event during the request: newer than the response,
+  // they are added to it.
   const last = fresh.at(-1)?.seq ?? 0;
   entries = [...fresh, ...entries.filter((e) => e.seq > last)].slice(-CAPACITY);
   lastSeq = Math.max(lastSeq, last);
@@ -191,8 +191,8 @@ export async function initJournal() {
     renderFilter();
     renderList();
   });
-  // Écouteur avant le chargement : aucune entrée perdue entre les deux, les
-  // doublons sont écartés par `seq`.
+  // Listener before the load: no entry lost in between, duplicates are
+  // discarded by `seq`.
   await listen("journal-entry", ({ payload: e }) => {
     if (e.seq <= lastSeq) return;
     lastSeq = e.seq;
@@ -201,7 +201,7 @@ export async function initJournal() {
     if (dialog.open) {
       if (e.plugin && ![...filterEl.options].some((o) => o.value === `plugin:${e.source}`)) renderFilter();
       if (matches(e)) {
-        // Suit le bas de la liste seulement si on y était déjà.
+        // Follows the bottom of the list only if we were already there.
         const atBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 24;
         listEl.append(renderRow(e));
         listEl.hidden = false;
@@ -211,7 +211,7 @@ export async function initJournal() {
     }
     notify();
   });
-  // Désinstallation : le backend a effacé les entrées du plugin.
+  // Uninstall: the backend erased the plugin's entries.
   await listen("plugins-changed", () => reload());
   await reload();
 }

@@ -1,20 +1,20 @@
-// Globales des vendors de la fenêtre principale, chargés en `<script>` classique
-// par `ui/index.html` (markdown-it, highlight.js, DOMPurify, KaTeX, texmath) ou
-// injectés à la demande (Plotly, cf. `ensurePlotly` dans render.js).
+// Globals of the main window's vendors, loaded as classic `<script>`s
+// by `ui/index.html` (markdown-it, highlight.js, DOMPurify, KaTeX, texmath) or
+// injected on demand (Plotly, cf. `ensurePlotly` in render.js).
 //
-// Seule la surface réellement appelée par `ui/js/*.js` est déclarée — pas les
-// typings complets des bibliothèques. Versions de référence : markdown-it 14.2.0,
+// Only the surface actually called by `ui/js/*.js` is declared — not the
+// full typings of the libraries. Reference versions: markdown-it 14.2.0,
 // highlight.js 11.11.1, DOMPurify 3.4.8, Plotly 3.8.2 (`ui/vendor/`).
-// L'API CSS Custom Highlight (`CSS.highlights`, `Highlight`) est couverte par
-// `lib.dom` : rien à déclarer ici.
+// The CSS Custom Highlight API (`CSS.highlights`, `Highlight`) is covered by
+// `lib.dom`: nothing to declare here.
 
 // --- markdown-it --------------------------------------------------------------
 
-/** `Token` de markdown-it (sortie de `parse`, entrée des règles de rendu). */
+/** markdown-it `Token` (output of `parse`, input of the render rules). */
 export interface MarkdownItToken {
   type: string;
   tag: string;
-  /** `[début, fin]` en lignes 0-based du source ; `null` pour un token inline. */
+  /** `[start, end]` as 0-based source lines; `null` for an inline token. */
   map: [number, number] | null;
   nesting: number;
   level: number;
@@ -27,7 +27,7 @@ export interface MarkdownItToken {
   attrJoin(name: string, value: string): void;
 }
 
-/** État du parseur de blocs (`StateBlock`), argument d'une règle de bloc. */
+/** Block parser state (`StateBlock`), argument of a block rule. */
 export interface MarkdownItStateBlock {
   src: string;
   bMarks: number[];
@@ -39,7 +39,7 @@ export interface MarkdownItStateBlock {
   getLines(begin: number, end: number, indent: number, keepLastLF: boolean): string;
 }
 
-/** État de la passe « core » (`StateCore`), argument d'une règle core. */
+/** State of the "core" pass (`StateCore`), argument of a core rule. */
 export interface MarkdownItStateCore {
   tokens: MarkdownItToken[];
   Token: new (type: string, tag: string, nesting: number) => MarkdownItToken;
@@ -48,7 +48,7 @@ export interface MarkdownItStateCore {
 export interface MarkdownItOptions {
   html?: boolean;
   linkify?: boolean;
-  /** Chaîne vide = échappement par défaut de markdown-it. */
+  /** Empty string = markdown-it's default escaping. */
   highlight?: (code: string, lang: string, attrs: string) => string;
 }
 
@@ -95,7 +95,7 @@ export interface KatexOptions {
   output?: "html" | "mathml" | "htmlAndMathml";
 }
 
-/** Le moteur passé à texmath : il n'en appelle que `renderToString`. */
+/** The engine passed to texmath: it only calls `renderToString`. */
 export interface Katex {
   renderToString(tex: string, options?: KatexOptions): string;
 }
@@ -109,7 +109,7 @@ export interface TexmathOptions {
 // --- highlight.js -------------------------------------------------------------
 
 export interface Hljs {
-  /** `undefined` si la grammaire n'est pas enregistrée. */
+  /** `undefined` if the grammar is not registered. */
   getLanguage(name: string): object | undefined;
   highlight(code: string, options: { language: string; ignoreIllegals?: boolean }): { value: string };
 }
@@ -124,13 +124,13 @@ export interface DOMPurifyConfig {
 }
 
 export interface DOMPurify {
-  /** Sans `RETURN_DOM*` dans la config (jamais utilisé ici) : une chaîne. */
+  /** Without `RETURN_DOM*` in the config (never used here): a string. */
   sanitize(dirty: string, config?: DOMPurifyConfig): string;
 }
 
 // --- Plotly -------------------------------------------------------------------
 
-/** Élément pris en main par Plotly : `_fullLayout` = mise en page résolue (interne). */
+/** Element taken over by Plotly: `_fullLayout` = resolved layout (internal). */
 export interface PlotlyHTMLElement extends HTMLElement {
   _fullLayout?: { width: number; height: number };
 }
@@ -150,10 +150,10 @@ declare global {
     markdownit(options?: MarkdownItOptions): MarkdownIt;
     hljs: Hljs;
     DOMPurify: DOMPurify;
-    /** Optionnels : render.js se passe des formules si leur script manque. */
+    /** Optional: render.js goes without formulas if their script is missing. */
     katex?: Katex;
     texmath?: (md: MarkdownIt, options: TexmathOptions) => void;
-    /** Absent tant que la première figure n'a pas injecté le bundle. */
+    /** Absent until the first figure has injected the bundle. */
     Plotly?: Plotly;
   }
 }

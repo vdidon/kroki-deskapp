@@ -1,19 +1,19 @@
 // @ts-check
-// Découpe d'un flot HTML coloré en une entrée par ligne.
+// Splitting of a colorized HTML stream into one entry per line.
 //
-// Module **pur** (aucune dépendance DOM ni app) : c'est la seule partie risquée
-// de la coloration de la vue source, elle est testée hors navigateur par
+// **Pure** module (no DOM or app dependency): it is the only risky part of the
+// source view's highlighting, and is tested outside the browser by
 // `tests/test_hlsplit.mjs`.
 
 /**
- * Découpe `html` à chaque `\n` en rééquilibrant les `<span>` à cheval : ceux
- * encore ouverts sont refermés en fin de ligne et rouverts à l'identique au
- * début de la suivante. Entrée attendue : uniquement des `<span …>`, `</span>`
- * et du texte échappé (`&lt;`) — la forme que produisent hljs et, après
- * sanitization DOMPurify, les plugins `highlight:code`.
+ * Splits `html` at every `\n`, rebalancing the straddling `<span>`s: those
+ * still open are closed at the end of the line and reopened identically at the
+ * start of the next. Expected input: only `<span …>`, `</span>` and escaped
+ * text (`&lt;`) — the form produced by hljs and, after DOMPurify
+ * sanitization, by the `highlight:code` plugins.
  *
- * Le nombre d'entrées retournées vaut toujours `html.split("\n").length` côté
- * texte : l'appelant s'en sert comme garde-fou avant de peindre.
+ * The number of returned entries always equals `html.split("\n").length` on the
+ * text side: the caller uses it as a safeguard before painting.
  *
  * @param {string} html
  * @returns {string[]}
@@ -22,16 +22,16 @@ export function splitHighlightedLines(html) {
   /** @type {string[]} */
   const lines = [];
   /** @type {string[]} */
-  const open = []; // pile des balises ouvrantes, telles quelles (classes comprises)
+  const open = []; // stack of opening tags, verbatim (classes included)
   let cur = "";
   const re = /<span\b[^>]*>|<\/span>|[^<]+|</g;
   let m;
   while ((m = re.exec(html)) !== null) {
     const tok = m[0];
     if (tok[0] === "<") {
-      if (tok === "<") continue; // `<` isolé : ni balise ni texte, on l'ignore
+      if (tok === "<") continue; // lone `<`: neither tag nor text, ignored
       if (tok[1] === "/") {
-        if (open.length === 0) continue; // fermeture orpheline : ne pas déséquilibrer
+        if (open.length === 0) continue; // orphan closing tag: do not unbalance
         open.pop();
       } else {
         open.push(tok);
@@ -49,6 +49,6 @@ export function splitHighlightedLines(html) {
       cur += parts[i];
     }
   }
-  lines.push(cur + "</span>".repeat(open.length)); // flot tronqué : on referme
+  lines.push(cur + "</span>".repeat(open.length)); // truncated stream: close it
   return lines;
 }

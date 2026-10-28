@@ -8,8 +8,8 @@ edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-# Empaquetage du plugin embarqué latex-doc en .kdext (build.rs) : écriture
-# Deflate seulement.
+# Packing of the embedded latex-doc plugin into a .kdext (build.rs): Deflate
+# writing only.
 serde_json = "1.0.150"
 zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
@@ -23,20 +23,20 @@ reqwest = "0.13.4"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 svgbob = "0.7.6"
-# Langue d'interface du système (réglage « Langue » en automatique, i18n.rs).
+# System UI language (the "Language" (« Langue ») setting on automatic, i18n.rs).
 sys-locale = "0.3"
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
 tiny_http = "0.12.0"
-# Extraction des archives de plugins .kdext. Toutes les méthodes de compression
-# zip usuelles sont acceptées (7-Zip, Compress-Archive…) : Store, Deflate,
-# Deflate64, BZip2, LZMA, Zstandard. Seul PPMd est écarté volontairement (usage
-# marginal) — l'installation le signale proprement. `deflate-flate2-zlib-rs`
-# plutôt que le méta-feature `deflate` : on ne fait que décompresser, inutile
-# d'embarquer zopfli. zip ≥ 8 requis : le lzma-rs des versions 2.x échoue sur
-# les entrées LZMA produites par 7-Zip (remplacé depuis par lzma-rust2).
+# Extraction of .kdext plugin archives. All the usual zip compression methods
+# are accepted (7-Zip, Compress-Archive…): Store, Deflate, Deflate64, BZip2,
+# LZMA, Zstandard. Only PPMd is deliberately left out (marginal use) — the
+# install reports it cleanly. `deflate-flate2-zlib-rs` rather than the `deflate`
+# meta-feature: we only decompress, so there is no point embedding zopfli.
+# zip >= 8 required: the lzma-rs of the 2.x versions fails on LZMA entries
+# produced by 7-Zip (since replaced by lzma-rust2).
 zip = { version = "8", default-features = false, features = [
     "deflate-flate2-zlib-rs",
     "deflate64",
@@ -57,9 +57,10 @@ windows = { version = "0.62.2", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
-# Dépendance directe requise par la macro `#[implement(IDropTarget)]` : son code
-# généré référence le crate `windows_core`. Version alignée sur `windows` 0.62
-# pour éviter le conflit avec le windows-core 0.61 tiré par tauri/wry.
+# Direct dependency required by the `#[implement(IDropTarget)]` macro: its
+# generated code references the `windows_core` crate. Version aligned with
+# `windows` 0.62 to avoid a conflict with the windows-core 0.61 pulled in by
+# tauri/wry.
 windows-core = "0.62.2"
 
 [profile.release]

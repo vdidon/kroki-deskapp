@@ -1,11 +1,10 @@
-# Fins de ligne. Le dépôt se développe sous Windows mais produit des artefacts
-# Unix : les fichiers ci-dessous sont interprétés tels quels par un système qui
-# ne tolère pas le CR.
+# Line endings. The repo is developed on Windows but produces Unix artifacts:
+# the files below are interpreted as-is by a system that does not tolerate CR.
 #
-# Le cas critique est src-tauri/linux/postinst.sh et postrm.sh : ils sont copiés
-# dans le control.tar.gz du paquet .deb et exécutés par dpkg. Un `#!/bin/sh\r`
-# fait échouer la configuration du paquet avec un message qui ne dit pas
-# pourquoi. Même chose pour le modèle .desktop, dont chaque valeur traînerait un
-# CR (`Exec=kroki_deskapp %F\r`).
+# The critical case is src-tauri/linux/postinst.sh and postrm.sh: they are copied
+# into the .deb package's control.tar.gz and run by dpkg. A `#!/bin/sh\r`
+# makes the package configuration fail with a message that does not say
+# why. Same for the .desktop template, whose every value would carry a
+# trailing CR (`Exec=kroki_deskapp %F\r`).
 *.sh text eol=lf
 *.desktop text eol=lf

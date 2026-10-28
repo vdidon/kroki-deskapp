@@ -1,10 +1,10 @@
 // @ts-check
 
-// Langue de la webview de rendu cachée. Contexte JS distinct de la fenêtre
-// principale (qui a `ui/js/i18n.js`, tirant `app.js` et le DOM de l'interface) :
-// même catalogue, lu par la même commande `get_i18n`, mais un `t()` autonome.
-// Les messages d'erreur levés ici remontent au Rust puis s'affichent dans le
-// document : ils doivent suivre la langue de l'interface.
+// Language of the hidden render webview. A JS context separate from the main
+// window (which has `ui/js/i18n.js`, pulling in `app.js` and the interface DOM):
+// same catalog, read through the same `get_i18n` command, but a standalone `t()`.
+// Error messages raised here bubble up to Rust and are then shown in the
+// document: they must follow the interface language.
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -13,8 +13,8 @@ const { listen } = window.__TAURI__.event;
 let messages = {};
 let plurals = new Intl.PluralRules("en");
 
-// Même contrat que `t()` de ui/js/i18n.js : paramètres `{nom}`, formes plurielles
-// choisies par `params.count`. Clé inconnue → la clé elle-même, jamais d'exception.
+// Same contract as `t()` in ui/js/i18n.js: `{name}` parameters, plural forms
+// picked by `params.count`. Unknown key -> the key itself, never an exception.
 /**
  * @param {string} key
  * @param {Record<string, unknown>} [params]
@@ -27,7 +27,7 @@ export function t(key, params) {
     s = s[plurals.select(Number(params?.count ?? 0))] ?? s.other;
   }
   if (typeof s !== "string") {
-    console.warn(`i18n : clé inconnue « ${key} »`);
+    console.warn(`i18n: unknown key "${key}"`);
     return key;
   }
   if (!params) return s;
@@ -40,16 +40,16 @@ async function loadLocale() {
   plurals = new Intl.PluralRules(r.locale);
 }
 
-// Boot, puis à chaque changement de langue (quelle que soit la fenêtre à
-// l'origine : cette webview n'a pas de réglage propre). Un catalogue
-// indisponible ne doit pas empêcher le rendu : les clés s'afficheront telles quelles.
+// At boot, then on every language change (whichever window it originates
+// from: this webview has no setting of its own). An unavailable catalog must
+// not prevent rendering: keys will simply be displayed as-is.
 export async function initI18n() {
   try {
     await loadLocale();
   } catch (err) {
-    console.error("i18n : catalogue indisponible :", err);
+    console.error("i18n: catalog unavailable:", err);
   }
   await listen("locale-changed", () =>
-    loadLocale().catch((err) => console.error("i18n : rechargement en échec :", err)),
+    loadLocale().catch((err) => console.error("i18n: reload failed:", err)),
   );
 }

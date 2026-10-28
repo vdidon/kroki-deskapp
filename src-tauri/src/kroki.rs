@@ -1,5 +1,5 @@
-//! Client HTTP vers un serveur Kroki externe (optionnel) + cache de rendus
-//! partagé entre le mode intégré et le mode externe.
+//! HTTP client for an external (optional) Kroki server + a render cache
+//! shared between the built-in and the external mode.
 
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
@@ -8,8 +8,8 @@ use std::time::Duration;
 
 pub struct KrokiState {
     pub client: reqwest::Client,
-    /// hash(mode, type, source, options) -> SVG. Seuls les succès sont mis en cache,
-    /// pour qu'un re-render retente naturellement les erreurs.
+    /// hash(mode, type, source, options) -> SVG. Only successes are cached, so
+    /// that a re-render naturally retries errors.
     pub cache: Mutex<HashMap<u64, String>>,
 }
 
@@ -26,7 +26,7 @@ impl Default for KrokiState {
     }
 }
 
-/// `mode` distingue le rendu intégré (« embedded ») des serveurs externes (URL).
+/// `mode` distinguishes built-in rendering ("embedded") from external servers (URL).
 pub fn cache_key(mode: &str, dtype: &str, source: &str, options: &BTreeMap<String, String>) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     mode.hash(&mut h);
@@ -36,7 +36,7 @@ pub fn cache_key(mode: &str, dtype: &str, source: &str, options: &BTreeMap<Strin
     h.finish()
 }
 
-/// Rend un diagramme via l'API d'un serveur Kroki externe (POST JSON sur la racine).
+/// Renders a diagram through an external Kroki server's API (JSON POST on the root).
 pub async fn render(
     kroki: &KrokiState,
     server: &str,

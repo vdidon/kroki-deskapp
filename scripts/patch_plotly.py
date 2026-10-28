@@ -1,31 +1,30 @@
-"""Patch de performance de `ui/vendor/plotly.min.js` (vectorize-text), à rendu identique.
+"""Performance patch for `ui/vendor/plotly.min.js` (vectorize-text), with identical output.
 
-Plotly gl3d transforme chaque libellé texte 3D (`scatter3d` en `mode: "...text"`, titres et
-graduations d'axes) en triangles : fillText sur un canvas partagé, `getImageData`,
-contours (surface-nets), simplification, nettoyage du graphe (clean-pslg), triangulation
-(cdt2d). Sur un rapport à 4 figures et 298 libellés distincts, cette chaîne prenait
-~9 s, dont 6,6 s dans clean-pslg — pour rien :
+Plotly gl3d turns every 3D text label (`scatter3d` with `mode: "...text"`, axis titles and
+ticks) into triangles: fillText on a shared canvas, `getImageData`, contours
+(surface-nets), simplification, graph cleanup (clean-pslg), triangulation (cdt2d). On a
+report with 4 figures and 298 distinct labels, this chain took ~9 s, 6.6 s of it in
+clean-pslg — for nothing:
 
-1. **clean-pslg** (module 332, fonction `L`) convertit *tous* les points en rationnels
-   exacts (`big-rat`/`bn.js`, d'où les `gcd`) puis les reconvertit en flottants, même
-   quand il n'existe aucun croisement d'arêtes à calculer (0 sur 588 appels mesurés). Un
-   rationnel construit depuis un flottant redonne ce flottant : sans croisement, on
-   garde les flottants (tri par comparaison numérique, `b()` accepte un nombre). Avec
-   croisement, chemin exact inchangé.
-2. **Remplissage du canvas** (module 7718) : avant chaque libellé, le canvas de
-   8192×1024 était repeint en noir en entier. Hors de la zone salie par le libellé
-   précédent il est déjà noir opaque (invariant posé par le premier remplissage plein) :
-   on ne repeint que cette zone. Remplissage plein au premier appel et après tout
-   redimensionnement (qui remet le canvas à zéro).
-3. **`willReadFrequently`** sur ce canvas (module 4359) : il est relu à chaque libellé.
+1. **clean-pslg** (module 332, function `L`) converts *all* points to exact rationals
+   (`big-rat`/`bn.js`, hence the `gcd`s) then converts them back to floats, even when
+   there is no edge crossing to compute (0 out of 588 measured calls). A rational built
+   from a float gives that float back: with no crossing, we keep the floats (sorted by
+   numeric comparison, `b()` accepts a number). With a crossing, the exact path is
+   unchanged.
+2. **Canvas fill** (module 7718): before every label, the 8192×1024 canvas was fully
+   repainted black. Outside the area dirtied by the previous label it is already opaque
+   black (invariant set by the first full fill): only that area is repainted. Full fill
+   on the first call and after any resize (which resets the canvas to zero).
+3. **`willReadFrequently`** on that canvas (module 4359): it is read back for every label.
 
-Validé le 2026-10-19 : 588 maillages identiques octet par octet à la chaîne d'origine
-(séquence complète, mêmes options de police que Plotly) ; 4 figures 9,3 → 3,6 s.
+Validated on 2026-10-19: 588 meshes byte-for-byte identical to the original chain
+(full sequence, same font options as Plotly); 4 figures 9.3 → 3.6 s.
 
-À relancer après chaque mise à jour de `plotly.min.js` :
+Re-run after every update of `plotly.min.js`:
     uv run scripts/patch_plotly.py
-Idempotent. Échoue si un motif n'est pas trouvé exactement une fois : le code amont a
-changé, le patch est à réexaminer (et peut-être devenu inutile).
+Idempotent. Fails if a pattern is not found exactly once: the upstream code has
+changed, the patch must be re-examined (and may have become unnecessary).
 """
 
 from pathlib import Path
@@ -34,13 +33,13 @@ TARGET = Path(__file__).resolve().parent.parent / "ui" / "vendor" / "plotly.min.
 MARKER = "/* kroki-desk: vectorize-text patch (scripts/patch_plotly.py) */\n"
 
 REPLACEMENTS = [
-    # 3. canvas relu à chaque libellé : backing CPU
+    # 3. canvas read back for every label: CPU backing
     (
         'l=document.createElement("canvas"),l.width=8192,l.height=1024,u=l.getContext("2d"))',
         'l=document.createElement("canvas"),l.width=8192,l.height=1024,'
         'u=l.getContext("2d",{willReadFrequently:!0}))',
     ),
-    # 1. clean-pslg : rationnels seulement s'il existe des croisements (G)
+    # 1. clean-pslg: rationals only if there are crossings (G)
     (
         "N,H,ie=q.map(function(mt){return[c(mt[0]),c(mt[1])]});",
         "N,H,ie=G.length?q.map(function(mt){return[c(mt[0]),c(mt[1])]}):null;",
@@ -58,7 +57,7 @@ REPLACEMENTS = [
         "function b(q){var V=h(q);return",
         'function b(q){var V=typeof q=="number"?q:h(q);return',
     ),
-    # 2. ne repeindre que la zone salie par le libellé précédent
+    # 2. only repaint the area dirtied by the previous label
     (
         'V.height<Be&&(V.height=Be),G.fillStyle="#000",G.fillRect(0,0,V.width,V.height),G.fillStyle="#fff";',
         'V.height<Be&&(V.height=Be),G.fillStyle="#000",'
@@ -75,21 +74,21 @@ REPLACEMENTS = [
 
 
 def main() -> None:
-    # Octets bruts : ne pas laisser Python réécrire les fins de ligne du vendor.
+    # Raw bytes: do not let Python rewrite the vendor's line endings.
     text = TARGET.read_bytes().decode("utf-8")
     if MARKER in text:
-        print(f"déjà patché : {TARGET}")
+        print(f"already patched: {TARGET}")
         return
     for old, new in REPLACEMENTS:
         count = text.count(old)
         if count != 1:
             raise SystemExit(
-                f"motif trouvé {count} fois (attendu : 1) — plotly.min.js a changé, "
-                f"patch à réexaminer :\n  {old[:100]}"
+                f"pattern found {count} times (expected: 1) — plotly.min.js has changed, "
+                f"patch to be re-examined:\n  {old[:100]}"
             )
         text = text.replace(old, new)
     TARGET.write_bytes((MARKER + text).encode("utf-8"))
-    print(f"patché ({len(REPLACEMENTS)} remplacements) : {TARGET}")
+    print(f"patched ({len(REPLACEMENTS)} replacements): {TARGET}")
 
 
 if __name__ == "__main__":

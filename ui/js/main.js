@@ -1,6 +1,6 @@
 // @ts-check
 
-// Orchestration de la fenêtre : état des onglets, vues, raccourcis, liens.
+// Window orchestration: tab state, views, shortcuts, links.
 
 import { invoke, listen, currentLabel, state, isHtmlPath } from "./app.js";
 import {
@@ -64,10 +64,10 @@ import { beginLoading, endLoading, beforeHeavyRender } from "./loading.js";
 const viewsEl = /** @type {HTMLElement} */ (document.getElementById("views"));
 const emptyEl = /** @type {HTMLElement} */ (document.getElementById("empty-state"));
 
-let zoom = 1; // zoom texte (Ctrl+molette) : l'échelle change, la colonne reflue
-let pageZoom = 1; // zoom de page (Maj+molette) : vrai zoom, sans reflux (cf. setPageZoom)
-let fitWidth = false; // préférence globale d'affichage : preview pleine largeur (cf. setFitWidth)
-let appVersion = ""; // version de l'app (tauri.conf.json), récupérée au boot
+let zoom = 1; // text zoom (Ctrl+wheel): the scale changes, the column reflows
+let pageZoom = 1; // page zoom (Shift+wheel): true zoom, no reflow (cf. setPageZoom)
+let fitWidth = false; // global display preference: full-width preview (cf. setFitWidth)
+let appVersion = ""; // app version (tauri.conf.json), fetched at boot
 
 /** @param {TabsPayload} payload */
 function applyTabs(payload) {
@@ -79,7 +79,7 @@ function applyTabs(payload) {
   updateTitle();
   if (state.active != null) showActive();
   else updateViewActions();
-  refreshGlobalSearch(); // onglets ouverts/fermés : les résultats de recherche suivent
+  refreshGlobalSearch(); // tabs opened/closed: the search results follow
 }
 
 function syncViews() {
@@ -95,7 +95,7 @@ function syncViews() {
     if (!state.views.has(t.id)) {
       const el = document.createElement("div");
       el.className = "doc-view";
-      el.tabIndex = -1; // focusable : PgUp/PgDn/flèches défilent sans clic préalable
+      el.tabIndex = -1; // focusable: PgUp/PgDn/arrows scroll without a prior click
       el.style.display = "none";
       viewsEl.appendChild(el);
       state.views.set(t.id, { el, rendered: false, seq: 0 });
@@ -104,9 +104,9 @@ function syncViews() {
 }
 
 async function showActive() {
-  // Typé non nul : `null` (aucun onglet actif) n'a pas de vue, sortie au `if (!v)`.
+  // Typed non-null: `null` (no active tab) has no view, exit at the `if (!v)`.
   const id = /** @type {number} */ (state.active);
-  closeToc(); // le sommaire référence l'onglet précédent : on le ferme au changement
+  closeToc(); // the TOC references the previous tab: close it on change
   for (const [vid, v] of state.views) {
     v.el.style.display = vid === id ? "" : "none";
   }
@@ -119,23 +119,23 @@ async function showActive() {
     await renderActive(v, id);
   }
   updateViewActions();
-  // Rattrape les figures Plotly d'un onglet rendu pendant qu'il était masqué, ou
-  // dont le zoom a changé pendant son inactivité (largeur alors non mesurable).
+  // Catches up the Plotly figures of a tab rendered while it was hidden, or
+  // whose zoom changed while it was inactive (width then not measurable).
   resizePlotlyFigures(v.el);
   consumePendingPlace(v, id);
   consumePendingAnchor(v);
-  onActiveViewShown(v, id); // saut de recherche en attente / surlignage qui suit l'onglet
-  refreshDocSearch(); // le DOM cherché par Ctrl+F vient de changer
+  onActiveViewShown(v, id); // pending search jump / highlighting that follows the tab
+  refreshDocSearch(); // the DOM searched by Ctrl+F has just changed
 }
 
-// --- Deep-link inter-fichiers : `[..](fichier.md#section)` ---
-// Le fragment d'un lien relatif vers un autre document est mémorisé ici : le
-// backend (`open_link`) ouvre/active l'onglet, puis `showActive` scrolle vers
-// l'ancre une fois le document cible rendu.
+// --- Cross-file deep link: `[..](file.md#section)` ---
+// The fragment of a relative link to another document is remembered here: the
+// backend (`open_link`) opens/activates the tab, then `showActive` scrolls to
+// the anchor once the target document is rendered.
 /** @type {{ path: string, fragment: string, expires: number } | null} */
-let pendingAnchor = null; // { path (normalisé), fragment, expires }
+let pendingAnchor = null; // { path (normalized), fragment, expires }
 
-// Chemin absolu normalisé pour comparaison Windows (séparateurs, `..`, casse).
+// Normalized absolute path for Windows comparison (separators, `..`, case).
 /**
  * @param {string} dir
  * @param {string} [rel]
@@ -150,9 +150,9 @@ function normPath(dir, rel = "") {
   return parts.join("\\").toLowerCase();
 }
 
-// Fragment « numéro de ligne » à la GitHub / VS Code : `#L75`, plage `#L75-L80`
-// (seul le début compte). Renvoie la ligne 0-based (convention des
-// `data-line`/`data-source-line`), ou null si le fragment n'en est pas un.
+// "Line number" fragment, GitHub / VS Code style: `#L75`, range `#L75-L80`
+// (only the start counts). Returns the 0-based line (convention of
+// `data-line`/`data-source-line`), or null if the fragment is not one.
 /**
  * @param {string} fragment
  * @returns {number | null}
@@ -162,7 +162,7 @@ function lineFragment(fragment) {
   return m ? Math.max(0, Number(m[1]) - 1) : null;
 }
 
-// Amène la ligne `line` du source réel en haut de la vue, quel que soit son mode.
+// Brings line `line` of the real source to the top of the view, whatever its mode.
 /**
  * @param {View} v
  * @param {number} line
@@ -171,11 +171,11 @@ function scrollToSourceLine(v, line) {
   if (v.mode === "source") scrollToLine(v.el, "data-line", line);
   else if (v.mode === "derived")
     scrollToLine(v.el, "data-line", v.lineMap ? mdLineForSource(v.lineMap, line) : line);
-  else scrollToLine(v.el, "data-source-line", line); // preview : déjà en lignes du source réel
+  else scrollToLine(v.el, "data-source-line", line); // preview: already in real-source lines
 }
 
-// Saute vers un fragment dans la vue `v` : un `id` existant prime, sinon un
-// fragment `L<n>` vaut numéro de ligne. Renvoie false si rien ne correspond.
+// Jumps to a fragment in view `v`: an existing `id` wins, otherwise an
+// `L<n>` fragment is a line number. Returns false if nothing matches.
 /**
  * @param {View} v
  * @param {string} fragment
@@ -201,17 +201,17 @@ function consumePendingAnchor(v) {
     pendingAnchor = null;
     return;
   }
-  // Vue HTML (iframe) : document hors de portée du querySelector, pas de saut.
+  // HTML view (iframe): document out of querySelector's reach, no jump.
   if (v.kind === "html" || !v.path || normPath(v.path) !== pendingAnchor.path) return;
-  // Fragment inconnu dans ce document : on garde l'ouverture simple.
+  // Unknown fragment in this document: keep the plain open.
   if (jumpToFragment(v, pendingAnchor.fragment)) pendingAnchor = null;
 }
 
-// Référence passée en ligne de commande (`kroki_deskapp.exe doc.tex#eq:x`) :
-// le backend l'empile (`manager::open_file_args`) et ne fait que signaler —
-// au lancement, elle précède l'écouteur. Seule la dernière compte : c'est le
-// dernier fichier ouvert qui devient actif. Délai large : un démarrage à froid
-// charge les moteurs et le worker du plugin avant le premier rendu.
+// Reference passed on the command line (`kroki_deskapp.exe doc.tex#eq:x`):
+// the backend queues it (`manager::open_file_args`) and only signals — at
+// launch, it precedes the listener. Only the last one counts: the last file
+// opened becomes active. Generous delay: a cold start loads the engines and
+// the plugin worker before the first render.
 async function drainPendingAnchors() {
   const last = (await invoke("take_pending_anchors")).at(-1);
   if (!last) return;
@@ -220,30 +220,30 @@ async function drainPendingAnchors() {
     fragment: last.fragment,
     expires: Date.now() + 30000,
   };
-  // Onglet déjà rendu (document déjà ouvert) : `showActive` est passé sans
-  // rien à consommer. En cours de rendu, c'est lui qui consommera.
+  // Tab already rendered (document already open): `showActive` ran with
+  // nothing to consume. While rendering, it will be the one to consume.
   const v = state.views.get(state.active);
   if (v && v.rendered && !v.rendering) consumePendingAnchor(v);
 }
 
-// --- Historique de navigation : précédent / suivant (boutons 4/5 de la souris, Alt+←/→) ---
-// Chaque lien suivi empile la position quittée (onglet + défilement) ; revenir
-// empile à son tour la position courante côté « suivant ». Seule l'origine est
-// mémorisée au clic : la destination l'est au moment où on la quitte, ce qui
-// couvre un fragment introuvable ou un document ouvert dans un nouvel onglet.
+// --- Navigation history: back / forward (mouse buttons 4/5, Alt+←/→) ---
+// Each followed link pushes the position left (tab + scroll); going back in
+// turn pushes the current position onto the "forward" side. Only the origin
+// is remembered on click: the destination is remembered when we leave it,
+// which covers a missing fragment or a document opened in a new tab.
 /** @typedef {{ docId: number, top: number, left: number }} Place */
 /** @type {Place[]} */
 const navBack = [];
 /** @type {Place[]} */
 const navForward = [];
 const NAV_MAX = 100;
-// Lien vers un autre document : la position quittée n'est empilée que si un
-// onglet s'affiche ensuite (`showActive`) — un fichier ouvert par l'application
-// système, ou un lien mort, ne laisse pas d'entrée qui ne ramènerait nulle part.
+// Link to another document: the position left is only pushed if a tab is
+// displayed afterwards (`showActive`) — a file opened by the system
+// application, or a dead link, leaves no entry that would lead nowhere.
 /** @type {{ place: Place, expires: number } | null} */
 let pendingOrigin = null;
 /** @type {Place | null} */
-let pendingPlace = null; // position à restaurer quand l'onglet visé s'affichera
+let pendingPlace = null; // position to restore when the target tab is displayed
 
 /** @returns {Place | null} */
 function currentPlace() {
@@ -256,7 +256,7 @@ function currentPlace() {
 function pushBack(place) {
   navBack.push(place);
   if (navBack.length > NAV_MAX) navBack.shift();
-  navForward.length = 0; // nouvelle branche : l'ancien « suivant » est caduc
+  navForward.length = 0; // new branch: the old "forward" is void
 }
 
 function consumePendingOrigin() {
@@ -265,19 +265,19 @@ function consumePendingOrigin() {
   pendingOrigin = null;
 }
 
-/** @param {number} dir -1 = précédent, 1 = suivant */
+/** @param {number} dir -1 = back, 1 = forward */
 function navigate(dir) {
   const from = dir < 0 ? navBack : navForward;
   const to = dir < 0 ? navForward : navBack;
   const alive = new Set(state.tabs.map((t) => t.id));
   /** @type {Place | undefined} */
   let target;
-  // Onglet fermé ou détaché dans une autre fenêtre depuis : entrée sautée.
+  // Tab closed or detached into another window since: entry skipped.
   while ((target = from.pop()) && !alive.has(target.docId));
   if (!target) return;
   const here = currentPlace();
   if (here) to.push(here);
-  pendingAnchor = null; // un deep-link encore en attente ne doit pas l'emporter
+  pendingAnchor = null; // a still-pending deep link must not win
   pendingOrigin = null;
   const v = state.views.get(target.docId);
   if (target.docId === state.active && v) {
@@ -308,7 +308,7 @@ function consumePendingPlace(v, id) {
 }
 
 /**
- * La vue rend-elle la preview (seul mode qui traverse markdown-it + KaTeX) ?
+ * Does the view render the preview (the only mode going through markdown-it + KaTeX)?
  * @param {View} v
  */
 function isPreview(v) {
@@ -321,7 +321,7 @@ function isPreview(v) {
  */
 async function renderActive(v, id) {
   const seq = ++v.seq;
-  v.rendering = true; // cf. drainPendingAnchors : pas de saut dans un DOM en chantier
+  v.rendering = true; // cf. drainPendingAnchors: no jump into a DOM under construction
   beginLoading();
   try {
     await renderActiveInner(v, id, seq);
@@ -349,11 +349,11 @@ async function renderActiveInner(v, id, seq) {
   }
   if (v.seq !== seq) return;
   v.rendered = true;
-  v.path = doc.path; // chemin absolu : ciblage des deep-links inter-fichiers
-  // Page HTML statique (dont les exports de l'app) : hors pipeline markdown —
-  // affichée telle quelle dans une iframe sandboxée. `v.markdown` reste null,
-  // ce qui désarme naturellement source/sommaire/export/recherche ; la pile
-  // d'actions de vue est masquée (cf. updateViewActions).
+  v.path = doc.path; // absolute path: targeting of cross-file deep links
+  // Static HTML page (including the app's exports): outside the markdown
+  // pipeline — displayed as is in a sandboxed iframe. `v.markdown` stays null,
+  // which naturally disarms source/TOC/export/search; the view action stack
+  // is hidden (cf. updateViewActions).
   if (isHtmlPath(doc.path)) {
     v.kind = "html";
     v.markdown = null;
@@ -365,13 +365,12 @@ async function renderActiveInner(v, id, seq) {
     return;
   }
   v.kind = "doc";
-  v.sourceText = doc.markdown; // source réel (markdown brut ou format d'un plugin), pour la vue source
+  v.sourceText = doc.markdown; // real source (raw markdown or a plugin's format), for the source view
   v.lineMap = null;
-  // Extension revendiquée par un plugin (`document:markdown`) : le worker du
-  // plugin transforme le source en markdown dérivé avant le pipeline habituel
-  // (circuit des .tex via latex-doc, par exemple). En
-  // panne/erreur, rendu dégradé §7.3 : bandeau + source en fence — jamais
-  // d'onglet vide.
+  // Extension claimed by a plugin (`document:markdown`): the plugin's worker
+  // transforms the source into derived markdown before the usual pipeline
+  // (the .tex path via latex-doc, for example). On failure/error, degraded
+  // render §7.3: banner + source in a fence — never an empty tab.
   const docPlugin = documentPluginFor(doc.path);
   if (docPlugin) {
     let gen;
@@ -382,8 +381,8 @@ async function renderActiveInner(v, id, seq) {
         dir: doc.dir,
         title: doc.title,
       });
-      // Avertissements non bloquants du plugin : bandeau en fin de document
-      // (en tête, ils décaleraient toutes les ancres).
+      // Non-blocking plugin warnings: banner at the end of the document
+      // (at the top, they would shift all the anchors).
       if (gen.warnings.length) {
         gen.markdown += `\n\n> ⚠️ ${gen.warnings.map((w) => String(w)).join(" · ")}\n`;
       }
@@ -397,59 +396,59 @@ async function renderActiveInner(v, id, seq) {
     doc = { ...doc, markdown: gen.markdown, lineMap: gen.anchors };
     v.lineMap = gen.anchors;
   }
-  v.markdown = doc.markdown; // conservé pour la bascule preview ↔ source sans relecture
+  v.markdown = doc.markdown; // kept for the preview ↔ source toggle without re-reading
   v.dir = doc.dir;
-  v.domCache = null; // nouveau contenu : tout DOM mémorisé par renderMode est périmé
-  if (v.mode === "derived" && !v.lineMap) v.mode = "preview"; // plus de transform (plugin retiré)
-  // Les trois rendus qui suivent sont synchrones (hors hydratation des
-  // diagrammes) : sans ce point de respiration, le voile de chargement ne
-  // serait peint qu'une fois le rendu terminé. Seule la preview le mérite —
-  // elle seule traverse markdown-it + KaTeX + DOMPurify. Les vues source et
-  // dérivée se contentent de découper et colorer du texte : ~115 ms là où la
-  // preview en demande ~765 sur le même document, soit un voile qui
-  // clignoterait au lieu d'informer.
+  v.domCache = null; // new content: any DOM remembered by renderMode is stale
+  if (v.mode === "derived" && !v.lineMap) v.mode = "preview"; // no more transform (plugin removed)
+  // The three renders that follow are synchronous (apart from diagram
+  // hydration): without this breathing point, the loading overlay would only
+  // be painted once the render is finished. Only the preview deserves it —
+  // it alone goes through markdown-it + KaTeX + DOMPurify. The source and
+  // derived views just split and color text: ~115 ms where the preview takes
+  // ~765 on the same document, i.e. an overlay that would flicker instead of
+  // informing.
   await beforeHeavyRender(isPreview(v) ? doc.markdown : "");
   if (v.seq !== seq) return;
   await renderMode(v, v.mode);
 }
 
-// Vue debug « markdown intermédiaire » : le markdown généré par le plugin
-// (document:markdown), affiché brut avec la mécanique de la vue source.
+// "Intermediate markdown" debug view: the markdown generated by the plugin
+// (document:markdown), displayed raw with the source view's machinery.
 /** @param {View} v */
 function renderDerived(v) {
-  // Toujours du markdown, quel que soit le format du fichier d'origine.
+  // Always markdown, whatever the original file's format.
   renderSource(v.el, /** @type {string} */ (v.markdown), { lang: "markdown", plugin: null });
   v.el.querySelector(".source-view")?.classList.add("derived-view");
 }
 
 /**
- * Affiche un mode dans la vue, en réutilisant le DOM déjà construit s'il existe.
+ * Displays a mode in the view, reusing the already-built DOM if it exists.
  *
- * Reconstruire la preview d'un gros document coûte ~500 ms — markdown-it, KaTeX,
- * DOMPurify puis l'insertion de dizaines de milliers de nœuds — et chaque
- * aller-retour vers la vue source repayait ce prix pour un contenu identique.
- * Le DOM de chaque mode est donc conservé et simplement réattaché. Effet de
- * bord bienvenu : les diagrammes déjà hydratés survivent à la bascule.
+ * Rebuilding the preview of a large document costs ~500 ms — markdown-it, KaTeX,
+ * DOMPurify then the insertion of tens of thousands of nodes — and every
+ * round trip to the source view paid that price again for identical content.
+ * Each mode's DOM is therefore kept and simply reattached. Welcome side
+ * effect: already-hydrated diagrams survive the toggle.
  *
- * Le cache est vidé par `renderActive`, seul endroit où le contenu change :
- * modification sur disque, changement de thème ou d'icônes y passent tous via
+ * The cache is cleared by `renderActive`, the only place where the content
+ * changes: disk modification, theme or icon changes all go through there via
  * `state.stale`.
  * @param {View} v
  * @param {ViewMode | undefined} mode
  */
 async function renderMode(v, mode) {
-  // Une vue neuve n'a pas encore de `mode` : partout ailleurs `undefined` se
-  // comporte comme "preview", mais ici il servirait de clé de cache distincte —
-  // le DOM du premier rendu serait rangé sous `undefined` et jamais retrouvé.
+  // A new view has no `mode` yet: everywhere else `undefined` behaves like
+  // "preview", but here it would serve as a distinct cache key — the first
+  // render's DOM would be stored under `undefined` and never found again.
   const key = mode === "source" || mode === "derived" ? mode : "preview";
   const cached = v.domCache?.[key];
   if (cached) {
     v.el.replaceChildren(cached);
     return;
   }
-  // Phase synchrone : le voile doit être peint avant qu'elle démarre. Seule la
-  // preview le mérite (cf. renderActive). `markdown`/`dir` sont posés : appelé
-  // par renderActiveInner après eux, ou par les bascules qui l'exigent non nul.
+  // Synchronous phase: the overlay must be painted before it starts. Only the
+  // preview deserves it (cf. renderActive). `markdown`/`dir` are set: called
+  // by renderActiveInner after them, or by the toggles that require them non-null.
   await beforeHeavyRender(key === "preview" ? v.markdown : "");
   if (key === "source")
     renderSource(v.el, /** @type {string} */ (v.sourceText ?? v.markdown), sourceHighlightFor(v.path));
@@ -463,7 +462,7 @@ async function renderMode(v, mode) {
   (v.domCache ??= {})[key] = v.el.firstElementChild;
 }
 
-// --- Actions de vue (sommaire + bascule code source) de l'onglet actif ---
+// --- View actions (TOC + source code toggle) of the active tab ---
 const viewActions = /** @type {HTMLElement} */ (document.getElementById("view-actions"));
 const sourceBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-source-toggle"));
 const derivedBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-derived"));
@@ -471,21 +470,22 @@ const fitBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-fi
 const tocBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-toc"));
 const tocPanel = /** @type {HTMLElement} */ (document.getElementById("toc-panel"));
 
-// Affiche/masque la pile de boutons selon qu'un onglet rendu est actif, et reflète
-// le mode courant sur le bouton source. Chaque bouton croise deux conditions : sa
-// pertinence pour le document affiché, et son activation dans les réglages
-// (`iconEnabled`) ; la pile entière disparaît quand il ne reste rien à montrer.
+// Shows/hides the button stack depending on whether a rendered tab is active, and
+// reflects the current mode on the source button. Each button crosses two
+// conditions: its relevance for the displayed document, and its activation in
+// the settings (`iconEnabled`); the whole stack disappears when there is
+// nothing left to show.
 function updateViewActions() {
   const v = state.views.get(state.active);
-  // Vue HTML (iframe) : aucune action ne s'applique (ni source, ni sommaire,
-  // ni export, ni pleine largeur) — toute la pile est masquée.
+  // HTML view (iframe): no action applies (no source, TOC, export or full
+  // width) — the whole stack is hidden.
   const show = !!v && v.rendered && v.kind !== "html";
   let any = false;
   for (const [id, relevant] of /** @type {[string, boolean][]} */ ([
     ["btn-toc", true],
     ["btn-source-toggle", true],
-    // Vue « markdown intermédiaire » : seulement pour un document passé par un
-    // transform de plugin (lineMap présent). Désactivée par défaut (cf. icons.js).
+    // "Intermediate markdown" view: only for a document that went through a
+    // plugin transform (lineMap present). Disabled by default (cf. icons.js).
     ["btn-derived", !!v?.lineMap],
     ["btn-fit-width", true],
     ["btn-export", true],
@@ -495,7 +495,7 @@ function updateViewActions() {
     any = any || on;
   }
   viewActions.hidden = !any;
-  // Sans bouton pour le refermer, le sommaire ne doit pas rester ouvert.
+  // Without a button to close it, the TOC must not stay open.
   if (!show || !iconEnabled("btn-toc")) closeToc();
   if (!show) return;
   const isSource = v.mode === "source";
@@ -507,7 +507,7 @@ function updateViewActions() {
   derivedBtn.setAttribute("aria-pressed", String(isDerived));
 }
 
-// Titre du bouton source : suit le mode de la vue active et la langue.
+// Source button title: follows the active view's mode and the language.
 function updateSourceTitle() {
   if (state.views.get(state.active)?.mode === "source") {
     sourceBtn.title = t("toolbar.source_hide");
@@ -516,13 +516,13 @@ function updateSourceTitle() {
   }
 }
 
-// Titre du bouton pleine largeur : suit la préférence et la langue.
+// Full-width button title: follows the preference and the language.
 function updateFitTitle() {
   if (fitWidth) fitBtn.title = t("toolbar.fit_on");
   else fitBtn.title = t("toolbar.fit_off");
 }
 
-// --- Sommaire (table des matières) de l'onglet actif ---
+// --- Table of contents (« sommaire ») of the active tab ---
 function closeToc() {
   if (tocPanel.hidden) return;
   tocPanel.hidden = true;
@@ -530,8 +530,8 @@ function closeToc() {
   tocBtn.setAttribute("aria-expanded", "false");
 }
 
-// Va au titre cliqué : en preview, scroll vers l'élément par son id (comme les
-// ancres) ; en mode source, aligne la ligne du titre en haut (cf. scrollToLine).
+// Goes to the clicked heading: in preview, scrolls to the element by its id (like
+// anchors); in source mode, aligns the heading's line at the top (cf. scrollToLine).
 /** @param {Heading} h */
 function gotoHeading(h) {
   const v = state.views.get(state.active);
@@ -579,13 +579,13 @@ function toggleToc() {
     closeToc();
     return;
   }
-  // Même ancre à l'écran : sommaire et recherches sont exclusifs.
+  // Same on-screen anchor: the TOC and the searches are mutually exclusive.
   closeGlobalSearch();
   closeDocSearch();
   const v = state.views.get(state.active);
   if (!v || !v.rendered || v.markdown == null) return;
   let headings = extractHeadings(v.markdown);
-  // Document dérivé d'un plugin : réaccorde les lignes des titres sur le source réel.
+  // Document derived by a plugin: realigns the headings' lines on the real source.
   if (v.lineMap) headings = headings.map((h) => ({ ...h, line: remapLine(/** @type {Anchor[]} */ (v.lineMap), h.line) }));
   buildToc(headings);
   tocPanel.hidden = false;
@@ -597,18 +597,18 @@ async function toggleSource() {
   const id = state.active;
   const v = state.views.get(id);
   if (!v || !v.rendered || v.markdown == null) return;
-  // Ligne de référence : en preview elle est déjà exprimée dans le source réel
-  // (data-source-line remappé) ; en vue dérivée (debug) c'est une ligne du
-  // markdown généré, remappée vers le source via les ancres.
+  // Reference line: in preview it is already expressed in the real source
+  // (remapped data-source-line); in the derived (debug) view it is a line of
+  // the generated markdown, remapped to the source via the anchors.
   const fromAttr = v.mode === "source" || v.mode === "derived" ? "data-line" : "data-source-line";
   let line = readTopLine(v.el, fromAttr);
   if (v.mode === "derived" && v.lineMap) line = remapLine(v.lineMap, line);
   v.mode = v.mode === "source" ? "preview" : "source";
   beginLoading();
   try {
-    // renderMode sert le DOM déjà construit s'il existe, et ne pose le voile que
-    // pour un vrai rendu de preview. hydrateDiagrams modifie les hauteurs : on
-    // attend la fin avant de réaligner.
+    // renderMode serves the already-built DOM if it exists, and only puts up
+    // the overlay for a real preview render. hydrateDiagrams changes heights:
+    // we wait for it to finish before realigning.
     await renderMode(v, v.mode);
   } finally {
     endLoading();
@@ -616,13 +616,13 @@ async function toggleSource() {
   const toAttr = v.mode === "source" ? "data-line" : "data-source-line";
   scrollToLine(v.el, toAttr, line);
   updateViewActions();
-  refreshDocSearch(); // vue reconstruite : les Range de Ctrl+F sont à recalculer
+  refreshDocSearch(); // view rebuilt: Ctrl+F's Ranges must be recomputed
 }
 
-// --- Vue debug : markdown intermédiaire (builds debug, documents transformés) ---
-// Bascule preview/source ↔ markdown généré par le plugin. L'alignement de
-// position passe par les ancres : approximatif (granularité par section),
-// suffisant pour un outil de débogage.
+// --- Debug view: intermediate markdown (debug builds, transformed documents) ---
+// Toggles preview/source ↔ markdown generated by the plugin. Position
+// alignment goes through the anchors: approximate (per-section granularity),
+// good enough for a debugging tool.
 /**
  * @param {Anchor[]} anchors
  * @param {number} srcLine
@@ -641,13 +641,13 @@ async function toggleDerived() {
   beginLoading();
   try {
     if (v.mode === "derived") {
-      const line = readTopLine(v.el, "data-line"); // ligne du markdown généré
+      const line = readTopLine(v.el, "data-line"); // line of the generated markdown
       v.mode = "preview";
       await renderMode(v, "preview");
       scrollToLine(v.el, "data-source-line", remapLine(v.lineMap, line));
     } else {
       const fromAttr = v.mode === "source" ? "data-line" : "data-source-line";
-      const srcLine = readTopLine(v.el, fromAttr); // ligne du source réel
+      const srcLine = readTopLine(v.el, fromAttr); // line of the real source
       v.mode = "derived";
       await renderMode(v, "derived");
       scrollToLine(v.el, "data-line", mdLineForSource(v.lineMap, srcLine));
@@ -667,10 +667,10 @@ function updateTitle() {
   invoke("set_title", { title });
 }
 
-// Une icône désactivée ne doit pas laisser une vue dans un état qu'on ne peut
-// plus quitter (mode source ou markdown intermédiaire, preview pleine largeur) :
-// ces vues repassent à l'état atteignable sans bouton. Idempotent : sans
-// changement de réglage, cette passe ne fait rien.
+// A disabled icon must not leave a view in a state that can no longer be left
+// (source mode or intermediate markdown, full-width preview): these views go
+// back to the state reachable without a button. Idempotent: without a
+// setting change, this pass does nothing.
 function enforceIconAvailability() {
   const sourceOn = iconEnabled("btn-source-toggle");
   const derivedOn = iconEnabled("btn-derived");
@@ -684,43 +684,43 @@ function enforceIconAvailability() {
 
 function rerenderAll() {
   enforceIconAvailability();
-  // Les workers de plugins vivants suivent le thème effectif (spec §6.6) ;
-  // notification idempotente, sans coût quand rien n'a changé.
+  // Live plugin workers follow the effective theme (spec §6.6);
+  // idempotent notification, no cost when nothing changed.
   notifyThemeChanged();
   for (const t of state.tabs) state.stale.add(t.id);
   if (state.active != null) showActive();
 }
 
-// Plotly est le seul rendu interactif (hover) ; son hit-testing casse sous le
-// `zoom` CSS de page (cf. app.css). Le contre-zoom (var --plotly-inv-zoom) ramène
-// l'échelle effective à 1 (coordonnées 1:1) ; il faut alors réaccorder le plan à la
-// largeur réelle de la colonne pour éviter un débordement au dézoom. On le fait via
-// relayout(width, height) en préservant le ratio d'aspect — surtout PAS via
-// Plots.resize, qui prend la hauteur du conteneur (sans hauteur CSS) et l'écrase.
+// Plotly is the only interactive render (hover); its hit-testing breaks under the
+// page's CSS `zoom` (cf. app.css). The counter-zoom (var --plotly-inv-zoom) brings
+// the effective scale back to 1 (1:1 coordinates); the plot must then be re-fitted
+// to the column's real width to avoid overflow when zooming out. This is done via
+// relayout(width, height) preserving the aspect ratio — NOT via Plots.resize,
+// which takes the container's height (no CSS height) and overwrites it.
 /** @param {HTMLElement | undefined} viewEl */
 function resizePlotlyFigures(viewEl) {
   const P = window.Plotly;
   if (!P || !viewEl) return;
-  // Plotly pose la classe `js-plotly-plot` sur l'élément cible lui-même (= le
-  // .kroki-diagram), pas sur un enfant : on filtre donc dessus directement.
+  // Plotly puts the `js-plotly-plot` class on the target element itself (= the
+  // .kroki-diagram), not on a child: so we filter on it directly.
   for (const el of /** @type {NodeListOf<HTMLElement>} */ (
     viewEl.querySelectorAll('.kroki-diagram[data-kroki-type="plotly"].js-plotly-plot')
   )) {
-    // offsetParent null = vue masquée (onglet inactif) : mesure de largeur
-    // invalide, on la rattrape à la réactivation (showActive).
+    // offsetParent null = hidden view (inactive tab): width measurement
+    // invalid, caught up on reactivation (showActive).
     if (el.offsetParent === null) continue;
     const w = el.clientWidth;
-    const ratio = parseFloat(/** @type {string} */ (el.dataset.plotlyRatio)); // absent → NaN → ignoré
+    const ratio = parseFloat(/** @type {string} */ (el.dataset.plotlyRatio)); // absent → NaN → ignored
     if (w > 0 && ratio > 0) P.relayout(el, { width: w, height: Math.round(w * ratio) });
   }
 }
 
-// Les deux zooms se composent dans un seul `zoom` CSS sur #views. Ce qui les
-// distingue est la largeur de mise en page des vues (`--page-zoom`, cf. app.css) :
-// le zoom texte laisse la colonne logique rétrécir avec l'échelle (le texte
-// grossit et reflue, une figure pleine largeur garde sa taille à l'écran), le zoom
-// de page la maintient à sa largeur d'échelle 1 (rien ne reflue, tout grossit et
-// déborde en défilement horizontal).
+// The two zooms compose into a single CSS `zoom` on #views. What distinguishes
+// them is the views' layout width (`--page-zoom`, cf. app.css): the text zoom
+// lets the logical column shrink with the scale (text grows and reflows, a
+// full-width figure keeps its on-screen size), the page zoom keeps it at its
+// scale-1 width (nothing reflows, everything grows and overflows into
+// horizontal scrolling).
 function applyZoom() {
   const scale = zoom * pageZoom;
   viewsEl.style.zoom = String(scale);
@@ -735,13 +735,13 @@ function setZoom(z) {
   applyZoom();
 }
 
-// Zoom de page autour d'un point : `anchor` = {view, x, y}, position du curseur
-// en pixels écran relative à la vue. La mise en page en pixels logiques de la
-// vue est la même à toute échelle (cf. --page-w), donc le point de contenu sous
-// le curseur, c = scroll + écran / échelle, est invariant : on repose le
-// défilement pour l'y ramener après le changement d'échelle. Sans ancre (Ctrl+0),
-// le coin haut-gauche reste en place. Borné à 1 : en deçà, Ctrl+molette fait
-// déjà tenir plus de contenu à l'écran.
+// Page zoom around a point: `anchor` = {view, x, y}, cursor position in screen
+// pixels relative to the view. The view's layout in logical pixels is the same
+// at every scale (cf. --page-w), so the content point under the cursor,
+// c = scroll + screen / scale, is invariant: we reset the scroll to bring it
+// back there after the scale change. Without an anchor (Ctrl+0), the top-left
+// corner stays in place. Clamped to 1: below that, Ctrl+wheel already fits
+// more content on screen.
 /**
  * @param {number} p
  * @param {{ view: HTMLElement, x: number, y: number } | null} [anchor]
@@ -764,12 +764,12 @@ function setPageZoom(p, anchor = null) {
   }
 }
 
-// Bascule globale « pleine largeur » : le preview lâche son plafond de lecture (920px)
-// pour remplir la colonne. Rien à recalculer au dézoom — la règle CSS suit la largeur
-// logique. Le changement de largeur reflue le contenu (les hauteurs bougent) : on
-// mémorise la ligne source collée en haut AVANT, et on réaligne dessus APRÈS, comme la
-// bascule code source. Plotly, qui fige sa largeur au layout, est réaccordé avant le
-// scroll pour que les hauteurs soient stables au moment de mesurer la cible.
+// Global "full width" toggle: the preview drops its reading cap (920px) to fill
+// the column. Nothing to recompute on zoom-out — the CSS rule follows the logical
+// width. The width change reflows the content (heights move): we remember the
+// source line stuck at the top BEFORE, and realign on it AFTER, like the source
+// code toggle. Plotly, which freezes its width at layout time, is re-fitted before
+// the scroll so that heights are stable when measuring the target.
 /** @param {boolean} on */
 function setFitWidth(on) {
   fitWidth = on;
@@ -794,12 +794,12 @@ function cycleTab(dir) {
   invoke("activate_tab", { docId: next.id });
 }
 
-// --- Liens dans les documents : web → navigateur, .md relatif → onglet, ancre → scroll ---
+// --- Links in documents: web → browser, relative .md → tab, anchor → scroll ---
 
 /**
- * Fragment d'un lien, décodé. Un `%` qui n'introduit pas une séquence valide
- * (`#100%`, `#a%zz`) ferait lever `decodeURIComponent` — le clic, déjà
- * intercepté, ne ferait alors plus rien : le fragment est gardé brut.
+ * Decoded fragment of a link. A `%` that does not introduce a valid sequence
+ * (`#100%`, `#a%zz`) would make `decodeURIComponent` throw — the click, already
+ * intercepted, would then do nothing: the fragment is kept raw.
  * @param {string} s
  * @returns {string}
  */
@@ -813,8 +813,8 @@ function decodeFragment(s) {
 
 function initLinks() {
   /** @type {HTMLElement} */ (document.getElementById("content")).addEventListener("click", (e) => {
-    // `closest("a")` (et non `a[href]`) : les SVG graphviz portent leurs liens
-    // en `xlink:href` (nœuds de diagramme liés à un autre document, cliquables).
+    // `closest("a")` (not `a[href]`): graphviz SVGs carry their links as
+    // `xlink:href` (diagram nodes linked to another document, clickable).
     const a = /** @type {Element} */ (e.target).closest("a");
     if (!a) return;
     e.preventDefault();
@@ -831,9 +831,9 @@ function initLinks() {
       const place = currentPlace();
       pendingOrigin = place && { place, expires: Date.now() + 5000 };
     }
-    // Lien relatif avec fragment (`fichier.md#section`, lien
-    // d'un nœud de diagramme) : le backend ouvre le document, le fragment est
-    // mémorisé pour scroller une fois l'onglet cible rendu (showActive).
+    // Relative link with fragment (`file.md#section`, link from a diagram
+    // node): the backend opens the document, the fragment is remembered to
+    // scroll once the target tab is rendered (showActive).
     const hash = href.indexOf("#");
     if (hash > 0 && !/^(https?:|mailto:)/i.test(href)) {
       pendingAnchor = {
@@ -864,9 +864,9 @@ function initShortcuts() {
     } else if (ctrl && e.shiftKey && e.key.toLowerCase() === "f") {
       e.preventDefault();
       toggleGlobalSearch();
-      // Ctrl+F / F3 / Ctrl+G déclencheraient la barre de recherche native de la
-      // webview (non thémée, hors de notre modèle d'onglets) : on la neutralise en
-      // prenant la main sur les trois raccourcis.
+      // Ctrl+F / F3 / Ctrl+G would trigger the webview's native search bar
+      // (unthemed, outside our tab model): we neutralize it by taking over
+      // the three shortcuts.
     } else if (ctrl && !e.shiftKey && e.key.toLowerCase() === "f") {
       e.preventDefault();
       openDocSearch();
@@ -906,8 +906,8 @@ function initShortcuts() {
       closeToc();
     }
   });
-  // Boutons latéraux de la souris (« précédent » = 3, « suivant » = 4) : sans
-  // preventDefault, la webview tenterait sa propre navigation d'historique.
+  // Mouse side buttons ("back" = 3, "forward" = 4): without preventDefault,
+  // the webview would attempt its own history navigation.
   window.addEventListener("mousedown", (e) => {
     if (e.button === 3 || e.button === 4) e.preventDefault();
   });
@@ -925,9 +925,9 @@ function initShortcuts() {
         return;
       }
       if (!e.shiftKey) return;
-      // Maj+molette : Chromium (Windows/Linux) reporte alors le cran sur deltaX
-      // (défilement horizontal natif, qu'on remplace), les autres moteurs sur
-      // deltaY — on prend celui des deux qui porte le mouvement.
+      // Shift+wheel: Chromium (Windows/Linux) then reports the notch on deltaX
+      // (native horizontal scrolling, which we replace), other engines on
+      // deltaY — we take whichever of the two carries the movement.
       const delta = e.deltaY || e.deltaX;
       if (!delta) return;
       e.preventDefault();
@@ -947,42 +947,42 @@ function initShortcuts() {
 }
 
 async function boot() {
-  // Langue en tout premier : le HTML statique est traduit (et la fenêtre
-  // démasquée) avant le premier paint, et les modules initialisés ensuite
-  // écrivent leurs textes directement dans la bonne langue.
+  // Language first of all: the static HTML is translated (and the window
+  // unmasked) before the first paint, and the modules initialized afterwards
+  // write their texts directly in the right language.
   await initI18n();
 
-  // Thème d'abord : applique l'override sauvegardé avant tout rendu. En « auto » il
-  // n'altère rien (le premier paint suit déjà @media en pur CSS). initTheme réaccorde
-  // les figures Plotly quand le système bascule en mode auto.
+  // Theme first: applies the saved override before any render. In "auto" it
+  // changes nothing (the first paint already follows @media in pure CSS).
+  // initTheme re-tunes the Plotly figures when the system switches in auto mode.
   try {
     applyTheme(await invoke("get_theme"));
   } catch {
-    /* défaut : auto */
+    /* default: auto */
   }
   initTheme(rerenderAll);
 
-  // Icônes désactivées : masquées avant le premier paint, comme le thème.
+  // Disabled icons: hidden before the first paint, like the theme.
   try {
     applyIcons(await invoke("get_icons"));
   } catch {
-    /* défaut : tout le registre à sa valeur par défaut */
+    /* default: the whole registry at its default value */
   }
 
   try {
     appVersion = await window.__TAURI__.app.getVersion();
   } catch {
-    appVersion = ""; // module app indisponible : on retombe sur le titre sans version
+    appVersion = ""; // app module unavailable: fall back to the title without a version
   }
-  // Registre des plugins avant le premier rendu : le routage des extensions
-  // et des fences en dépend. Un changement (install/suppression) re-rend tout.
+  // Plugin registry before the first render: the routing of extensions
+  // and fences depends on it. A change (install/removal) re-renders everything.
   await initPlugins(rerenderAll);
-  updateSourceTitle(); // titres dynamiques : pas de data-i18n-title (cf. index.html)
+  updateSourceTitle(); // dynamic titles: no data-i18n-title (cf. index.html)
   updateFitTitle();
   onLocaleChange(() => {
     updateSourceTitle();
     updateFitTitle();
-    closeToc(); // son contenu (« Aucun titre… », « (sans titre) ») est dans l'ancienne langue
+    closeToc(); // its content (the empty-TOC and untitled-heading labels) is in the old language
   });
   initTabbar();
   initTearDrag();
@@ -991,7 +991,7 @@ async function boot() {
   initSettings(rerenderAll);
   initInfo();
   initChangelog();
-  initJournal(); // non attendue : hors du chemin critique de l'affichage
+  initJournal(); // not awaited: off the display's critical path
   initNotices();
   initFindWord();
   initGlobalSearch({
@@ -1009,11 +1009,11 @@ async function boot() {
   await initPluginsUi();
   await initFileDrop();
   await initSession();
-  initUpdates(); // non attendue : requête réseau, jusqu'à 10 s
+  initUpdates(); // not awaited: network request, up to 10 s
 
   /** @type {HTMLElement} */ (document.getElementById("btn-open")).addEventListener("click", () => invoke("open_file_dialog"));
-  // Délégation : le lien est dans un texte traduit par innerHTML (`welcome.open_hint`),
-  // recréé à chaque changement de langue — un écouteur direct serait perdu.
+  // Delegation: the link is inside a text translated via innerHTML (`welcome.open_hint`),
+  // recreated on every language change — a direct listener would be lost.
   emptyEl.addEventListener("click", (e) => {
     if (/** @type {Element} */ (e.target).closest("#btn-open-empty")) invoke("open_file_dialog");
   });
@@ -1021,15 +1021,15 @@ async function boot() {
   /** @type {HTMLElement} */ (document.getElementById("btn-new-window")).addEventListener("click", () => invoke("new_window"));
   /** @type {HTMLElement} */ (document.getElementById("btn-settings")).addEventListener("click", openSettings);
   /** @type {HTMLElement} */ (document.getElementById("btn-info")).addEventListener("click", openInfo);
-  // Export du rendu de l'onglet actif : désarmé pendant l'opération (un
-  // re-rendu hors écran peut prendre quelques secondes sur un gros document).
+  // Export of the active tab's render: disarmed during the operation (an
+  // offscreen re-render can take a few seconds on a large document).
   const exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById("btn-export"));
   exportBtn.addEventListener("click", async () => {
     exportBtn.disabled = true;
     try {
       await exportActiveView();
     } catch (err) {
-      console.error("export du rendu :", err);
+      console.error("render export:", err);
     } finally {
       exportBtn.disabled = false;
     }
@@ -1038,7 +1038,7 @@ async function boot() {
   derivedBtn.addEventListener("click", toggleDerived);
   fitBtn.addEventListener("click", () => setFitWidth(!fitWidth));
   tocBtn.addEventListener("click", toggleToc);
-  // Fermer le sommaire dès qu'on clique en dehors (panneau et bouton exclus).
+  // Close the TOC as soon as one clicks outside (panel and button excluded).
   document.addEventListener("click", (e) => {
     if (tocPanel.hidden) return;
     if (
@@ -1049,8 +1049,8 @@ async function boot() {
     closeToc();
   });
 
-  // S'abonner avant de lire l'état initial : aucune mise à jour ne peut se perdre
-  // entre les deux (un détachement assigne l'onglet avant que la fenêtre ne boote).
+  // Subscribe before reading the initial state: no update can be lost
+  // between the two (a detach assigns the tab before the window boots).
   await listen("tabs-updated", (e) => {
     if (e.payload.window !== currentLabel) return;
     applyTabs(e.payload);
@@ -1066,31 +1066,31 @@ async function boot() {
       state.stale.add(id);
     }
   });
-  // Thème changé dans une AUTRE fenêtre : la fenêtre initiatrice s'est déjà mise à
-  // jour localement (cf. settings.js), on ignore donc son propre echo via `from`.
+  // Theme changed in ANOTHER window: the initiating window has already updated
+  // locally (cf. settings.js), so we ignore its own echo via `from`.
   await listen("theme-changed", (e) => {
     if (e.payload.from === currentLabel) return;
     applyTheme(e.payload.mode);
     rerenderAll();
   });
-  // Langue changée dans une AUTRE fenêtre : même protocole que le thème. Le
-  // re-rendu traduit les messages insérés dans les documents (erreurs de rendu,
-  // bannières des plugins).
+  // Language changed in ANOTHER window: same protocol as the theme. The
+  // re-render translates the messages inserted into documents (render errors,
+  // plugin banners).
   await listen("locale-changed", async (e) => {
     if (e.payload.from === currentLabel) return;
     await loadLocale();
     rerenderAll();
   });
-  // Icônes changées dans une AUTRE fenêtre (réglage global) : même protocole
-  // que le thème — la fenêtre initiatrice a déjà appliqué localement.
+  // Icons changed in ANOTHER window (global setting): same protocol as the
+  // theme — the initiating window has already applied it locally.
   await listen("icons-changed", (e) => {
     if (e.payload.from === currentLabel) return;
     applyIcons(e.payload.icons);
     rerenderAll();
   });
 
-  // Avant l'état initial : le premier `showActive` trouve la référence d'un
-  // lancement `kroki_deskapp.exe doc#ref`.
+  // Before the initial state: the first `showActive` finds the reference of a
+  // `kroki_deskapp.exe doc#ref` launch.
   await drainPendingAnchors();
   applyTabs(await invoke("get_window_state"));
 }

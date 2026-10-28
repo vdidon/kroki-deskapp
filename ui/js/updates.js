@@ -1,10 +1,9 @@
 // @ts-check
-// Mises à jour (updates.rs) : notification seule, rien n'est installé. Au boot
-// de chaque fenêtre, une vérification automatique dont le backend décide si
-// elle a lieu (réglage, une fois par jour, première fenêtre seulement) ; à la
-// demande depuis le dialog « Informations » (info.js). Deux liens, ouverts dans
-// le navigateur : le fichier adapté à cette installation, et la page de la
-// release (notes de version).
+// Updates (updates.rs): notification only, nothing is installed. At each
+// window's boot, an automatic check whose occurrence the backend decides
+// (setting, once a day, first window only); on demand from the Info
+// (« Informations ») dialog (info.js). Two links, opened in the browser: the
+// file suited to this installation, and the release page (release notes).
 
 import { invoke } from "./app.js";
 import { t } from "./i18n.js";
@@ -18,7 +17,7 @@ function openUrl(href) {
 }
 
 /**
- * Fichier de la release adapté à cette installation (ou, à défaut, sa page).
+ * Release file suited to this installation (or, failing that, its page).
  * @param {UpdateInfo} info
  */
 export function openDownload(info) {
@@ -31,15 +30,15 @@ export function openRelease(info) {
 }
 
 /**
- * Résultat de `check_update` forcé ; l'erreur est déjà un message traduit.
- * Jamais null : seule la vérification automatique rend `None` (updates.rs).
+ * Result of a forced `check_update`; the error is already a translated message.
+ * Never null: only the automatic check returns `None` (updates.rs).
  * @returns {Promise<UpdateInfo>}
  */
 export function checkForUpdate() {
   return /** @type {Promise<UpdateInfo>} */ (invoke("check_update", { automatic: false }));
 }
 
-/** Non attendue par le boot : la requête peut prendre jusqu'à 10 s. */
+/** Not awaited by the boot: the request can take up to 10 s. */
 export async function initUpdates() {
   let info;
   try {

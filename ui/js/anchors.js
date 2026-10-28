@@ -1,15 +1,15 @@
 // @ts-check
-// Ancres des documents dérivés (plugins → markdown) : remapping des
-// lignes du markdown généré vers les lignes du source réel. Format commun à
-// tous les transformateurs : `[[ligneMarkdown, ligneSource], …]`, trié par
-// ligne markdown croissante (protocole de plugins §6.2).
+// Anchors of derived documents (plugins → markdown): remapping of the
+// generated markdown's lines to the real source's lines. Format common to all
+// transformers: `[[markdownLine, sourceLine], …]`, sorted by ascending
+// markdown line (plugin protocol §6.2).
 
 /** @typedef {import("../../types/ipc").Anchor} Anchor */
 
 /**
- * Remappe une ligne du markdown généré vers la ligne du source : plus grande
- * ancre ≤ `line` (les deux 0-based). Granularité par section — suffisant pour
- * la synchro preview ↔ source et le sommaire.
+ * Remaps a line of the generated markdown to the source line: largest anchor
+ * ≤ `line` (both 0-based). Per-section granularity — enough for the
+ * preview ↔ source sync and the table of contents.
  *
  * @param {Anchor[]} anchors
  * @param {number} line
@@ -25,9 +25,9 @@ export function remapLine(anchors, line) {
 }
 
 /**
- * Valide des ancres venues d'un plugin (données non fiables) : paires de
- * nombres finis ≥ 0, triées ; à défaut `[[0, 0]]` (tout le rendu pointe sur la
- * première ligne du source).
+ * Validates anchors coming from a plugin (untrusted data): pairs of finite
+ * numbers ≥ 0, sorted; failing that `[[0, 0]]` (the whole rendering points to
+ * the source's first line).
  *
  * @param {unknown} anchors
  * @returns {Anchor[]}

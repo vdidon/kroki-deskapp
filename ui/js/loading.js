@@ -1,42 +1,40 @@
 // @ts-check
-// Voile de chargement de la zone de rendu.
+// Loading overlay for the render area.
 //
-// Afficher un gros document se fait en deux temps : la transformation par le
-// plugin qui le revendique (asynchrone, dans son worker) puis markdown-it +
-// KaTeX + DOMPurify + insertion DOM. Ce second temps est **synchrone** et
-// occupe le thread principal — près d'une seconde pour un document de 100 Ko,
-// qui produit ~2 Mo de HTML et ~54 000 nœuds. Sans retour visuel, l'onglet
-// reste vide pendant tout ce temps : l'attente se perçoit plus longue qu'elle
-// n'est.
+// Displaying a large document happens in two steps: the transformation by the
+// plugin that claims it (asynchronous, in its worker) then markdown-it +
+// KaTeX + DOMPurify + DOM insertion. This second step is **synchronous** and
+// occupies the main thread — close to a second for a 100 KB document, which
+// produces ~2 MB of HTML and ~54,000 nodes. Without visual feedback, the tab
+// stays empty the whole time: the wait feels longer than it is.
 //
-// Trois contraintes dictent l'implémentation :
+// Three constraints dictate the implementation:
 //
-// 1. **Anti-flash.** Le voile n'apparaît qu'au bout de `DELAY_MS` : un document
-//    ordinaire se rend bien avant, et ne doit rien faire clignoter.
-// 2. **Peindre avant de bloquer.** Afficher le voile ne suffit pas : tant que
-//    le thread principal n'a pas rendu la main, rien n'est peint. Une phase
-//    synchrone lancée dans la foulée afficherait donc le voile *après* s'être
-//    terminée — c'est-à-dire jamais. D'où `paintLoading`, à attendre juste
-//    avant cette phase.
-// 3. **Une animation qui survit au blocage.** Pendant la phase synchrone, le
-//    thread principal ne peut plus animer quoi que ce soit. Seules les
-//    propriétés `transform` et `opacity` sont animées par le compositeur, hors
-//    thread principal : le CSS du voile s'y tient (cf. `#loading-overlay` dans
-//    `css/app.css`), sans quoi le spinner se figerait exactement quand il doit
-//    rassurer.
+// 1. **Anti-flash.** The overlay only appears after `DELAY_MS`: an ordinary
+//    document renders well before that, and must not flicker anything.
+// 2. **Paint before blocking.** Showing the overlay is not enough: as long as
+//    the main thread has not yielded, nothing is painted. A synchronous phase
+//    started right after would thus show the overlay *after* it has finished
+//    — that is, never. Hence `paintLoading`, to be awaited just before that
+//    phase.
+// 3. **An animation that survives blocking.** During the synchronous phase,
+//    the main thread cannot animate anything. Only the `transform` and
+//    `opacity` properties are animated by the compositor, off the main
+//    thread: the overlay's CSS sticks to them (cf. `#loading-overlay` in
+//    `css/app.css`), otherwise the spinner would freeze exactly when it is
+//    meant to reassure.
 
 import { t } from "./i18n.js";
 
 const DELAY_MS = 180;
 
-// Taille de markdown au-delà de laquelle un rendu **synchrone** est réputé
-// assez long pour mériter le voile. Le délai anti-flash ne peut rien pour ces
-// phases : un `setTimeout` ne se déclenche pas pendant que le thread principal
-// est bloqué, si bien que le voile doit être posé *avant*, sur prédiction.
-// La taille du markdown est un prédicteur imparfait — le coût réel suit le
-// volume de DOM produit, que les formules KaTeX font exploser (~20× le source)
-// — mais elle est gratuite et ne se trompe que dans le sens inoffensif : un
-// document volumineux et pauvre en formules affiche un voile un peu court.
+// Markdown size beyond which a **synchronous** render is deemed long enough to
+// deserve the overlay. The anti-flash delay is useless for these phases: a
+// `setTimeout` does not fire while the main thread is blocked, so the overlay
+// must be put up *beforehand*, on prediction. Markdown size is an imperfect
+// predictor — the real cost follows the volume of DOM produced, which KaTeX
+// formulas blow up (~20× the source) — but it is free and only errs on the
+// harmless side: a large, formula-poor document shows a slightly short overlay.
 const HEAVY_CHARS = 60000;
 
 const overlay = document.getElementById("loading-overlay");
@@ -44,18 +42,18 @@ const labelEl = overlay?.querySelector(".loading-label");
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let timer = null;
-let depth = 0; // rendus imbriqués (renderActive appelé pendant une bascule)
+let depth = 0; // nested renders (renderActive called during a toggle)
 
 /**
- * Signale le début d'une phase de rendu. Le voile n'apparaîtra que si elle
- * dure plus de `DELAY_MS`. À apparier systématiquement avec `endLoading`
- * dans un `finally` : un rendu qui échoue ne doit pas laisser le voile posé.
+ * Signals the start of a render phase. The overlay only appears if it lasts
+ * longer than `DELAY_MS`. Always pair with `endLoading` in a `finally`: a
+ * failing render must not leave the overlay up.
  *
  * @param {string} [label]
  */
 export function beginLoading(label = t("loading.rendering")) {
   depth += 1;
-  if (!overlay || timer !== null || !overlay.hidden) return; // déjà armé ou visible
+  if (!overlay || timer !== null || !overlay.hidden) return; // already armed or visible
   timer = setTimeout(() => {
     timer = null;
     if (labelEl) labelEl.textContent = label;
@@ -63,16 +61,16 @@ export function beginLoading(label = t("loading.rendering")) {
   }, DELAY_MS);
 }
 
-/** Le voile est-il effectivement affiché ? */
+/** Is the overlay actually displayed? */
 export function loadingVisible() {
   return !!overlay && !overlay.hidden;
 }
 
 /**
- * Rend la main au navigateur le temps d'un paint — mais **seulement si** le
- * voile est affiché. Sur un document rapide il n'apparaît jamais, et l'attente
- * de deux frames n'est pas payée. Deux `requestAnimationFrame` imbriqués :
- * le premier s'exécute avant le paint du frame courant, le second après.
+ * Yields to the browser for one paint — but **only if** the overlay is
+ * displayed. On a fast document it never appears, and the two-frame wait is
+ * not paid. Two nested `requestAnimationFrame`s: the first runs before the
+ * current frame's paint, the second after.
  *
  * @returns {Promise<void>}
  */
@@ -84,13 +82,13 @@ export function paintLoading() {
 }
 
 /**
- * À attendre juste avant une phase de rendu **synchrone** portant sur `text`.
- * Au-delà de `HEAVY_CHARS`, pose le voile sans attendre le délai — puis attend
- * qu'il soit peint. En deçà, ne fait rien et ne coûte rien.
+ * To be awaited just before a **synchronous** render phase working on `text`.
+ * Beyond `HEAVY_CHARS`, puts the overlay up without waiting for the delay —
+ * then waits for it to be painted. Below that, does nothing and costs nothing.
  *
- * À utiliser en plus de `beginLoading`, pas à sa place : le délai couvre les
- * phases asynchrones (transformation par un plugin), celle-ci les phases
- * bloquantes, et un même rendu enchaîne souvent les deux.
+ * To be used in addition to `beginLoading`, not instead of it: the delay covers
+ * the asynchronous phases (plugin transformation), this one the blocking
+ * phases, and a single render often chains both.
  *
  * @param {string | null | undefined} text
  */
@@ -106,7 +104,7 @@ export async function beforeHeavyRender(text) {
   await paintLoading();
 }
 
-/** Fin de la phase de rendu : désarme le voile, ou le retire s'il est posé. */
+/** End of the render phase: disarms the overlay, or removes it if it is up. */
 export function endLoading() {
   depth = Math.max(0, depth - 1);
   if (depth > 0) return;

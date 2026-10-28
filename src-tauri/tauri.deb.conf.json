@@ -6,7 +6,7 @@
     "publisher": "vdidon",
     "category": "Utility",
     "shortDescription": "Markdown viewer with Kroki diagram rendering",
-    "longDescription": "Kroki Desk affiche des documents Markdown et rend les blocs de diagrammes Kroki (mermaid, plantuml, graphviz, d2, bpmn, svgbob…) en SVG sans serveur, sans Docker et sans réseau : tous les moteurs sont embarqués dans l'exécutable.\n\nLes moteurs PlantUML, C4-PlantUML et ditaa s'exécutent sur la JVM et réclament donc un Java installé (default-jre suffit) ; aucun des autres n'en a besoin.",
+    "longDescription": "Kroki Desk displays Markdown documents and renders Kroki diagram blocks (mermaid, plantuml, graphviz, d2, bpmn, svgbob…) to SVG with no server, no Docker and no network: all the engines are embedded in the executable.\n\nThe PlantUML, C4-PlantUML and ditaa engines run on the JVM and therefore need an installed Java (default-jre is enough); none of the others do.",
     "fileAssociations": [
       {
         "ext": ["kdws"],
