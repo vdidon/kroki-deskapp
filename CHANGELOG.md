@@ -22,6 +22,11 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   document in a new window while the tab stays where it is — also available
   on a window's only tab.
 
+### Changed
+- BPMN diagrams now carry the bpmn.io logo, linked to https://bpmn.io, in a
+  strip below the diagram, as the bpmn-js license requires. The diagram's
+  own drawing is unchanged; the image is 33 px taller.
+
 ## [3.29.0] — 2026-10-22
 
 ### Added

@@ -572,7 +572,10 @@ frontend side** — keep both in sync when adding an alias.
 details: **d2** is a dynamic import (~8 MB) and its calls are
 **serialized** (a single compile/render exchange at a time on its worker); **dbml**
 and **erd** (in-house parser `ui/renderer/erd.js`) generate DOT that is then rendered by the
-already-loaded graphviz WASM; **bpmn** renders in an offscreen container; **vega**
+already-loaded graphviz WASM; **bpmn** renders in an offscreen container and
+`addBpmnWatermark` adds the bpmn.io logo in a strip below the diagram — the
+bpmn-js license requires it fully visible and unoverlapped, `saveSVG()` drops
+it: never remove it; **vega**
 uses the `expressionInterpreter` (no `eval`); **excalidraw** is a
 dynamic import (~8 MB) and renders via `exportToSvg` — its handwriting fonts (14 MB) are
 **not** embedded: empty `@font-face` rules are removed and the families rewritten to a
