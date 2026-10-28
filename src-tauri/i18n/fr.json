@@ -296,6 +296,8 @@
   "shortcut.key_enter": "Entrée",
   "shortcut.key_esc": "Échap",
   "shortcut.key_shift": "Maj",
+  "shortcut.nav_back": "Revenir avant le lien suivi (bouton précédent de la souris)",
+  "shortcut.nav_forward": "Avancer à nouveau (bouton suivant de la souris)",
   "shortcut.new_window": "Nouvelle fenêtre",
   "shortcut.next_match": "Occurrence suivante",
   "shortcut.next_tab": "Onglet suivant",

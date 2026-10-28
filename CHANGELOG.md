@@ -8,6 +8,10 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 ## [3.30.0] — 2026-10-28
 
 ### Added
+- **Back / forward after following a link**: the mouse back and forward
+  buttons (or `Alt+←` / `Alt+→`) return to where a link was clicked — same
+  tab and scroll position, including a jump to an anchor in the same
+  document — and redo the jump. A tab closed since is skipped.
 - **Duplicate in a new window** in the tab context menu: opens the same
   document in a new window while the tab stays where it is — also available
   on a window's only tab.

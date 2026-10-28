@@ -296,6 +296,8 @@
   "shortcut.key_enter": "Invio",
   "shortcut.key_esc": "Esc",
   "shortcut.key_shift": "Maiusc",
+  "shortcut.nav_back": "Torna indietro dopo un link (tasto indietro del mouse)",
+  "shortcut.nav_forward": "Vai di nuovo avanti (tasto avanti del mouse)",
   "shortcut.new_window": "Nuova finestra",
   "shortcut.next_match": "Occorrenza successiva",
   "shortcut.next_tab": "Scheda successiva",

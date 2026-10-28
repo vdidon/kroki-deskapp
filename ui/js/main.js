@@ -111,6 +111,7 @@ async function showActive() {
   }
   const v = state.views.get(id);
   if (!v) return;
+  consumePendingOrigin();
   v.el.focus({ preventScroll: true });
   if (!v.rendered || state.stale.has(id)) {
     state.stale.delete(id);
@@ -120,6 +121,7 @@ async function showActive() {
   // Rattrape les figures Plotly d'un onglet rendu pendant qu'il était masqué, ou
   // dont le zoom a changé pendant son inactivité (largeur alors non mesurable).
   resizePlotlyFigures(v.el);
+  consumePendingPlace(v, id);
   consumePendingAnchor(v);
   onActiveViewShown(v, id); // saut de recherche en attente / surlignage qui suit l'onglet
   refreshDocSearch(); // le DOM cherché par Ctrl+F vient de changer
@@ -221,6 +223,87 @@ async function drainPendingAnchors() {
   // rien à consommer. En cours de rendu, c'est lui qui consommera.
   const v = state.views.get(state.active);
   if (v && v.rendered && !v.rendering) consumePendingAnchor(v);
+}
+
+// --- Historique de navigation : précédent / suivant (boutons 4/5 de la souris, Alt+←/→) ---
+// Chaque lien suivi empile la position quittée (onglet + défilement) ; revenir
+// empile à son tour la position courante côté « suivant ». Seule l'origine est
+// mémorisée au clic : la destination l'est au moment où on la quitte, ce qui
+// couvre un fragment introuvable ou un document ouvert dans un nouvel onglet.
+/** @typedef {{ docId: number, top: number, left: number }} Place */
+/** @type {Place[]} */
+const navBack = [];
+/** @type {Place[]} */
+const navForward = [];
+const NAV_MAX = 100;
+// Lien vers un autre document : la position quittée n'est empilée que si un
+// onglet s'affiche ensuite (`showActive`) — un fichier ouvert par l'application
+// système, ou un lien mort, ne laisse pas d'entrée qui ne ramènerait nulle part.
+/** @type {{ place: Place, expires: number } | null} */
+let pendingOrigin = null;
+/** @type {Place | null} */
+let pendingPlace = null; // position à restaurer quand l'onglet visé s'affichera
+
+/** @returns {Place | null} */
+function currentPlace() {
+  const v = state.active != null ? state.views.get(state.active) : undefined;
+  if (!v || state.active == null) return null;
+  return { docId: state.active, top: v.el.scrollTop, left: v.el.scrollLeft };
+}
+
+/** @param {Place} place */
+function pushBack(place) {
+  navBack.push(place);
+  if (navBack.length > NAV_MAX) navBack.shift();
+  navForward.length = 0; // nouvelle branche : l'ancien « suivant » est caduc
+}
+
+function consumePendingOrigin() {
+  if (!pendingOrigin) return;
+  if (Date.now() <= pendingOrigin.expires) pushBack(pendingOrigin.place);
+  pendingOrigin = null;
+}
+
+/** @param {number} dir -1 = précédent, 1 = suivant */
+function navigate(dir) {
+  const from = dir < 0 ? navBack : navForward;
+  const to = dir < 0 ? navForward : navBack;
+  const alive = new Set(state.tabs.map((t) => t.id));
+  /** @type {Place | undefined} */
+  let target;
+  // Onglet fermé ou détaché dans une autre fenêtre depuis : entrée sautée.
+  while ((target = from.pop()) && !alive.has(target.docId));
+  if (!target) return;
+  const here = currentPlace();
+  if (here) to.push(here);
+  pendingAnchor = null; // un deep-link encore en attente ne doit pas l'emporter
+  pendingOrigin = null;
+  const v = state.views.get(target.docId);
+  if (target.docId === state.active && v) {
+    restorePlace(v, target);
+  } else {
+    pendingPlace = target;
+    invoke("activate_tab", { docId: target.docId });
+  }
+}
+
+/**
+ * @param {View} v
+ * @param {Place} place
+ */
+function restorePlace(v, place) {
+  v.el.scrollTop = place.top;
+  v.el.scrollLeft = place.left;
+}
+
+/**
+ * @param {View} v
+ * @param {number} id
+ */
+function consumePendingPlace(v, id) {
+  if (!pendingPlace || pendingPlace.docId !== id) return;
+  restorePlace(v, pendingPlace);
+  pendingPlace = null;
 }
 
 /**
@@ -738,10 +821,15 @@ function initLinks() {
     if (!href) return;
     if (href.startsWith("#")) {
       const v = state.views.get(state.active);
-      if (v) jumpToFragment(v, decodeFragment(href.slice(1)));
+      const place = currentPlace();
+      if (v && jumpToFragment(v, decodeFragment(href.slice(1))) && place) pushBack(place);
       return;
     }
     const dir = state.views.get(state.active)?.el.dataset.dir ?? "";
+    if (!/^(https?:|mailto:)/i.test(href)) {
+      const place = currentPlace();
+      pendingOrigin = place && { place, expires: Date.now() + 5000 };
+    }
     // Lien relatif avec fragment (`fichier.md#section`, lien
     // d'un nœud de diagramme) : le backend ouvre le document, le fragment est
     // mémorisé pour scroller une fois l'onglet cible rendu (showActive).
@@ -784,6 +872,9 @@ function initShortcuts() {
     } else if (e.key === "F3" || (ctrl && e.key.toLowerCase() === "g")) {
       e.preventDefault();
       findNext(e.shiftKey ? -1 : 1);
+    } else if (e.altKey && !ctrl && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      navigate(e.key === "ArrowLeft" ? -1 : 1);
     } else if (ctrl && e.key === "Tab") {
       e.preventDefault();
       cycleTab(e.shiftKey ? -1 : 1);
@@ -813,6 +904,16 @@ function initShortcuts() {
       e.preventDefault();
       closeToc();
     }
+  });
+  // Boutons latéraux de la souris (« précédent » = 3, « suivant » = 4) : sans
+  // preventDefault, la webview tenterait sa propre navigation d'historique.
+  window.addEventListener("mousedown", (e) => {
+    if (e.button === 3 || e.button === 4) e.preventDefault();
+  });
+  window.addEventListener("mouseup", (e) => {
+    if (e.button !== 3 && e.button !== 4) return;
+    e.preventDefault();
+    navigate(e.button === 3 ? -1 : 1);
   });
   /** @type {HTMLElement} */ (document.getElementById("content")).addEventListener(
     "wheel",

@@ -288,6 +288,8 @@
   "shortcut.key_enter": "Enter",
   "shortcut.key_esc": "Esc",
   "shortcut.key_shift": "Shift",
+  "shortcut.nav_back": "返回链接跳转前的位置（鼠标后退键）",
+  "shortcut.nav_forward": "再次前进（鼠标前进键）",
   "shortcut.new_window": "新建窗口",
   "shortcut.next_match": "下一个匹配项",
   "shortcut.next_tab": "下一个选项卡",

@@ -288,6 +288,8 @@
   "shortcut.key_enter": "Enter",
   "shortcut.key_esc": "Esc",
   "shortcut.key_shift": "Shift",
+  "shortcut.nav_back": "リンク移動前の位置に戻る（マウスの戻るボタン）",
+  "shortcut.nav_forward": "再び進む（マウスの進むボタン）",
   "shortcut.new_window": "新しいウィンドウ",
   "shortcut.next_match": "次の一致",
   "shortcut.next_tab": "次のタブ",

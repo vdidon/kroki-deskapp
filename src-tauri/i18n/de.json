@@ -296,6 +296,8 @@
   "shortcut.key_enter": "Eingabe",
   "shortcut.key_esc": "Esc",
   "shortcut.key_shift": "Umschalt",
+  "shortcut.nav_back": "Zurück vor den gefolgten Link (Maustaste „Zurück“)",
+  "shortcut.nav_forward": "Wieder vorwärts (Maustaste „Vorwärts“)",
   "shortcut.new_window": "Neues Fenster",
   "shortcut.next_match": "Nächster Treffer",
   "shortcut.next_tab": "Nächste Registerkarte",

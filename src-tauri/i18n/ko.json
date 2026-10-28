@@ -288,6 +288,8 @@
   "shortcut.key_enter": "Enter",
   "shortcut.key_esc": "Esc",
   "shortcut.key_shift": "Shift",
+  "shortcut.nav_back": "링크 이동 전 위치로 돌아가기(마우스 뒤로 단추)",
+  "shortcut.nav_forward": "다시 앞으로(마우스 앞으로 단추)",
   "shortcut.new_window": "새 창",
   "shortcut.next_match": "다음 일치 항목",
   "shortcut.next_tab": "다음 탭",

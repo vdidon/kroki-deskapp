@@ -278,6 +278,7 @@ open tab).
 | `Ctrl+O` | Open a file |
 | `Ctrl+W` | Close the tab (then the window if no tab is left) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
+| `Alt+←` / `Alt+→`, mouse back / forward buttons | Back to where a followed link was clicked / forward again |
 | `Ctrl+Shift+N` | New window |
 | `Ctrl+F` | Search in the displayed document (`Esc` closes) |
 | `Enter` / `Shift+Enter`, `F3` / `Shift+F3`, `Ctrl+G` | Next / previous occurrence |

@@ -296,6 +296,8 @@
   "shortcut.key_enter": "Enter",
   "shortcut.key_esc": "Esc",
   "shortcut.key_shift": "Shift",
+  "shortcut.nav_back": "Back after following a link (mouse back button)",
+  "shortcut.nav_forward": "Forward again (mouse forward button)",
   "shortcut.new_window": "New window",
   "shortcut.next_match": "Next match",
   "shortcut.next_tab": "Next tab",
