@@ -973,6 +973,60 @@ body.tab-dragging * {
   margin: 0;
 }
 
+/* .kd-label: label the author gives a list item (LaTeX `\item[(a)]`, enumitem
+   `label=OP\arabic*`), first element of the item. It replaces the bullet and
+   hangs in the margin; a label wider than the margin pushes the first line. */
+
+.markdown-body ul:has(> li > .kd-label:first-child, > li > p:first-child > .kd-label:first-child) {
+  padding-left: 3em;
+}
+
+.markdown-body li:has(> .kd-label:first-child, > p:first-child > .kd-label:first-child) {
+  list-style-type: none;
+}
+
+.markdown-body li > .kd-label:first-child,
+.markdown-body li > p:first-child > .kd-label:first-child {
+  display: inline-block;
+  box-sizing: border-box;
+  min-width: 3em;
+  margin-left: -3em;
+  padding-right: 0.5em;
+}
+
+/* .kd-booktabs: wrapper of a table ruled like LaTeX's booktabs — thick rules
+   above and below, a thin one under the header, no grid, no striping, cells
+   left-aligned unless the column says otherwise (inline style wins). A
+   header whose cells are all empty is hidden (header-less table). */
+
+.markdown-body .kd-booktabs table {
+  border-collapse: collapse;
+  border-top: 2px solid var(--fg);
+  border-bottom: 2px solid var(--fg);
+}
+
+.markdown-body .kd-booktabs table tr,
+.markdown-body .kd-booktabs table tr:nth-child(2n) {
+  background: none;
+  border-top: 0;
+}
+
+.markdown-body .kd-booktabs table th,
+.markdown-body .kd-booktabs table td {
+  border: 0;
+  padding: 4px 16px 4px 0;
+  text-align: left;
+  vertical-align: baseline; /* LaTeX aligns the cells of a row on their first line */
+}
+
+.markdown-body .kd-booktabs table thead th {
+  border-bottom: 1px solid var(--fg);
+}
+
+.markdown-body .kd-booktabs table thead:not(:has(th:not(:empty))) {
+  display: none;
+}
+
 .kroki-loading {
   color: var(--fg-muted);
   font-size: 13px;

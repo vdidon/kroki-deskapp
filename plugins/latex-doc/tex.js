@@ -213,13 +213,22 @@ function unescapeMd(s) {
 }
 
 /**
- * Columns of a `tabular` spec → markdown alignments. Token-based reading:
- * filtering by character would read the `c` of `p{5cm}` as a centered column.
+ * Columns of a `tabular` spec → markdown alignments, plus the bold set by a
+ * `>{\bfseries}` prefix (a label column, common in key/value tables).
+ * Token-based reading: filtering by character would read the `c` of `p{5cm}`
+ * as a centered column.
  * @param {string} spec
- * @returns {string[]} one `l`/`c`/`r` per column
+ * @returns {Array<{ align: string, bold: boolean }>} one entry per column, align `l`/`c`/`r`
  */
-function columnAligns(spec) {
+function columnSpecs(spec) {
+  /** @type {Array<{ align: string, bold: boolean }>} */
   const out = [];
+  let bold = false; // `>{…}` applies to the column that follows it
+  /** @param {string} align */
+  const col = (align) => {
+    out.push({ align, bold });
+    bold = false;
+  };
   let i = 0;
   const group = () => {
     // `spec[i]` must be `{`; returns the content and advances past `}`.
@@ -240,24 +249,101 @@ function columnAligns(spec) {
   };
   while (i < spec.length) {
     const c = spec[i++];
-    if (c === "l" || c === "c" || c === "r") out.push(c);
+    if (c === "l" || c === "c" || c === "r") col(c);
     else if (c === "p" || c === "m" || c === "b") {
-      out.push("l");
+      col("l");
       skipSpaces();
       group();
-    } else if (c === "X") out.push("l");
-    else if (c === ">" || c === "<" || c === "@" || c === "!") {
+    } else if (c === "X") col("l");
+    else if (c === ">") {
+      skipSpaces();
+      bold = /\\(?:bfseries|bf)(?![A-Za-z])/.test(group());
+    } else if (c === "<" || c === "@" || c === "!") {
       skipSpaces();
       group();
     } else if (c === "*") {
       skipSpaces();
       const n = Number(group()) || 0;
       skipSpaces();
-      const inner = columnAligns(group());
+      const inner = columnSpecs(group());
       for (let k = 0; k < Math.min(n, 64); k++) out.push(...inner);
     }
   }
   return out;
+}
+
+/**
+ * Value of a key in a `key=value` option list (`[leftmargin=*,label=\textbf{OP\arabic*}]`,
+ * tcolorbox options). Commas inside braces do not split; one level of
+ * surrounding braces is removed. `null` if the key is absent.
+ * @param {string} raw
+ * @param {string} key
+ * @returns {string | null}
+ */
+function optionValue(raw, key) {
+  /** @type {string[]} */
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === "\\") i++;
+    else if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (c === "," && depth === 0) {
+      parts.push(raw.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(raw.slice(start));
+  for (const p of parts) {
+    const m = /^\s*([^=]+?)\s*=\s*([\s\S]*?)\s*$/.exec(p);
+    if (!m || m[1] !== key) continue;
+    const v = m[2];
+    return v.startsWith("{") && v.endsWith("}") ? v.slice(1, -1) : v;
+  }
+  return null;
+}
+
+/** @type {Array<[number, string]>} */
+const ROMAN = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"],
+  [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+/** @param {number} v */
+const roman = (v) => ROMAN.reduce((s, [k, r]) => {
+  for (; v >= k; v -= k) s += r;
+  return s;
+}, "");
+
+/**
+ * Value of a counter in one of LaTeX's styles (`\arabic`, `\alph`…).
+ * @param {string} style macro name, without the backslash
+ * @param {number} v
+ * @returns {string}
+ */
+function counterText(style, v) {
+  switch (style) {
+    case "alph":
+      return v >= 1 && v <= 26 ? String.fromCharCode(96 + v) : String(v);
+    case "Alph":
+      return v >= 1 && v <= 26 ? String.fromCharCode(64 + v) : String(v);
+    case "roman":
+      return roman(v).toLowerCase();
+    case "Roman":
+      return roman(v);
+    default:
+      return String(v);
+  }
+}
+
+/**
+ * Plain text of a short LaTeX fragment (a counter representation, a list
+ * label): commands dropped, braces removed — for the text of a reference,
+ * which can land inside a formula's `\text{}`.
+ * @param {string} s
+ * @returns {string}
+ */
+function plainLabel(s) {
+  return oneLine(s.replace(/\\[A-Za-z@]+\*?/g, "").replace(/[{}]/g, ""));
 }
 
 /**
@@ -386,10 +472,20 @@ function hasArg(node, i) {
  */
 
 /**
+ * Box environment declared by `\newtcolorbox`.
+ * @typedef {object} BoxSpec
+ * @property {number} nargs number of arguments, the optional one included
+ * @property {boolean} optional true if the first argument is optional
+ * @property {string} defaultArg its default value
+ * @property {string} title raw `title=` option, `#1`…`#9` not substituted ("" without one)
+ */
+
+/**
  * Definitions collected from the document by `collectDefs`.
  * @typedef {object} Defs
  * @property {Map<string, MacroDef>} macros by name, without the backslash
  * @property {Map<string, TheoremSpec>} theorems by environment name
+ * @property {Map<string, BoxSpec>} boxes by environment name
  * @property {{ title?: string, author?: string, date?: string }} meta raw LaTeX
  * @property {string} theoremStyle current `\theoremstyle`
  */
@@ -444,6 +540,16 @@ function collectDefs(nodes, defs) {
         parent: hasArg(n, 4) ? argRaw(n, 4) : null,
         numbered: argRaw(n, 0) !== "*",
         style: defs.theoremStyle,
+      });
+    } else if (name === "newtcolorbox" || name === "renewtcolorbox") {
+      // args (see DEFS_SIGNATURES): [init options], {env}, [nargs], [default], {options}
+      const env = argRaw(n, 1);
+      if (!env) continue;
+      defs.boxes.set(env, {
+        nargs: Number(argRaw(n, 2)) || 0,
+        optional: hasArg(n, 3),
+        defaultArg: argRaw(n, 3),
+        title: optionValue(argRaw(n, 4), "title") ?? "",
       });
     } else if (name === "theoremstyle") {
       // Applies to every `\newtheorem` that follows (amsthm).
@@ -566,7 +672,38 @@ function makeExpander(macros) {
 // Declarations that `collectDefs` knows how to recognize. Used to decide whether
 // the document body must be included in the collection parse (see `defsScope`):
 // a false positive only costs the original behavior, never fidelity.
-const DEF_MARKERS = /\\(newcommand|renewcommand|providecommand|DeclareMathOperator|newtheorem|def|title|author|date)\b/;
+const DEF_MARKERS = /\\(newcommand|renewcommand|providecommand|DeclareMathOperator|newtheorem|newtcolorbox|renewtcolorbox|def|title|author|date)\b/;
+
+// Signatures the parser does not know, for the collection parse: without
+// them, the arguments of `\newtcolorbox` would be loose groups.
+/** @type {Record<string, ArgSpec>} */
+const DEFS_SIGNATURES = {
+  newtcolorbox: { signature: "o m o o m" },
+  renewtcolorbox: { signature: "o m o o m" },
+};
+
+// Same for the document parse: macros and environments of common packages
+// (tabularx, enumitem, tcolorbox, hyperref) whose arguments would otherwise
+// stay in the text — a column spec in the first cell, `[label=…]` in a
+// paragraph.
+/** @type {Record<string, ArgSpec>} */
+const MACRO_SIGNATURES = {
+  textsuperscript: { signature: "m" },
+  textsubscript: { signature: "m" },
+};
+/** @type {Record<string, ArgSpec>} */
+const ENV_SIGNATURES = {
+  longtable: { signature: "o m" },
+  tabularx: { signature: "m o m" },
+  "tabular*": { signature: "m o m" },
+  "enumerate*": { signature: "o" },
+  "itemize*": { signature: "o" },
+  "description*": { signature: "o" },
+  tcolorbox: { signature: "o" },
+};
+
+// Inline lists (enumitem `inline` option): rendered in the flow of the paragraph.
+const INLINE_LISTS = new Set(["enumerate*", "itemize*", "description*"]);
 
 /**
  * Scope of the **first** parse, the one that only serves to collect definitions.
@@ -797,14 +934,15 @@ export function docLanguage(source) {
 function generate(source, { title, fragment, M }) {
   const L = LABELS[docLanguage(source)];
   /** @type {Defs} */
-  const defs = { macros: new Map(), theorems: new Map(), meta: {}, theoremStyle: "plain" };
-  const nude = getParser().parse(defsScope(source));
+  /** @type {Defs} */
+  const defs = { macros: new Map(), theorems: new Map(), boxes: new Map(), meta: {}, theoremStyle: "plain" };
+  const nude = getParser({ macros: DEFS_SIGNATURES }).parse(defsScope(source));
   collectDefs(nude.content, defs);
 
   // Second parse: the parser now knows the signature of user macros, so
   // their arguments are correctly attached.
   /** @type {Record<string, ArgSpec>} */
-  const signatures = {};
+  const signatures = { ...MACRO_SIGNATURES };
   for (const [name, def] of defs.macros) {
     const sig = (def.optional !== null ? "o" : "") + "m".repeat(def.nargs - (def.optional !== null ? 1 : 0));
     signatures[name] = { signature: sig };
@@ -813,11 +951,12 @@ function generate(source, { title, fragment, M }) {
   // (`theorem`, `remark`…). Without a signature, the title of a
   // `\begin{hypothese}[Title]` would stay in the body, brackets included.
   /** @type {Record<string, ArgSpec>} */
-  const envSignatures = {};
+  const envSignatures = { ...ENV_SIGNATURES };
   for (const name of defs.theorems.keys()) envSignatures[name] = { signature: "o" };
-  // `longtable` is unknown to the parser: without a signature, its column spec
-  // (`{p{1.7cm} …}`) would stay in the first cell.
-  envSignatures.longtable = { signature: "o m" };
+  for (const [name, box] of defs.boxes) {
+    const sig = (box.optional ? "o" : "m") + "m".repeat(Math.max(0, box.nargs - 1));
+    if (box.nargs) envSignatures[name] = { signature: sig };
+  }
   const parser = getParser({ macros: signatures, environments: envSignatures });
   const ast = parser.parse(source);
   const docEnv = ast.content.find(
@@ -887,8 +1026,32 @@ function generate(source, { title, fragment, M }) {
       .join(".");
 
   // --- references ------------------------------------------------------- //
-  /** @type {(kind: "r" | "e" | "t", key: string) => string} */
+  /** @type {(kind: "r" | "e" | "t" | "h", key: string) => string} */
   const ref = (kind, key) => `${SEP}${kind}${SEP}${key}${SEP}`;
+  /**
+   * Number of a theorem as LaTeX prints it: `\the<counter>` when the document
+   * redefines it (`\renewcommand{\thehypothese}{H\arabic{hypothese}}` → "H4",
+   * in the heading and in every `\ref`), `fallback` otherwise.
+   * @param {string} counter
+   * @param {string} fallback
+   * @returns {string}
+   */
+  const counterLabel = (counter, fallback) => {
+    const def = defs.macros.get("the" + counter);
+    if (!def || def.nargs) return fallback;
+    /** @param {string} c */
+    const value = (c) => {
+      const level = ["section", "subsection", "subsubsection"].indexOf(c);
+      return level >= 0 ? sectionNums[level] : (counters.get(c) ?? 0);
+    };
+    const text = def.body
+      .replace(/\\(arabic|alph|Alph|roman|Roman)\s*\{\s*([A-Za-z@*]+)\s*\}/g, (_, style, c) => counterText(style, value(c)))
+      .replace(/\\the([A-Za-z@]+)/g, (_, c) => {
+        const level = ["section", "subsection", "subsubsection"].indexOf(c);
+        return level >= 0 ? sectionPrefix(level + 1) : String(value(c));
+      });
+    return plainLabel(text) || fallback;
+  };
   /** @type {(key: string, text: string, anchor: string) => void} */
   const defineLabel = (key, text, anchor) => {
     if (key) labels.set(key, { text, anchor });
@@ -1066,7 +1229,7 @@ function generate(source, { title, fragment, M }) {
           break;
         case "environment": {
           flush();
-          res += emitInline(n.content ?? [], depth);
+          res += INLINE_LISTS.has(envName(n)) ? inlineList(n, depth) : emitInline(n.content ?? [], depth);
           break;
         }
         case "macro": {
@@ -1123,6 +1286,19 @@ function generate(source, { title, fragment, M }) {
     }
     if (name === "eqref") {
       return { text: ref("e", argRaw(n, n.args && n.args.length > 1 ? n.args.length - 1 : 0)) };
+    }
+    if (name === "hyperref") {
+      // `\hyperref[label]{text}`: a link with free text to a label's target.
+      // The bracket is the label, never text to display.
+      const text = emitInline(argNodes(n, n.args?.length ? n.args.length - 1 : 0), depth).trim();
+      const opt = n.args?.find((a) => a.openMark === "[");
+      const key = opt ? printRaw(opt.content).trim() : "";
+      return { text: key && text ? `[${text}](${ref("h", key)})` : text };
+    }
+    if (name === "textsuperscript" || name === "textsubscript") {
+      const inner = emitInline(argNodes(n, n.args?.length ? n.args.length - 1 : 0), depth).trim();
+      const tag = name === "textsuperscript" ? "sup" : "sub";
+      return { text: inner ? `<${tag}>${inner}</${tag}>` : "" };
     }
     if (name === "label") {
       takeLabel(argRaw(n, n.args && n.args.length > 1 ? n.args.length - 1 : 0));
@@ -1221,7 +1397,7 @@ function generate(source, { title, fragment, M }) {
 
   /** @type {(n: TexNode) => boolean} */
   const isBlockNode = (n) =>
-    n.type === "environment" ||
+    (n.type === "environment" && !INLINE_LISTS.has(envName(n))) ||
     n.type === "mathenv" ||
     n.type === "displaymath" ||
     n.type === "verbatim" ||
@@ -1371,15 +1547,6 @@ function generate(source, { title, fragment, M }) {
     paragraph: 4, subparagraph: 4,
   };
 
-  /** @type {Array<[number, string]>} */
-  const ROMAN = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"],
-    [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
-  /** @param {number} v */
-  const roman = (v) => ROMAN.reduce((s, [k, r]) => {
-    for (; v >= k; v -= k) s += r;
-    return s;
-  }, "");
-
   /**
    * `\part`: own roman counter (`\ref` → "II"), which does **not** touch
    * the sections — in the `article` class, their numbering continues from one
@@ -1459,7 +1626,7 @@ function generate(source, { title, fragment, M }) {
     let num = "";
     if (spec.numbered) {
       const v = bump(spec.counter);
-      num = spec.parent === "section" ? `${sectionPrefix(1)}.${v}` : String(v);
+      num = counterLabel(spec.counter, spec.parent === "section" ? `${sectionPrefix(1)}.${v}` : String(v));
     }
     const anchor = slug(name, num || String(out.length));
     blank();
@@ -1469,7 +1636,7 @@ function generate(source, { title, fragment, M }) {
     // amsthm: bold head (`plain`, `definition` styles) or italic
     // (`remark`), note in parentheses in roman, trailing period.
     const d = spec.style === "remark" ? "*" : "**";
-    const head = `${escapeMd(spec.label)}${num ? " " + num : ""}`;
+    const head = `${escapeMd(spec.label)}${num ? " " + escapeMd(num) : ""}`;
     const note = titleNodes.length ? oneLine(emitInline(titleNodes)) : "";
     const h = out.length;
     push(note ? `${d}${head}${d} (${note}).` : `${d}${head}.${d}`);
@@ -1495,14 +1662,19 @@ function generate(source, { title, fragment, M }) {
 
   /**
    * @typedef {object} ListItem
-   * @property {string} marker explicit marker (`\item[(a)]`), "" without one
+   * @property {string} marker marker in markdown: explicit (`\item[(a)]`) or
+   *   computed from enumitem's `label=` — "" for a plain bullet/number
+   * @property {string} [ref] text of a `\ref` to the item (ordered lists only)
    * @property {TexNode[]} nodes body
    * @property {TexNode} [node] the `\item` itself
    */
+  let itemAnchors = 0;
   /**
    * Emits list items. An explicit marker (`\item[(a)]`) replaces the
    * numbered bullet — the "1. (a)" duplicate does not exist in LaTeX; it is
-   * bold in `description`, roman elsewhere.
+   * bold in `description`, roman elsewhere. An item of an ordered list is the
+   * target of the `\label`s it contains (`\ref` → its number, or its
+   * enumitem label): the anchor is only written if a label uses it.
    * @param {ListItem[]} items
    * @param {boolean} ordered
    * @param {string} indent
@@ -1510,14 +1682,31 @@ function generate(source, { title, fragment, M }) {
    */
   const emitItems = (items, ordered, indent, boldMarkers) => {
     const numbered = ordered && items.every((it) => !it.marker);
+    // The environment is a group: after it, a `\label` targets again what
+    // preceded the list.
+    const before = pendingLabel;
     items.forEach((it, idx) => {
       const bullet = numbered ? `${idx + 1}. ` : "- ";
       const child = indent + " ".repeat(bullet.length);
       const start = out.length;
+      const id = it.ref ? slug("item", String(++itemAnchors)) : "";
+      if (it.ref) openLabelTarget(it.ref, id);
       emitBlocks(it.nodes, child);
       // Removes the leading blank lines produced by `blank()` at the start of an item.
       while (out.length > start && out[start] === "") removeLine(start);
-      const label = it.marker ? (boldMarkers ? `**${it.marker}** ` : `${it.marker} `) : "";
+      let ids = "";
+      if (id) {
+        const keys = [...labels].filter(([, t]) => t.anchor === id).map(([k]) => k);
+        if (keys.length) {
+          // The `\label` itself as an alias, like the other numbered objects.
+          ids = [id, ...keys.filter((k) => !anchorLines.has(k))].map((k) => `<span id="${attrValue(k)}"></span>`).join("");
+        }
+      }
+      // A marker replaces the bullet, as in LaTeX: the host's `kd-label` class
+      // (protocol §6.7) hides the bullet and hangs the label in the margin. It
+      // must be the item's first element — the anchors therefore go inside.
+      const marker = it.marker ? (boldMarkers ? `**${it.marker}**` : it.marker) : "";
+      const label = marker ? `<span class="kd-label">${ids}${marker}</span> ` : ids;
       if (out.length > start) {
         out[start] = indent + bullet + label + out[start].slice(child.length);
       } else {
@@ -1526,18 +1715,29 @@ function generate(source, { title, fragment, M }) {
       // A blank line at the end of an item would split the list into two blocks.
       while (out.length > start && out[out.length - 1] === "") removeLine(out.length - 1);
     });
+    pendingLabel = before;
     push("");
   };
 
   /**
+   * Items of a list. enumitem's `label=` option (`[label=\textbf{OP\arabic*}]`)
+   * gives each item without an explicit marker its marker — and the text of
+   * a `\ref` to it ("OP3"). The counter only steps on those items, as in LaTeX.
    * @param {Environment} n
    * @param {boolean} ordered
-   * @param {string} indent
-   * @param {boolean} [boldMarkers]
+   * @returns {ListItem[]}
    */
-  const emitList = (n, ordered, indent, boldMarkers = false) => {
+  const listItems = (n, ordered) => {
+    const opt = n.args?.find((a) => a.openMark === "[");
+    const template = opt ? optionValue(printRaw(opt.content), "label") : null;
+    /** @param {number} k */
+    const fill = (k) =>
+      /** @type {string} */ (template).replace(/\\(arabic|alph|Alph|roman|Roman)\s*(?:\{\s*\*\s*\}|\*)/g, (_, style) =>
+        counterText(style, k),
+      );
     /** @type {ListItem[]} */
     const items = [];
+    let k = 0;
     /** @type {ListItem | null} */
     let cur = null;
     for (const c of n.content ?? []) {
@@ -1549,11 +1749,16 @@ function generate(source, { title, fragment, M }) {
         const args = c.args ?? [];
         const optional = args.find((a) => a.openMark === "[");
         const bodyArg = args.filter((a) => a.openMark !== "[").pop();
-        cur = {
-          node: c,
-          marker: optional ? emitInline(optional.content ?? []).trim() : "",
-          nodes: [...(bodyArg?.content ?? [])],
-        };
+        cur = { node: c, marker: "", nodes: [...(bodyArg?.content ?? [])] };
+        if (optional) cur.marker = emitInline(optional.content ?? []).trim();
+        else {
+          k++;
+          if (template !== null) {
+            const raw = fill(k);
+            cur.marker = emitInline(parser.parse(raw).content).trim();
+            if (ordered) cur.ref = plainLabel(raw);
+          } else if (ordered) cur.ref = String(k);
+        }
         items.push(cur);
       } else if (cur) cur.nodes.push(c);
       else if (c.type !== "whitespace" && c.type !== "parbreak" && c.type !== "comment") {
@@ -1562,10 +1767,44 @@ function generate(source, { title, fragment, M }) {
         items.push(cur);
       }
     }
+    return items;
+  };
+
+  /**
+   * @param {Environment} n
+   * @param {boolean} ordered
+   * @param {string} indent
+   * @param {boolean} [boldMarkers]
+   */
+  const emitList = (n, ordered, indent, boldMarkers = false) => {
+    const items = listItems(n, ordered);
     if (!items.length) return;
     blank();
     anchorAt(n);
     emitItems(items, ordered, indent, boldMarkers);
+  };
+
+  /**
+   * Inline list (`enumerate*`, `itemize*`, `description*` of enumitem): the
+   * items follow each other in the paragraph, "(a) … (b) …".
+   * @param {Environment} n
+   * @param {number} depth
+   * @returns {string}
+   */
+  const inlineList = (n, depth) => {
+    const name = envName(n);
+    const items = listItems(n, name === "enumerate*");
+    let k = 0;
+    return items
+      .map((it) => {
+        const body = emitInline(it.nodes, depth).replace(/\s+/g, " ").trim();
+        let marker = it.marker;
+        if (!marker && name === "enumerate*") marker = `${++k}.`;
+        else if (!marker && name === "itemize*") marker = "•";
+        else if (marker && name === "description*") marker = `**${marker}**`;
+        return marker ? `${marker} ${body}` : body;
+      })
+      .join(" ");
   };
 
   /**
@@ -1695,7 +1934,8 @@ function generate(source, { title, fragment, M }) {
    */
   const emitTabular = (n, indent) => {
     const spec = argRaw(n, n.args?.length ? n.args.length - 1 : 0);
-    const aligns = columnAligns(spec).map((c) => (c === "c" ? ":---:" : c === "r" ? "---:" : "---"));
+    const columns = columnSpecs(spec);
+    const aligns = columns.map((c) => (c.align === "c" ? ":---:" : c.align === "r" ? "---:" : "---"));
     /** @type {string[][]} */
     const rows = [];
     /** @type {string[]} */
@@ -1707,8 +1947,16 @@ function generate(source, { title, fragment, M }) {
     // header of the following pages — a markdown table has only one header.
     let mark = 0;
     let firstHead = -1;
+    // booktabs (`\toprule`…): rendered with rules only, and a header only if a
+    // rule separates the first row from the next ones.
+    let booktabs = false;
+    let headerRule = false;
     const endCell = () => {
-      row.push(escapeCell(oneLine(emitInline(cell))));
+      const text = escapeCell(oneLine(emitInline(cell)));
+      // `>{\bfseries}` column; a cell already entirely bold stays as is
+      // (`****` would be read literally).
+      const bold = columns[row.length]?.bold && text && !/^\*\*[\s\S]*\*\*$/.test(text);
+      row.push(bold ? `**${text}**` : text);
       cell = [];
     };
     const endRow = () => {
@@ -1737,6 +1985,8 @@ function generate(source, { title, fragment, M }) {
         c.type === "macro" &&
         ["hline", "toprule", "midrule", "bottomrule", "cline", "rowcolor", "noalign"].includes(c.content)
       ) {
+        if (["toprule", "midrule", "bottomrule"].includes(c.content)) booktabs = true;
+        if ((c.content === "midrule" || c.content === "hline") && rows.length === 1) headerRule = true;
         continue;
       } else {
         cell.push(c);
@@ -1748,12 +1998,25 @@ function generate(source, { title, fragment, M }) {
     /** @param {string[]} r */
     const pad = (r) => [...r, ...Array(width - r.length).fill("")];
     const sep = Array.from({ length: width }, (_, i) => aligns[i] ?? "---");
+    // Markdown has no header-less table: without a rule under the first row,
+    // a booktabs table gets an empty header, which `kd-booktabs` hides.
+    const head = booktabs && !headerRule ? Array(width).fill("") : rows[0];
+    const bodyRows = head === rows[0] ? rows.slice(1) : rows;
     blank();
     anchorAt(n);
-    push(indent + "| " + pad(rows[0]).join(" | ") + " |");
+    if (booktabs) {
+      // `kd-booktabs` (protocol §6.7): horizontal rules only, as LaTeX prints it.
+      push(indent + '<div class="kd-booktabs">');
+      push("");
+    }
+    push(indent + "| " + pad(head).join(" | ") + " |");
     push(indent + "| " + sep.join(" | ") + " |");
-    for (const r of rows.slice(1)) push(indent + "| " + pad(r).join(" | ") + " |");
+    for (const r of bodyRows) push(indent + "| " + pad(r).join(" | ") + " |");
     push("");
+    if (booktabs) {
+      push(indent + "</div>");
+      push("");
+    }
   };
 
   /**
@@ -1842,6 +2105,43 @@ function generate(source, { title, fragment, M }) {
   };
 
   /**
+   * tcolorbox box (`\newtcolorbox` environment, or `tcolorbox` itself):
+   * rendered as a quote headed by its title in bold — the `title=` option,
+   * `#1`… replaced by the arguments of the `\begin`, as tcolorbox does.
+   * Colors and frame are dropped; the title and the framing are what carry
+   * meaning ("Attention — …").
+   * @param {Environment} n
+   * @param {BoxSpec | null} box null for a bare `tcolorbox`
+   * @param {string} indent
+   */
+  const emitBox = (n, box, indent) => {
+    const args = n.args ?? [];
+    let titleRaw;
+    if (box) {
+      titleRaw = box.title.replace(/#([1-9])/g, (_, d) => {
+        const k = Number(d) - 1;
+        const a = args[k];
+        if (a && a.openMark) return printRaw(a.content);
+        return k === 0 && box.optional ? box.defaultArg : "";
+      });
+    } else {
+      const opt = args.find((a) => a.openMark === "[");
+      titleRaw = opt ? (optionValue(printRaw(opt.content), "title") ?? "") : "";
+    }
+    const title = titleRaw ? oneLine(emitInline(parser.parse(titleRaw).content)) : "";
+    blank();
+    anchorAt(n);
+    const start = out.length;
+    if (title) {
+      push(indent + `**${title}**`);
+      push("");
+    }
+    emitBlocks(n.content ?? [], indent);
+    quoteFrom(start, indent);
+    blank();
+  };
+
+  /**
    * @param {TexNode} n
    * @param {string} [indent]
    */
@@ -1860,6 +2160,8 @@ function generate(source, { title, fragment, M }) {
       const spec = defs.theorems.get(name);
       if (spec) return emitTheorem(n, name, spec);
       if (MATH_ENVS.has(name)) return emitDisplayMath(n, printRaw(n.content), name);
+      const box = defs.boxes.get(name);
+      if (box || name === "tcolorbox") return emitBox(n, box ?? null, indent);
       switch (name) {
         case "document":
           return emitBlocks(n.content ?? [], indent);
@@ -1881,6 +2183,7 @@ function generate(source, { title, fragment, M }) {
           return emitBlocks(n.content ?? [], indent);
         }
         case "tabular":
+        case "tabular*":
         case "tabularx":
         case "array":
         case "longtable":
@@ -2016,12 +2319,17 @@ function generate(source, { title, fragment, M }) {
   // --- reference resolution ------------------------------------------------ //
   const unresolved = new Set();
   // `r` = \ref, `e` = \eqref, `t` = reference that appeared in a formula (rendered
-  // as bare text: a markdown link would not survive inside a `$…$`).
-  const pattern = new RegExp(`${SEP}([ret])${SEP}([^${SEP}]*)${SEP}`, "g");
+  // as bare text: a markdown link would not survive inside a `$…$`), `h` = link
+  // target of a `\hyperref[label]{text}` (the anchor alone, the text is the author's).
+  const pattern = new RegExp(`${SEP}([reth])${SEP}([^${SEP}]*)${SEP}`, "g");
   const markdown = out
     .join("\n")
     .replace(pattern, (_, kind, key) => {
       const target = labels.get(key);
+      if (kind === "h") {
+        if (!target?.anchor) unresolved.add(key);
+        return "#" + (target?.anchor || attrValue(key));
+      }
       if (!target || !target.text) {
         unresolved.add(key);
         return kind === "e" ? "(?)" : kind === "t" ? "?" : "**?**";

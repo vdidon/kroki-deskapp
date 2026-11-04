@@ -4,6 +4,38 @@ All notable changes to this plugin are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 versioning follows [semver](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-11-04
+
+### Added
+
+- **tcolorbox boxes.** An environment declared by `\newtcolorbox` (or a bare
+  `tcolorbox`) renders as a quote headed by its `title=` in bold, `#1`…
+  replaced by the arguments of the `\begin` — "Attention — …" instead of a
+  bracketed argument followed by unframed text.
+- **enumitem labels.** The `label=` option of a list (`label=\textbf{OP\arabic*}`,
+  `label=(\alph*)`) gives the items their marker, and a `\ref` to an item of
+  an ordered list now gives its number or label instead of the enclosing
+  section's.
+- **Inline lists** (`enumerate*`, `itemize*`, `description*`) render in the
+  flow of the paragraph: "(a) … (b) …".
+- `\hyperref[label]{text}` renders as a link to the label's target; the
+  label was displayed as text ("op:1 OP1").
+- `\textsuperscript` / `\textsubscript` (1<sup>er</sup>), and the bold of a
+  `>{\bfseries}` table column.
+- **Rendering closer to the PDF** with Kroki Desk 3.31.0 or later: an item
+  label replaces the bullet and hangs in the margin (`kd-label`), and a
+  booktabs table (`\toprule`…) is drawn with horizontal rules only
+  (`kd-booktabs`), with no header row unless a `\midrule` follows the first
+  row. An older Kroki Desk keeps the bullet and the grid.
+
+### Fixed
+
+- A theorem whose `\the<counter>` is redefined
+  (`\renewcommand{\thehypothese}{H\arabic{hypothese}}`) was numbered "1"
+  instead of "H1", in its heading as in every `\ref` to it.
+- The column spec of a `tabularx` or `tabular*` (`@{}>{\bfseries}l X@{}`)
+  leaked into the first cell.
+
 ## [1.5.1] - 2026-10-22
 
 ### Fixed

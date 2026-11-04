@@ -251,6 +251,67 @@ group("Theorems (amsthm)", () => {
   check("proposition reference resolved", /\[2\]\(#proposition-2\)/.test(markdown), markdown);
 });
 
+group("Redefined \\the<counter> (theorem numbers and their \\ref)", () => {
+  const preamble =
+    "\\newtheorem{hypothese}{Hypothèse}\n" +
+    "\\renewcommand{\\thehypothese}{H\\arabic{hypothese}}\n" +
+    "\\newtheorem{regle}{Règle}\n" +
+    "\\renewcommand{\\theregle}{R\\Roman{regle}}\n";
+  const { markdown } = texToMarkdown(
+    doc(
+      "\\begin{hypothese}[Spot]\\label{h:spot} A. \\end{hypothese}\n" +
+        "\\begin{hypothese}\\label{h:b} B. \\end{hypothese}\n" +
+        "\\begin{regle}\\label{r:a} C. \\end{regle}\n" +
+        "\\begin{regle}\\label{r:b} D. \\end{regle}\n" +
+        "Voir \\ref{h:b} et \\ref{r:b}, et $x=\\ref{h:spot}$.",
+      preamble,
+    ),
+  );
+  check("heading uses \\thehypothese", markdown.includes("**Hypothèse H1** (Spot). A."), markdown);
+  check("second item numbered H2", markdown.includes("**Hypothèse H2.** B."), markdown);
+  check("\\Roman honored", markdown.includes("**Règle RII.** D."), markdown);
+  check("\\ref gives the redefined number", markdown.includes("[H2](#hypothese-h2)") && markdown.includes("[RII](#regle-rii)"), markdown);
+  check("\\ref inside a formula gives it too", markdown.includes("\\text{H1}"), markdown);
+});
+
+group("Package constructs (enumitem, tcolorbox, tabularx, hyperref, textsuperscript)", () => {
+  const preamble =
+    "\\newtcolorbox{attention}[1][]{colback=red!4,title={Attention --- #1},breakable}\n" +
+    "\\newcommand{\\op}[1]{\\hyperref[op:#1]{\\textsf{\\small OP#1}}}\n";
+  const { markdown, warnings } = texToMarkdown(
+    doc(
+      "\\begin{attention}[à lire]\nLe 1\\textsuperscript{er} janvier.\n\\end{attention}\n\n" +
+        "Choix : \\begin{enumerate*}[label=(\\alph*)]\\item un ;\\item deux.\\end{enumerate*} Fin.\n\n" +
+        "\\begin{tabularx}{\\linewidth}{@{}>{\\bfseries}l X@{}}\n\\toprule\nEntrée & a \\\\\nSortie & b \\\\\n\\bottomrule\n\\end{tabularx}\n\n" +
+        "\\begin{enumerate}[leftmargin=*,label=\\textbf{OP\\arabic*}]\n\\item\\label{op:1} Premier.\n\\item\\label{op:2} Second.\n\\end{enumerate}\n\n" +
+        "Voir \\op{2} et \\ref{op:1}.",
+      preamble,
+    ),
+  );
+  check("no 'rendered without formatting' warning", warnings.length === 0, warnings.join(" | "));
+  check("tcolorbox: quote headed by its substituted title", markdown.includes("> **Attention — à lire**"), markdown);
+  check("textsuperscript → <sup>", markdown.includes("1<sup>er</sup> janvier"), markdown);
+  check("inline list in the paragraph, enumitem labels", markdown.includes("Choix : (a) un ; (b) deux. Fin."), markdown);
+  check("tabularx column spec not leaked", !/@|bfseries/.test(markdown.split("\n").filter((l) => l.startsWith("|")).join("\n")), markdown);
+  check("tabularx >{\\bfseries} column bold", markdown.includes("| **Entrée** | a |") && markdown.includes("| **Sortie** | b |"), markdown);
+  check("enumitem label as item marker", /- <span class="kd-label"><span id="item-\d+"><\/span><span id="op:1"><\/span>\*\*OP1\*\*<\/span> Premier\./.test(markdown), markdown);
+  check("\\hyperref[label]{text}: link, label not displayed", /\[OP2\]\(#item-\d+\)/.test(markdown) && !markdown.includes("op:2 OP2"), markdown);
+  check("\\ref to an item gives its label", /\[OP1\]\(#item-\d+\)/.test(markdown), markdown);
+  check("booktabs table wrapped in kd-booktabs", /<div class="kd-booktabs">\n\n\| /.test(markdown) && /\|\n\n<\/div>/.test(markdown), markdown);
+  check("booktabs without \\midrule: empty header, first row in the body", markdown.includes("|  |  |\n| --- | --- |\n| **Entrée** | a |"), markdown);
+});
+
+group("booktabs: header only above \\midrule; plain tabular unchanged", () => {
+  const { markdown } = texToMarkdown(
+    doc(
+      "\\begin{tabular}{ll}\\toprule A & B\\\\\\midrule x & y\\\\\\bottomrule\\end{tabular}\n\n" +
+        "\\begin{tabular}{|l|l|}\\hline C & D\\\\\\hline z & t\\\\\\hline\\end{tabular}",
+    ),
+  );
+  check("header = row above \\midrule", markdown.includes('<div class="kd-booktabs">\n\n| A | B |\n| --- | --- |\n| x | y |'), markdown);
+  check("\\hline table: no wrapper, first row as header", markdown.includes("\n| C | D |\n| --- | --- |\n| z | t |") && (markdown.match(/kd-booktabs/g) ?? []).length === 1, markdown);
+});
+
 group("Preamble macros", () => {
   const preamble =
     "\\newcommand{\\E}{\\mathbb{E}}\n" +
@@ -285,7 +346,7 @@ group("Listes", () => {
   check("bullets with their content", /^- Premier point\.$/m.test(markdown), markdown);
   check("bullet containing a formula", /^- Deuxième avec \$x\$\.$/m.test(markdown), markdown);
   check("numbered list", /^1\. Un\.$/m.test(markdown) && /^2\. Deux\.$/m.test(markdown), markdown);
-  check("item with explicit marker", /^- \*\*Terme\*\* Sa définition\.$/m.test(markdown), markdown);
+  check("item with explicit marker", /^- <span class="kd-label">\*\*Terme\*\*<\/span> Sa définition\.$/m.test(markdown), markdown);
   check("no empty bullet", !/^\s*[-\d]+\.?\s*$/m.test(markdown.replace(/^---$/gm, "")), markdown);
 
   // Lists remove lines already emitted: the anchors must follow.
@@ -524,7 +585,7 @@ group("PDF fidelity: text and macros", () => {
   check("macro followed by a letter", markdown.includes("\\alpha x"), markdown);
   check("number at paragraph start not escaped", /^0\.92 n’est pas une liste\.$/m.test(markdown), markdown);
   check("real list marker escaped", /^1\\\. en est une\.$/m.test(markdown), markdown);
-  check("explicit marker without a duplicated number", /^- \(a\) Premier\.$/m.test(markdown) && !/^1\. \(a\)/m.test(markdown), markdown);
+  check("explicit marker without a duplicated number", /^- <span class="kd-label">\(a\)<\/span> Premier\.$/m.test(markdown) && !/^1\. \(a\)/m.test(markdown), markdown);
   const { errors } = katexErrors(markdown);
   check("formules compilent", errors.length === 0, errors.map((e) => `${e.msg} — ${e.tex}`).join("\n"));
 });

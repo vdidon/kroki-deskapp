@@ -342,6 +342,11 @@ the host exposes a small vocabulary of classes, styled in both themes
 | --- | --- | --- |
 | `kd-fold` | `<details>` | Framed collapsible block, `<summary>` as a clickable banner; when nested, it is slightly indented. |
 | `kd-note` | `<div>` | Indented documentation callout, left border, muted text. |
+| `kd-label` | `<span>`, **first** element of a list item (`- <span class="kd-label">**OP1**</span> …`) | Author-supplied item label: replaces the bullet and hangs in the margin (3em; a wider label pushes the first line). Anchors placed inside the span do not break it. Since 3.31.0. |
+| `kd-booktabs` | `<div>` wrapping a markdown table (blank line after the opening tag) | Table ruled like LaTeX's booktabs: thick rules above and below, thin rule under the header, no grid, no striping, header left-aligned. A header whose cells are all empty is hidden — the way to render a header-less table. Since 3.31.0. |
+
+An older host ignores the classes it does not know: the bullet stays next to
+the label, the table keeps its grid — still readable.
 
 These classes survive DOMPurify (`class` attribute kept). Any other class is
 allowed but remains unstyled.

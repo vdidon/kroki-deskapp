@@ -64,13 +64,20 @@ contents, source view, global search, theme, HTML export) comes for free.
 - **Preamble macros**: `\newcommand` (with arguments and optional argument) and
   `\DeclareMathOperator` are **expanded** before the formula reaches KaTeX, which
   does not know them.
-- **Lists** (`itemize`, `enumerate`, `description`, nested), **tables**
-  (`tabular`, `array`, `longtable` — spec alignment preserved), `table`/`figure`
-  floats with numbered caption, `verbatim`/`lstlisting`/`alltt` (as code
-  blocks; the `language=` of a `lstlisting` colors it), `quote`.
+- **Lists** (`itemize`, `enumerate`, `description`, nested; enumitem's
+  `label=` option and inline `enumerate*`/`itemize*`), **tables** (`tabular`,
+  `tabular*`, `tabularx`, `array`, `longtable` — spec alignment and
+  `>{\bfseries}` columns preserved), `table`/`figure` floats with numbered
+  caption, `verbatim`/`lstlisting`/`alltt` (as code blocks; the `language=` of
+  a `lstlisting` colors it), `quote`, tcolorbox boxes (`\newtcolorbox`,
+  rendered as a quote headed by their `title=`).
+- **Numbering**: a redefined `\the<counter>`
+  (`\renewcommand{\thehypothese}{H\arabic{hypothese}}`) is applied to the
+  theorem and to every `\ref` to it.
 - **Text**: bold/italic/monospace, LaTeX accents (`\'e` → é), ligatures
   (`---` → —, ` `` ` → “), `textcomp` symbols (`\euro` → €), footnotes
-  gathered at the end of the document, `\url`/`\href`, `\includegraphics`.
+  gathered at the end of the document, `\url`/`\href`/`\hyperref[label]{…}`,
+  `\textsuperscript`, `\includegraphics`.
 
 A ` ```latex ` fence in an ordinary `.md` gets the **same rendering**, without a
 leading title (`fence:markdown` capability). The ` ```tex ` language is
@@ -102,7 +109,7 @@ Two precautions:
   starred section, which follows the title text.
 - **A label without a numbered object has no anchor.** The `\label{}` must
   follow an object the plugin numbers — equation, section (starred included),
-  theorem, float. Placed in running text, it cannot be anchored: the link will
+  theorem, float, item of an ordered list. Placed in running text, it cannot be anchored: the link will
   open the document but will not scroll (and a `\ref` to it is already flagged
   with a warning).
 

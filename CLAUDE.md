@@ -831,7 +831,9 @@ source, options); a re-render therefore naturally retries errors.
   isolated — otherwise phantom occurrences would appear between two blocks).
 - **Components of document plugins**: a plugin that emits inline HTML
   (accordions, callouts) relies on the generic classes `kd-fold`
-  (collapsible `<details>`) and `kd-note` (documentation callout), styled in
+  (collapsible `<details>`), `kd-note` (documentation callout), `kd-label`
+  (author's list label replacing the bullet, 3.31.0) and `kd-booktabs`
+  (rules-only table wrapper, header hidden when empty, 3.31.0), styled in
   `ui/css/app.css` and documented in §6.7 of the protocol — the host carries no
   plugin-specific class. A relative `doc#fragment` link emitted in an SVG
   (`xlink:href`) is clickable like a markdown link (`initLinks`,
