@@ -273,6 +273,8 @@
   "settings.api.hint_on": "Built-in rendering exposed on http://127.0.0.1:{port} — usable by other tools (VS Code extensions, scripts…).",
   "settings.api.label": "Local Kroki API",
   "settings.api.port": "port",
+  "settings.git_marks.hint": "In a Git repository, what differs from the last commit is marked in the rendered document and in the source code (<span class=\"git-swatch git-swatch-added\"></span>&nbsp;added, <span class=\"git-swatch git-swatch-modified\"></span>&nbsp;modified), and a dot of the same color flags the tab: yellow also when lines were only deleted, <span class=\"git-swatch git-swatch-deleted\"></span>&nbsp;red when the file itself was deleted.",
+  "settings.git_marks.label": "Highlight uncommitted changes",
   "settings.icons.hint": "Setting shared by all windows. Each icon keeps its default behavior until you touch it; only your explicit choices are saved.",
   "settings.icons.label": "Displayed icons",
   "settings.language.auto": "Automatic (system language)",

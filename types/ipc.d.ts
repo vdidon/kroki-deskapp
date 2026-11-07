@@ -47,6 +47,20 @@ export interface SettingsData {
   removed_plugins: string[];
   update_check: boolean;
   update_checked_at: number;
+  git_marks: boolean;
+}
+
+/**
+ * `git::Changes` — lines (0-based, half-open `[start, end)`) of the file on
+ * disk that differ from `HEAD`. Pure deletions mark no line: `removed`.
+ */
+export interface GitChanges {
+  added: [start: number, end: number][];
+  modified: [start: number, end: number][];
+  /** At least one hunk only deletes lines of `HEAD` (tab dot only). */
+  removed: boolean;
+  /** File of `HEAD` no longer on disk (red tab dot). */
+  deleted: boolean;
 }
 
 /** `commands::SettingsInfo` (SettingsData aplati + infos d'environnement). */
@@ -191,10 +205,13 @@ export interface Commands {
       language: string;
       icons: Record<string, boolean>;
       updateCheck: boolean;
+      gitMarks: boolean;
     };
     ret: void;
   };
   open_link: { args: { baseDir: string; href: string }; ret: void };
+  /** `null` = no marks (setting off, outside a repository, ignored file…). */
+  git_changes: { args: { docId: number }; ret: GitChanges | null };
   read_data_file: { args: { baseDir: string; rel: string }; ret: string };
   export_html: { args: { suggestedName: string; html: string }; ret: boolean };
   save_session: { args: NoArgs; ret: boolean };
@@ -229,6 +246,9 @@ export interface Events {
   "theme-changed": Broadcast & { mode: string };
   "locale-changed": Broadcast & { locale: string };
   "icons-changed": Broadcast & { icons: Record<string, boolean> };
+  "git-marks-changed": Broadcast & { enabled: boolean };
+  /** `index` or `HEAD` of a watched repository rewritten (commit, reset…). */
+  "git-changed": null;
   "plugins-changed": PluginInfo[];
   "plugin-install-request": null;
   "session-report": { message: string; error: boolean };

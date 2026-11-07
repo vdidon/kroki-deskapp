@@ -265,6 +265,8 @@
   "settings.api.hint_on": "内置渲染已在 http://127.0.0.1:{port} 上公开 — 可供其他工具使用（VS Code 扩展、脚本…）。",
   "settings.api.label": "本地 Kroki API",
   "settings.api.port": "端口",
+  "settings.git_marks.hint": "在 Git 仓库中，与最近一次提交不同的内容会在渲染的文档和源代码中标出（<span class=\"git-swatch git-swatch-added\"></span>&nbsp;新增，<span class=\"git-swatch git-swatch-modified\"></span>&nbsp;修改），并在标签页上显示一个相同颜色的圆点：仅删除了行时也为黄色，文件本身被删除时为 <span class=\"git-swatch git-swatch-deleted\"></span>&nbsp;红色。",
+  "settings.git_marks.label": "高亮显示未提交的更改",
   "settings.icons.hint": "所有窗口共用此设置。在你更改之前，每个图标均保持其默认行为；仅保存你明确做出的选择。",
   "settings.icons.label": "显示的图标",
   "settings.language.auto": "自动（系统语言）",

@@ -191,10 +191,17 @@ md.core.ruler.push("heading_ids", (mdState) => {
 // in the source). We expose the start as a `data-source-line` attribute so that,
 // when toggling preview ↔ source, we can find the line shown at the top
 // and realign the other view on it (cf. readTopLine / scrollToLine, main.js).
+// List items, at any depth, carry their whole range `start end` in a separate
+// attribute: it only serves the uncommitted-change marks (gitmarks.js), which
+// would otherwise light up a whole list for one edited item — and a separate
+// name keeps them out of readTopLine/scrollToLine.
 md.core.ruler.push("source_lines", (mdState) => {
   for (const token of mdState.tokens) {
     if (token.level === 0 && token.map) {
       token.attrSet("data-source-line", String(token.map[0]));
+    }
+    if (token.type === "list_item_open" && token.map) {
+      token.attrSet("data-src-item", `${token.map[0]} ${token.map[1]}`);
     }
   }
 });
@@ -573,6 +580,13 @@ export async function renderDocument(view, doc) {
     for (const el of view.querySelectorAll("[data-source-line]")) {
       const line = Number(el.getAttribute("data-source-line")) || 0;
       el.setAttribute("data-source-line", String(remapLine(doc.lineMap, line)));
+    }
+    for (const el of view.querySelectorAll("[data-src-item]")) {
+      const [s, e] = String(el.getAttribute("data-src-item")).split(" ").map(Number);
+      const start = remapLine(doc.lineMap, s || 0);
+      // An item can fall inside one anchor's span: never an empty range.
+      const end = Math.max(start + 1, remapLine(doc.lineMap, e || 0));
+      el.setAttribute("data-src-item", `${start} ${end}`);
     }
   }
   view.dataset.dir = doc.dir;

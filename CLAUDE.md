@@ -634,7 +634,31 @@ source, options); a re-render therefore naturally retries errors.
   open dialog. No automatic restore at startup.
 - `server.rs` — local Kroki HTTP API (`tiny_http`), 127.0.0.1 only.
 - `kroki.rs` — external server client + cache.
-- `watcher.rs` — auto-reload on disk change (`notify`).
+- `watcher.rs` — auto-reload on disk change (`notify`). Also watches, non-
+  recursively, the `.git` folder of each open file inside a repository
+  (shared folder refcount): a rewrite of its `index`/`HEAD` (commit, reset,
+  checkout, stage) emits `git-changed`, debounced 250 ms.
+- `git.rs` — uncommitted-change marks (3.31.0): `git_changes` returns the
+  lines of the file on disk added / modified relative to `HEAD` (0-based
+  `[start, end)`; pure deletions mark no line, only `removed`; file of `HEAD`
+  gone from disk = `deleted`; file absent from `HEAD` = wholly added;
+  ignored, LFS pointer, outside a repository = `None`).
+  **Pure Rust (`gix` + `imara-diff`), never the system `git`**: it reads the
+  repository's config, whose `core.fsmonitor`/`filter.*.clean`/`textconv`
+  run commands — opening a document must execute nothing. Price: no filters,
+  so CRLF/LF are normalized on both sides. `gix` features minimal
+  (`excludes`, `parallel` — Arc, required to cache a `ThreadSafeRepository`
+  per folder —, `sha1` **and** `sha256`: the object format is per
+  repository, a missing feature silently gives no marks there; both tested,
+  `depot_reel_sha1`/`_sha256`). **Jujutsu**: colocated (`.jj` + `.git`) works as
+  is — jj keeps `HEAD` on `@-`, so the marks are the current change `@`
+  (verified 2026-11-07, jj 0.47); a `.jj` **without** `.git` (non-colocated,
+  `jj workspace add`) stops discovery → no marks (`non_colocated_jj_root`),
+  otherwise gix would climb to an enclosing git repository and compare with
+  the wrong one. Real support would need jj's op store (internal protobuf) or
+  the `jj` CLI (snapshots the working copy = a write on every call): ruled
+  out. Tests: `cargo test --manifest-path
+  src-tauri/Cargo.toml git::` (builds a real repository with gix).
 - `updates.rs` — update check (3.28.0), **notification only**: `check_update`
   reads the latest GitHub release (`releases/latest` of the `repository` field
   of `Cargo.toml`, single source) and compares its tag to the version. Nothing
@@ -732,6 +756,24 @@ source, options); a re-render therefore naturally retries errors.
   `plugins.js`) — for their *messages*; labels written into a rendering
   follow the document (latex-doc: babel/polyglossia). Adding a language = adding a catalog to
   `CATALOGS` (`i18n.rs`) with its `language.name` endonym.
+- **Uncommitted-change marks** (3.31.0, `gitmarks.js`, backend `git.rs`):
+  pure decoration laid **after** rendering — the classes `git-added` (green)
+  / `git-modified` (yellow) on existing elements, never a wrapper, so the
+  searches, the alignment and the scroll are untouched, and a commit
+  (`git-changed`, window `focus`) re-reads the marks without re-rendering.
+  `renderMode` repaints every cached mode DOM (`paintViewOf`). Preview: a
+  root-level block spans from its `data-source-line` to the next block's
+  (blank lines skipped); list items carry their whole range in
+  `data-src-item` (any depth, remapped for plugin documents) and are marked
+  on their own lines, sub-items excluded. Source view: per `.src-line`;
+  intermediate markdown: never (its lines are not git's). Styling by
+  **box-shadow** (outer bar + inset tint): `pre`, `table` and KaTeX blocks are
+  scroll containers that would clip an absolute pseudo-element. The tab dot
+  is a `::before` of `.tab-title` (`data-git` set by `paintTab`): it tells
+  the state of the **file** — `deleted` red, `modified` yellow (modified or
+  deleted lines, which the rendering cannot show), `added` green. Stripped
+  from HTML exports. Setting `SettingsData::git_marks` (default on),
+  propagated by `git-marks-changed`; off → `git_changes` answers `null`.
 - **Two zooms** (3.17.0): text zoom (`Ctrl+wheel`, `setZoom`) and
   page zoom (`Shift+wheel`, `setPageZoom`) compose into a **single** CSS
   `zoom` on `#views` (`applyZoom`, `main.js`). CSS `zoom` alone is only

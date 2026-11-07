@@ -14,6 +14,9 @@
   --word-hl: rgba(255, 165, 0, 0.42); /* highlighting of occurrences of the selected word */
   --search-hl: rgba(88, 86, 214, 0.28); /* highlighting of global search results */
   --find-cur: rgba(255, 166, 0, 0.62); /* current occurrence of the in-document search */
+  --git-added: #1a7f37; /* uncommitted-change marks (gitmarks.js): added lines */
+  --git-modified: #bf8700; /* … modified lines */
+  --git-deleted: #cf222e; /* … file of HEAD deleted from disk (tab dot only) */
   color-scheme: light;
 }
 
@@ -44,6 +47,9 @@
     --word-hl: rgba(255, 200, 70, 0.34);
     --search-hl: rgba(122, 121, 232, 0.34);
     --find-cur: rgba(255, 200, 70, 0.5);
+    --git-added: #3fb950;
+    --git-modified: #d29922;
+    --git-deleted: #f85149;
     color-scheme: dark;
   }
 }
@@ -63,6 +69,9 @@
   --word-hl: rgba(255, 200, 70, 0.34);
   --search-hl: rgba(122, 121, 232, 0.34);
   --find-cur: rgba(255, 200, 70, 0.5);
+  --git-added: #3fb950;
+  --git-modified: #d29922;
+  --git-deleted: #f85149;
   color-scheme: dark;
 }
 
@@ -191,6 +200,30 @@ body.tab-dragging * {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Uncommitted changes in the tab's document (gitmarks.js): dot of the same
+   color as the marks of the rendering — yellow as soon as a line is modified
+   or deleted, green when there are only additions, red when the file itself
+   was deleted. Inside the title, so that the width
+   measurements of updateTabbarWrap (tabs.js) count it. */
+.tab[data-git] .tab-title::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: var(--git-modified);
+}
+
+.tab[data-git="added"] .tab-title::before {
+  background: var(--git-added);
+}
+
+.tab[data-git="deleted"] .tab-title::before {
+  background: var(--git-deleted);
 }
 
 .tab-close {
@@ -863,6 +896,56 @@ body.tab-dragging * {
   color: var(--fg-muted);
   opacity: 0.55;
   user-select: none;
+}
+
+/* ---------- Uncommitted-change marks (gitmarks.js) ----------
+   Classes laid on existing elements, never a wrapper: the layout does not move
+   by a pixel. Hence box-shadow rather than a border or padding: a bar in the
+   left margin and a light tint of the block. The bar is an *outer* shadow
+   because `pre`, `table` and KaTeX blocks are scroll containers — an absolute
+   pseudo-element would be clipped by their own overflow, their outer shadow
+   is not. The first shadow, in the page's background color, cuts the gap
+   between bar and block. */
+.git-added {
+  --git-c: var(--git-added);
+}
+
+.git-modified {
+  --git-c: var(--git-modified);
+}
+
+.markdown-body :is(.git-added, .git-modified) {
+  box-shadow:
+    -5px 0 0 var(--bgColor-default, var(--bg)),
+    -8px 0 0 var(--git-c),
+    inset 0 0 0 100vmax color-mix(in srgb, var(--git-c) 9%, transparent);
+}
+
+/* Source view: one line = one element, the gutter on the left carries the bar. */
+.source-view .src-line:is(.git-added, .git-modified) {
+  background: color-mix(in srgb, var(--git-c) 13%, transparent);
+  box-shadow: inset 3px 0 0 var(--git-c);
+}
+
+/* Color samples in the hint of the setting. */
+.git-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.git-swatch-added {
+  background: var(--git-added);
+}
+
+.git-swatch-modified {
+  background: var(--git-modified);
+}
+
+.git-swatch-deleted {
+  background: var(--git-deleted);
 }
 
 /* "Intermediate markdown" debug view (debug builds only): accent

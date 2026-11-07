@@ -97,6 +97,11 @@ export async function exportActiveView() {
   const article = await previewArticle(v);
   if (!article) return false;
   for (const el of article.querySelectorAll(".modebar-container")) el.remove();
+  // Uncommitted-change marks (gitmarks.js): the state of this workstation's
+  // repository has nothing to do in a shared export.
+  for (const el of article.querySelectorAll(".git-added, .git-modified")) {
+    el.classList.remove("git-added", "git-modified");
+  }
 
   const title = state.tabs.find((t) => t.id === state.active)?.title || t("export.default_title");
   const theme = document.documentElement.dataset.theme;

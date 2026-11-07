@@ -265,6 +265,8 @@
   "settings.api.hint_on": "組み込みのレンダリングを http://127.0.0.1:{port} で公開しています — 他のツール (VS Code 拡張機能、スクリプトなど) から使用できます。",
   "settings.api.label": "ローカル Kroki API",
   "settings.api.port": "ポート",
+  "settings.git_marks.hint": "Git リポジトリでは、最後のコミットとの差分がレンダリングされた文書とソースコードに表示され（<span class=\"git-swatch git-swatch-added\"></span>&nbsp;追加、<span class=\"git-swatch git-swatch-modified\"></span>&nbsp;変更）、同じ色の点がタブにも表示されます。行が削除されただけの場合も黄色、ファイル自体が削除された場合は <span class=\"git-swatch git-swatch-deleted\"></span>&nbsp;赤になります。",
+  "settings.git_marks.label": "コミットされていない変更を強調表示",
   "settings.icons.hint": "すべてのウィンドウに共通の設定です。各アイコンは、変更するまで既定の動作のままです。明示的に選択した内容のみが保存されます。",
   "settings.icons.label": "表示するアイコン",
   "settings.language.auto": "自動 (システムの言語)",

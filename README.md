@@ -174,6 +174,16 @@ pan across a figure too dense to fit on one screen. `Ctrl+0` resets.
   plugins that provide a grammar; a format without a grammar is shown as plain
   text. Toggling preview ↔ source keeps the reading position.
 - **Automatic reload** when the file changes on disk.
+- **Uncommitted changes** of a document inside a Git repository are
+  highlighted: in the rendering, the blocks (paragraphs, list items, tables,
+  diagrams…) touched since the last commit get a bar in the margin, **green**
+  for added lines and **yellow** for modified ones; the source view marks the
+  lines themselves, and a dot of the same color flags the tab — yellow also
+  when lines were only deleted, red when the file itself was deleted. A
+  commit clears the marks right away. Colocated
+  [Jujutsu](https://github.com/jj-vcs/jj) repositories are supported too (the
+  marks show the current change, `@`); non-colocated ones and secondary jj
+  workspaces show no marks. Can be turned off in the Settings.
 - **`.html`/`.htm` files** (including the app's own exports) open in a tab: the
   page is displayed as is, through a sandboxed iframe (no script executed).
 
@@ -297,7 +307,7 @@ Spanish, Italian, Japanese, Korean, Brazilian Portuguese, Simplified Chinese)
 are chosen there too.
 
 <details>
-<summary>Server, local API, icons, updates</summary>
+<summary>Server, local API, icons, change marks, updates</summary>
 
 - **External Kroki server** (empty = built-in rendering, recommended);
 - **Local Kroki API**: enable + port (8442 by default);
@@ -310,6 +320,8 @@ are chosen there too.
   — the raw output of a document plugin
   (`.tex`…), useful when developing a plugin — is enabled here; it is off by
   default;
+- **Highlight uncommitted changes** (on by default): the Git marks in the
+  rendering, the source view and on the tabs;
 - **Check for updates at startup** (on by default): at most once a day, asks
   the GitHub API for the
   latest release and, if it is newer, shows a notification with two links,
@@ -388,6 +400,7 @@ running application by [`scripts/readme_media/`](scripts/readme_media/README.md)
   - `manager.rs`: windows, tabs, detach/reattach
     (Win32 `WindowFromPoint` on mouse release);
   - `watcher.rs`: automatic reload (notify);
+  - `git.rs`: uncommitted-change marks, read in pure Rust (gix);
   - `kroki.rs`: client for the optional external server + render cache;
   - `assets/plantuml-mit.jar`: PlantUML (MIT license) embedded via `include_bytes!`;
   - `assets/ditaa-0.11.0-standalone.jar`: ditaa (LGPL v3 license, Batik included for
@@ -428,6 +441,12 @@ untrusted content, injected scripts not executed); the only real `eval` is
 internal to d2, confined to the rendering webview — the same trust already
 granted to the mermaid/PlantUML/graphviz engines. The local API only listens
 on 127.0.0.1.
+
+The uncommitted-change marks read the repository with
+[gitoxide](https://github.com/GitoxideLabs/gitoxide), never with the
+`git` command: the latter honors the repository's own configuration, whose
+`core.fsmonitor`, filters and `textconv` run arbitrary commands — opening a
+document in a cloned repository executes nothing.
 
 Rendering never touches the network. The only request the application makes
 on its own is the update check (`GET

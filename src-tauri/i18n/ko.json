@@ -265,6 +265,8 @@
   "settings.api.hint_on": "기본 제공 렌더링이 http://127.0.0.1:{port}에 노출됨 — 다른 도구(VS Code 확장, 스크립트…)에서 사용할 수 있습니다.",
   "settings.api.label": "로컬 Kroki API",
   "settings.api.port": "포트",
+  "settings.git_marks.hint": "Git 저장소에서는 마지막 커밋과 다른 부분이 렌더링된 문서와 소스 코드에 표시되며(<span class=\"git-swatch git-swatch-added\"></span>&nbsp;추가됨, <span class=\"git-swatch git-swatch-modified\"></span>&nbsp;수정됨), 같은 색의 점이 탭에도 표시됩니다. 줄이 삭제되기만 한 경우에도 노란색이며, 파일 자체가 삭제된 경우에는 <span class=\"git-swatch git-swatch-deleted\"></span>&nbsp;빨간색입니다.",
+  "settings.git_marks.label": "커밋되지 않은 변경 사항 강조 표시",
   "settings.icons.hint": "모든 창에 공통으로 적용되는 설정입니다. 각 아이콘은 변경하기 전까지 기본 동작을 유지하며, 명시적으로 선택한 항목만 저장됩니다.",
   "settings.icons.label": "표시할 아이콘",
   "settings.language.auto": "자동(시스템 언어)",

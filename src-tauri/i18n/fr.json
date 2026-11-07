@@ -273,6 +273,8 @@
   "settings.api.hint_on": "Rendu intégré exposé sur http://127.0.0.1:{port} — utilisable par d'autres outils (extensions VS Code, scripts…).",
   "settings.api.label": "API Kroki locale",
   "settings.api.port": "port",
+  "settings.git_marks.hint": "Dans un dépôt Git, ce qui diffère du dernier commit est marqué dans le document rendu et dans le code source (<span class=\"git-swatch git-swatch-added\"></span>&nbsp;ajouté, <span class=\"git-swatch git-swatch-modified\"></span>&nbsp;modifié), et un point de la même couleur le signale sur l'onglet : jaune aussi quand des lignes ont seulement été supprimées, <span class=\"git-swatch git-swatch-deleted\"></span>&nbsp;rouge quand le fichier lui-même a été supprimé.",
+  "settings.git_marks.label": "Surligner les modifications non commitées",
   "settings.icons.hint": "Réglage commun à toutes les fenêtres. Chaque icône garde son comportement par défaut tant que vous n'y touchez pas ; seuls vos choix explicites sont enregistrés.",
   "settings.icons.label": "Icônes affichées",
   "settings.language.auto": "Automatique (langue du système)",

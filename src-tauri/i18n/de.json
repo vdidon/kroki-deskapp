@@ -273,6 +273,8 @@
   "settings.api.hint_on": "Integriertes Rendering unter http://127.0.0.1:{port} bereitgestellt — nutzbar für andere Tools (VS Code-Erweiterungen, Skripts…).",
   "settings.api.label": "Lokale Kroki-API",
   "settings.api.port": "Port",
+  "settings.git_marks.hint": "In einem Git-Repository wird alles, was vom letzten Commit abweicht, im gerenderten Dokument und im Quelltext markiert (<span class=\"git-swatch git-swatch-added\"></span>&nbsp;hinzugefügt, <span class=\"git-swatch git-swatch-modified\"></span>&nbsp;geändert); ein Punkt in derselben Farbe kennzeichnet den Tab – gelb auch, wenn nur Zeilen gelöscht wurden, <span class=\"git-swatch git-swatch-deleted\"></span>&nbsp;rot, wenn die Datei selbst gelöscht wurde.",
+  "settings.git_marks.label": "Nicht committete Änderungen hervorheben",
   "settings.icons.hint": "Einstellung für alle Fenster. Jedes Symbol behält sein Standardverhalten, bis Sie es ändern; nur Ihre ausdrückliche Auswahl wird gespeichert.",
   "settings.icons.label": "Angezeigte Symbole",
   "settings.language.auto": "Automatisch (Systemsprache)",

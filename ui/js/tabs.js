@@ -5,6 +5,7 @@
 import { invoke, state } from "./app.js";
 import { showToast } from "./session.js";
 import { t, applyLocale, onLocaleChange } from "./i18n.js";
+import { paintTab } from "./gitmarks.js";
 
 /** @typedef {import("../../types/ipc").TabInfo} TabInfo */
 
@@ -55,6 +56,7 @@ export function renderTabbar() {
     const title = /** @type {HTMLElement} */ (el.querySelector(".tab-title"));
     if (title.textContent !== tab.title) title.textContent = tab.title;
     if (el.title !== tab.path) el.title = tab.path;
+    paintTab(el, tab.id); // dot of the uncommitted-change marks (gitmarks.js)
   }
   updateTabbarWrap();
 }

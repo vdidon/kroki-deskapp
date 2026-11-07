@@ -211,6 +211,16 @@
         Setting shared by all windows. Each icon keeps its default behavior until
         you touch it; only your explicit choices are saved.
       </p>
+      <div class="settings-row">
+        <label class="settings-checkbox"><input type="checkbox" id="git-marks" /> <span data-i18n="settings.git_marks.label">Highlight uncommitted changes</span></label>
+      </div>
+      <p class="settings-hint" data-i18n-html="settings.git_marks.hint">
+        In a Git repository, what differs from the last commit is marked in the
+        rendered document and in the source code (<span class="git-swatch git-swatch-added"></span>&nbsp;added,
+        <span class="git-swatch git-swatch-modified"></span>&nbsp;modified), and a dot of the same color
+        flags the tab: yellow also when lines were only deleted,
+        <span class="git-swatch git-swatch-deleted"></span>&nbsp;red when the file itself was deleted.
+      </p>
       <label for="kroki-url" data-i18n="settings.server.label">External Kroki server (optional)</label>
       <input id="kroki-url" type="text" spellcheck="false" placeholder="Empty = built-in rendering (recommended)" data-i18n-placeholder="settings.server.placeholder" />
       <p class="settings-hint" id="supported-hint"></p>

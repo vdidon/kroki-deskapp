@@ -17,6 +17,22 @@ zip = { version = "8", default-features = false, features = ["deflate-flate2-zli
 base64 = "0.22.1"
 dunce = "1.0.5"
 flate2 = "1.1.9"
+# Uncommitted-change marks (git.rs): reads HEAD and the excludes in pure Rust.
+# Never the system `git`: it would read the repository's config, whose
+# core.fsmonitor / filters / textconv run commands — opening a document in a
+# cloned repository must not execute anything. No default features: no
+# network, no worktree status walk; `parallel` = Arc instead of Rc, required
+# to cache a ThreadSafeRepository across Tauri threads; `sha1` AND `sha256`:
+# the object format is read per repository (extensions.objectFormat), a
+# missing one makes opening such a repository fail (= no marks).
+gix = { version = "0.90", default-features = false, features = [
+    "excludes",
+    "parallel",
+    "sha1",
+    "sha256",
+] }
+# Line diff of HEAD vs the file on disk (git.rs), histogram algorithm.
+imara-diff = "0.2"
 notify = "8.2.0"
 pikchr = "0.1.4"
 reqwest = "0.13.4"

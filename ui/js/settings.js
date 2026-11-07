@@ -1,11 +1,13 @@
 // @ts-check
 // Settings (« Réglages »): theme, language, toolbar icons, optional external server,
-// local Kroki API and update check, persisted on the Rust side.
+// uncommitted-change marks, local Kroki API and update check, persisted on the
+// Rust side.
 
 import { invoke } from "./app.js";
 import { applyTheme } from "./theme.js";
 import { openPlugins } from "./plugins_ui.js";
 import { ICON_GROUPS, applyIcons } from "./icons.js";
+import { setGitMarksEnabled } from "./gitmarks.js";
 import { getLanguages, getLanguageSetting, loadLocale, onLocaleChange, t } from "./i18n.js";
 
 /** @typedef {import("../../types/ipc").SettingsInfo} SettingsInfo */
@@ -21,6 +23,7 @@ const serverPort = /** @type {HTMLInputElement} */ (document.getElementById("ser
 const supportedHint = /** @type {HTMLElement} */ (document.getElementById("supported-hint"));
 const serverHint = /** @type {HTMLElement} */ (document.getElementById("server-hint"));
 const updateCheck = /** @type {HTMLInputElement} */ (document.getElementById("update-check"));
+const gitMarks = /** @type {HTMLInputElement} */ (document.getElementById("git-marks"));
 const errorEl = /** @type {HTMLElement} */ (document.getElementById("settings-error"));
 
 /** @type {(() => void) | null} */
@@ -139,6 +142,7 @@ export async function openSettings() {
   serverEnabled.checked = s.server_enabled;
   serverPort.value = String(s.server_port);
   updateCheck.checked = s.update_check;
+  gitMarks.checked = s.git_marks;
   supportedInfo = s;
   updateSupportedHint();
   updateServerHint();
@@ -180,6 +184,7 @@ export function initSettings(savedCallback) {
     serverEnabled.checked = true;
     serverPort.value = "8442";
     updateCheck.checked = true;
+    gitMarks.checked = true;
     updateServerHint();
   });
   /** @type {HTMLElement} */ (document.getElementById("settings-cancel")).addEventListener("click", () => {
@@ -196,6 +201,7 @@ export function initSettings(savedCallback) {
         language: languageSelect.value,
         icons: iconWork,
         updateCheck: updateCheck.checked,
+        gitMarks: gitMarks.checked,
       });
       // Language: reload the catalog BEFORE `onSaved`, whose re-render must
       // already produce messages in the new language. Also when the effective
@@ -206,6 +212,7 @@ export function initSettings(savedCallback) {
       // re-renders with the updated theme and re-evaluates the view actions.
       applyTheme(themeSelect.value);
       applyIcons(iconWork);
+      setGitMarksEnabled(gitMarks.checked);
       dialog.close();
       onSaved?.();
     } catch (err) {

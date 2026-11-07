@@ -101,6 +101,10 @@ pub struct SettingsData {
     /// Timestamp (Unix seconds) of the last automatic check.
     /// Not exposed in the Settings (« Réglages ») dialog.
     pub update_checked_at: u64,
+    /// Highlight what is not committed (lines and blocks differing from
+    /// `HEAD`, dot on the tab), see `git.rs`. On by default; `serde(default)`
+    /// turns it on for a settings file written before it existed.
+    pub git_marks: bool,
 }
 
 impl Default for SettingsData {
@@ -115,6 +119,7 @@ impl Default for SettingsData {
             removed_plugins: Vec::new(),
             update_check: true,
             update_checked_at: 0,
+            git_marks: true,
         }
     }
 }

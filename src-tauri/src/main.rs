@@ -9,6 +9,7 @@ mod commands;
 #[cfg(windows)]
 mod drop_target;
 mod engine;
+mod git;
 mod journal;
 mod kroki;
 mod manager;
@@ -118,6 +119,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_window_state,
             commands::read_document,
+            commands::git_changes,
             commands::render_diagram,
             commands::renderer_ready,
             commands::render_job_done,

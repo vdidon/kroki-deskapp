@@ -273,6 +273,8 @@
   "settings.api.hint_on": "Renderizado integrado expuesto en http://127.0.0.1:{port} — disponible para otras herramientas (extensiones de VS Code, scripts…).",
   "settings.api.label": "API local de Kroki",
   "settings.api.port": "puerto",
+  "settings.git_marks.hint": "En un repositorio Git, lo que difiere del último commit se marca en el documento renderizado y en el código fuente (<span class=\"git-swatch git-swatch-added\"></span>&nbsp;añadido, <span class=\"git-swatch git-swatch-modified\"></span>&nbsp;modificado), y un punto del mismo color lo señala en la pestaña: amarillo también cuando solo se eliminaron líneas, <span class=\"git-swatch git-swatch-deleted\"></span>&nbsp;rojo cuando se eliminó el propio archivo.",
+  "settings.git_marks.label": "Resaltar los cambios sin confirmar",
   "settings.icons.hint": "Configuración común a todas las ventanas. Cada icono mantiene su comportamiento predeterminado hasta que lo cambies; solo se guardan tus elecciones explícitas.",
   "settings.icons.label": "Iconos mostrados",
   "settings.language.auto": "Automático (idioma del sistema)",

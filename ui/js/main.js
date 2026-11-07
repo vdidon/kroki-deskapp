@@ -54,6 +54,13 @@ import {
 import { initPluginsUi } from "./plugins_ui.js";
 import { applyIcons, iconEnabled } from "./icons.js";
 import { beginLoading, endLoading, beforeHeavyRender } from "./loading.js";
+import {
+  refreshGitMarks,
+  refreshAllGitMarks,
+  paintViewOf,
+  forgetGitMarks,
+  setGitMarksEnabled,
+} from "./gitmarks.js";
 
 /** @typedef {import("../../types/ipc").Anchor} Anchor */
 /** @typedef {import("../../types/ipc").TabsPayload} TabsPayload */
@@ -89,6 +96,7 @@ function syncViews() {
       v.el.remove();
       state.views.delete(id);
       state.stale.delete(id);
+      forgetGitMarks(id);
     }
   }
   for (const t of state.tabs) {
@@ -99,6 +107,7 @@ function syncViews() {
       el.style.display = "none";
       viewsEl.appendChild(el);
       state.views.set(t.id, { el, rendered: false, seq: 0 });
+      refreshGitMarks(t.id); // the tab's dot, even if it is never displayed
     }
   }
 }
@@ -337,6 +346,10 @@ async function renderActive(v, id) {
  * @param {number} seq
  */
 async function renderActiveInner(v, id, seq) {
+  // Marks re-read alongside the render, which lays them as soon as they
+  // arrive (or with the render, whichever comes last). Before the read: a
+  // file deleted from disk fails it, and its tab must still turn red.
+  refreshGitMarks(id);
   let doc;
   try {
     doc = await invoke("read_document", { docId: id });
@@ -460,6 +473,7 @@ async function renderMode(v, mode) {
       lineMap: v.lineMap,
     });
   (v.domCache ??= {})[key] = v.el.firstElementChild;
+  paintViewOf(v);
 }
 
 // --- View actions (TOC + source code toggle) of the active tab ---
@@ -1064,7 +1078,19 @@ async function boot() {
       if (v) renderActive(v, id);
     } else {
       state.stale.add(id);
+      refreshGitMarks(id); // the tab's dot follows without waiting for activation
     }
+  });
+  // Uncommitted-change marks: a commit (or reset, checkout…) rewrote the
+  // `index` / `HEAD` of a repository holding an open document (watcher.rs).
+  await listen("git-changed", () => refreshAllGitMarks());
+  // Coming back to the window: a commit made in a repository the watcher
+  // could not watch (network drive…) is caught up here.
+  window.addEventListener("focus", () => refreshAllGitMarks());
+  // Setting changed in ANOTHER window: same protocol as the theme.
+  await listen("git-marks-changed", (e) => {
+    if (e.payload.from === currentLabel) return;
+    setGitMarksEnabled(e.payload.enabled);
   });
   // Theme changed in ANOTHER window: the initiating window has already updated
   // locally (cf. settings.js), so we ignore its own echo via `from`.

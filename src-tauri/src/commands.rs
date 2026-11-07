@@ -54,6 +54,31 @@ pub fn read_document(state: State<AppState>, doc_id: u64) -> Result<DocPayload, 
     })
 }
 
+/// Lines of a document not committed (relative to `HEAD`), for the change marks.
+/// `None` = no marks: setting disabled, outside a repository, ignored file…
+/// Async: reading a large blob from a pack must not block the main thread.
+#[tauri::command]
+pub async fn git_changes(
+    state: State<'_, AppState>,
+    settings: State<'_, SettingsState>,
+    doc_id: u64,
+) -> Result<Option<crate::git::Changes>, String> {
+    if !settings.0.lock().unwrap().git_marks {
+        return Ok(None);
+    }
+    let path = {
+        let st = state.0.lock().unwrap();
+        st.docs
+            .get(&doc_id)
+            .ok_or_else(|| tr!("error.document.unknown"))?
+            .path
+            .clone()
+    };
+    tauri::async_runtime::spawn_blocking(move || crate::git::changes(&path))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Renders a diagram: built-in engines by default, external Kroki server if configured.
 #[tauri::command]
 pub async fn render_diagram(
@@ -378,6 +403,7 @@ pub fn set_settings(
     language: String,
     icons: BTreeMap<String, bool>,
     update_check: bool,
+    git_marks: bool,
 ) -> Result<(), String> {
     let url = external_url.trim().trim_end_matches('/').to_string();
     if !url.is_empty() && !url.starts_with("http://") && !url.starts_with("https://") {
@@ -399,8 +425,10 @@ pub fn set_settings(
     };
     let previous_locale = i18n::current();
     let locale = i18n::set_language(&language);
+    let git_marks_changed;
     {
         let mut s = settings.0.lock().unwrap();
+        git_marks_changed = s.git_marks != git_marks;
         // Not exposed in the Settings (« Réglages ») dialog: preserved as is (fed by
         // plugins::install_plugin / uninstall_plugin and updates::check_update).
         let removed_plugins = std::mem::take(&mut s.removed_plugins);
@@ -415,6 +443,7 @@ pub fn set_settings(
             removed_plugins,
             update_check,
             update_checked_at,
+            git_marks,
         };
     }
     save_settings(&app);
@@ -441,6 +470,12 @@ pub fn set_settings(
         "icons-changed",
         json!({ "icons": icons, "from": window.label() }),
     );
+    if git_marks_changed {
+        let _ = app.emit(
+            "git-marks-changed",
+            json!({ "enabled": git_marks, "from": window.label() }),
+        );
+    }
     Ok(())
 }
 

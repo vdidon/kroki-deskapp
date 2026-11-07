@@ -18,6 +18,19 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   enumitem labels and inline lists, `\hyperref`, `\textsuperscript`, bold
   table columns, redefined theorem numbers (`H1`, `R1`) in headings and
   references.
+- **Uncommitted changes highlighted**: in a Git repository, what differs
+  from the last commit is marked — green for added lines, yellow for
+  modified ones — on the rendered blocks (paragraphs, list items, tables,
+  diagrams, formulas), on the lines of the source view, and by a dot of the
+  same color on the tab — yellow also when lines were only deleted, red when
+  the file itself was deleted. A commit clears the marks without
+  re-rendering.
+  The repository is read in pure Rust (gitoxide), never through the `git`
+  command, so no repository configuration can run anything. SHA-1 and
+  SHA-256 repositories are both supported. Colocated
+  Jujutsu repositories work the same way (the marks show the current change,
+  `@`); a non-colocated one or a secondary jj workspace shows no marks rather
+  than wrong ones. On by default, can be turned off in the Settings.
 
 ## [3.30.0] — 2026-10-28
 
