@@ -356,7 +356,7 @@ Each step is removed by its `--skip-…` (`--skip-skill`, `--skip-plugins`,
 `--skip-native`, `--skip-msi`, `--skip-appimage`, `--skip-binary`, `--skip-deb`)
 or isolated by its `--…-only` (`--skill-only`, `--native-only`, `--plugins-only`,
 `--msi-only`, `--deb-only`,
-mutually exclusive); added to these are `--skip-image-build`, `--compile-only`
+combinable — union of the kept steps); added to these are `--skip-image-build`, `--compile-only`
 (Linux cargo build for verification only, no artifact) and `--test` (headless
 Xvfb runtime test via `scripts/linux_runtime_run.sh`, incompatible with the
 `--…-only`). Two dependencies between steps: the MSI is **skipped outright outside

@@ -3,7 +3,7 @@
 single command, from Windows or Linux.
 
 Everything is produced by default; each step is removed by its --skip-*, or
-isolated by its --*-only. Each artifact is published suffixed with the version
+isolated by its --*-only (combinable: the steps kept are the union). Each artifact is published suffixed with the version
 (source of truth: src-tauri/Cargo.toml) and paired with an unversioned file
 pointing at the same content (hardlink, copy as a fallback — see publish_dist
 in xtask/src/main.rs):
@@ -76,6 +76,7 @@ Examples:
     python build_dist.py --msi-only                 # just the .kdext + the MSI (no Docker)
     python build_dist.py --msi-only --skip-plugins  # just the MSI, .kdext from dist/ reused
     python build_dist.py --deb-only                 # just the .kdext + the .deb (Docker)
+    python build_dist.py --native-only --msi-only   # native binary + .kdext + MSI (no Docker)
     python build_dist.py --compile-only             # Linux compile check only
     python build_dist.py --channel public           # public channel artifacts
     python build_dist.py --channel all              # public and local channels in one pass
@@ -330,21 +331,33 @@ def main() -> None:
     # "skipped" messages name the option actually typed.
     explicit_skips = {s for s in STEPS if getattr(args, f"skip_{s}")}
 
+    # The --*-only options combine: the steps kept are the union of theirs
+    # (--native-only --msi-only = native binary + plugins + MSI).
     selected = [name for name in ONLY_MODES if getattr(args, name)]
-    if len(selected) > 1:
-        parser.error("the --*-only options are mutually exclusive: " + ", ".join(flag(n) for n in selected))
-
     only_flag = None
     if selected:
-        only_flag = flag(selected[0])
-        isolated, kept = ONLY_MODES[selected[0]]
+        only_flag = " ".join(flag(n) for n in selected)
         if args.test:
             parser.error(f"{only_flag} is incompatible with --test")
-        if isolated in explicit_skips:
-            parser.error(f"{only_flag} is incompatible with {flag('skip_' + isolated)}")
+        kept: set[str] = set()
+        for name in selected:
+            isolated, steps = ONLY_MODES[name]
+            if isolated in explicit_skips:
+                parser.error(f"{flag(name)} is incompatible with {flag('skip_' + isolated)}")
+            kept |= steps
         for step in STEPS:
             if step not in kept:
                 setattr(args, f"skip_{step}", True)
+
+    def nothing_left(after: str) -> bool:
+        """With --*-only, true once every step after `after` is skipped: stop
+        there rather than print a "skipped" line for each of them. The Linux
+        compile check (--compile-only) sits between the MSI and the AppImage."""
+        if not selected:
+            return False
+        if args.compile_only and STEPS.index(after) <= STEPS.index("msi"):
+            return False
+        return all(getattr(args, f"skip_{s}") for s in STEPS[STEPS.index(after) + 1:])
 
     # WiX v3 only runs on Windows: elsewhere, the MSI is out of scope, not an
     # error — unless it is explicitly the only artifact requested.
@@ -400,7 +413,7 @@ def main() -> None:
         skipped("Skill", "skill")
     else:
         collect(pack_skill(version), release_dir)
-    if args.skill_only:
+    if nothing_left("skill"):
         return
 
     # Plugins next: a few hundred ms, neither cargo nor Docker. Same logic as
@@ -412,7 +425,7 @@ def main() -> None:
         pack_plugins()
     if public and not (args.skip_plugins and args.skip_msi and args.skip_deb):
         collect_plugins(public[2], release_dir)
-    if args.plugins_only:
+    if nothing_left("plugins"):
         return
 
     # The native binary next: it is the fastest artifact to get and the one
@@ -429,7 +442,7 @@ def main() -> None:
             sys.exit(f"Build finished but no native binary for version {version} found in dist/.")
         collect(native, release_dir)
         say("== Native binary published to dist/ (versioned + twin, see publish_dist) ==", "32")
-    if args.native_only:
+    if nothing_left("native"):
         return
 
     # The MSI after the native binary: it reruns a release build, which is then
@@ -447,7 +460,7 @@ def main() -> None:
                 sys.exit(f"Build finished but no MSI for version {version} found in dist/.")
             collect(msi, channel_dir)
             say("== MSI published to dist/ (versioned + twin) ==", "32")
-    if args.msi_only:
+    if nothing_left("msi"):
         return
 
     if needs_docker:
@@ -465,7 +478,8 @@ def main() -> None:
         run(["docker", "run", "--rm", *COMMON_VOLUMES,
              "-e", "CARGO_TARGET_DIR=/target", IMAGE_NAME, "cargo", "build"])
         say("== Compile OK ==", "32")
-        return
+        if all(getattr(args, f"skip_{s}") for s in STEPS[STEPS.index("msi") + 1:]):
+            return
 
     if args.skip_appimage:
         skipped("AppImage", "appimage")

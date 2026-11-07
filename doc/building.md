@@ -44,8 +44,9 @@ a cheap artifact):
 
 Each step is removed with its `--skip-…` (`--skip-plugins`, `--skip-native`,
 `--skip-msi`, `--skip-appimage`, `--skip-binary`, `--skip-deb`) or isolated with
-its `--…-only` (`--native-only`, `--plugins-only`, `--msi-only`, `--deb-only`,
-mutually exclusive). Also available: `--skip-image-build`, `--compile-only`
+its `--…-only` (`--skill-only`, `--native-only`, `--plugins-only`, `--msi-only`,
+`--deb-only`; combinable — `--native-only --msi-only` builds the native binary,
+the `.kdext` and the MSI). Also available: `--skip-image-build`, `--compile-only`
 (verification-only Linux compilation, no artifact) and `--test` (headless
 runtime test under Xvfb). Without Docker: `--skip-appimage --skip-binary --skip-deb`.
 
