@@ -50,7 +50,7 @@ fn detach_if_requested() {
             return;
         }
     };
-    let rest: Vec<_> = args.iter().filter(|a| !is_detach(*a)).collect();
+    let rest: Vec<_> = args.iter().filter(|a| !is_detach(a)).collect();
     let command = || {
         let mut cmd = std::process::Command::new(&exe);
         cmd.args(&rest)
