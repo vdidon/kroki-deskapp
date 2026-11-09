@@ -202,10 +202,9 @@ body.tab-dragging * {
   white-space: nowrap;
 }
 
-/* Uncommitted changes in the tab's document (gitmarks.js): dot of the same
-   color as the marks of the rendering — yellow as soon as a line is modified
-   or deleted, green when there are only additions, red when the file itself
-   was deleted. Inside the title, so that the width
+/* Uncommitted changes in the tab's document (gitmarks.js): state of the
+   file — green when it is new (its lines are not marked one by one), yellow
+   when it is modified, red when it was deleted. Inside the title, so that the width
    measurements of updateTabbarWrap (tabs.js) count it. */
 .tab[data-git] .tab-title::before {
   content: "";

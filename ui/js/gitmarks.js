@@ -2,10 +2,12 @@
 
 // Uncommitted-change marks: what differs from the repository's `HEAD`
 // (`git_changes`, git.rs) is highlighted in the rendered document and in the
-// source view — green for added lines, yellow for modified ones — and a dot of
-// the same color flags the tab; red when the file of `HEAD` was deleted.
-// Deleted lines mark nothing in the document (no element to carry them), but
-// they still turn the dot yellow: the dot tells the state of the file.
+// source view — green for added lines, yellow for modified ones — and a dot
+// flags the tab with the state of the **file**: green when it is new (absent
+// from `HEAD`: nothing is marked inside, every line would be green), yellow
+// when it is modified, red when the file of `HEAD` was deleted. Deleted lines
+// mark nothing in the document (no element to carry them), but they still
+// turn the dot yellow.
 //
 // Pure decoration laid **after** rendering, as two classes on existing
 // elements: no node is added, so the three searches, the preview ↔ source
@@ -28,9 +30,9 @@ const changes = new Map();
 const requests = new Map();
 
 /**
- * State of a tab for its dot: `deleted` (file gone from disk), `modified` as
- * soon as one line is modified or deleted, otherwise `added`, otherwise `null`
- * (nothing to report).
+ * State of a tab for its dot: `deleted` (file gone from disk), `added` (new
+ * file, absent from `HEAD`), `modified` as soon as one line of a known file is
+ * added, modified or deleted, otherwise `null` (nothing to report).
  * @param {number} id
  * @returns {"added" | "modified" | "deleted" | null}
  */
@@ -38,8 +40,8 @@ export function gitStatusOf(id) {
   const c = changes.get(id);
   if (!c) return null;
   if (c.deleted) return "deleted";
-  if (c.modified.length || c.removed) return "modified";
-  return c.added.length ? "added" : null;
+  if (c.created) return "added";
+  return c.added.length || c.modified.length || c.removed ? "modified" : null;
 }
 
 /** @param {boolean} on */

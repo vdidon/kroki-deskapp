@@ -21,10 +21,11 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - **Uncommitted changes highlighted**: in a Git repository, what differs
   from the last commit is marked — green for added lines, yellow for
   modified ones — on the rendered blocks (paragraphs, list items, tables,
-  diagrams, formulas), on the lines of the source view, and by a dot of the
-  same color on the tab — yellow also when lines were only deleted, red when
-  the file itself was deleted. A commit clears the marks without
-  re-rendering.
+  diagrams, formulas) and on the lines of the source view. A dot on the tab
+  tells the state of the file: yellow when it is modified (also when lines
+  were only deleted), red when it was deleted, green when it is new — a new
+  file is not painted green from top to bottom, the dot says it all. A
+  commit clears the marks without re-rendering.
   The repository is read in pure Rust (gitoxide), never through the `git`
   command, so no repository configuration can run anything. SHA-1 and
   SHA-256 repositories are both supported. Colocated

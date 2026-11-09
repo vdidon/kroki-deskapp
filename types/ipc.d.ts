@@ -61,6 +61,8 @@ export interface GitChanges {
   removed: boolean;
   /** File of `HEAD` no longer on disk (red tab dot). */
   deleted: boolean;
+  /** File absent from `HEAD`: no line listed, green tab dot only. */
+  created: boolean;
 }
 
 /** `commands::SettingsInfo` (SettingsData aplati + infos d'environnement). */

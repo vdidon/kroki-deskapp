@@ -641,7 +641,7 @@ source, options); a re-render therefore naturally retries errors.
 - `git.rs` — uncommitted-change marks (3.31.0): `git_changes` returns the
   lines of the file on disk added / modified relative to `HEAD` (0-based
   `[start, end)`; pure deletions mark no line, only `removed`; file of `HEAD`
-  gone from disk = `deleted`; file absent from `HEAD` = wholly added;
+  gone from disk = `deleted`; file absent from `HEAD` = `created`, no line;
   ignored, LFS pointer, outside a repository = `None`).
   **Pure Rust (`gix` + `imara-diff`), never the system `git`**: it reads the
   repository's config, whose `core.fsmonitor`/`filter.*.clean`/`textconv`
@@ -770,8 +770,10 @@ source, options); a re-render therefore naturally retries errors.
   **box-shadow** (outer bar + inset tint): `pre`, `table` and KaTeX blocks are
   scroll containers that would clip an absolute pseudo-element. The tab dot
   is a `::before` of `.tab-title` (`data-git` set by `paintTab`): it tells
-  the state of the **file** — `deleted` red, `modified` yellow (modified or
-  deleted lines, which the rendering cannot show), `added` green. Stripped
+  the state of the **file** — `deleted` red, `modified` yellow (any change to
+  a file of `HEAD`, deleted lines included, which the rendering cannot show),
+  `added` green = **new** file (`created`: no line listed, nothing marked
+  inside — a wholly green document says nothing the dot does not). Stripped
   from HTML exports. Setting `SettingsData::git_marks` (default on),
   propagated by `git-marks-changed`; off → `git_changes` answers `null`.
 - **Two zooms** (3.17.0): text zoom (`Ctrl+wheel`, `setZoom`) and

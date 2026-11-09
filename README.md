@@ -178,8 +178,10 @@ pan across a figure too dense to fit on one screen. `Ctrl+0` resets.
   highlighted: in the rendering, the blocks (paragraphs, list items, tables,
   diagrams…) touched since the last commit get a bar in the margin, **green**
   for added lines and **yellow** for modified ones; the source view marks the
-  lines themselves, and a dot of the same color flags the tab — yellow also
-  when lines were only deleted, red when the file itself was deleted. A
+  lines themselves. A dot flags the tab with the state of the file: yellow
+  when it is modified (also when lines were only deleted), red when it was
+  deleted, green when it is new — a new file is not painted green from top
+  to bottom, the dot says it all. A
   commit clears the marks right away. Colocated
   [Jujutsu](https://github.com/jj-vcs/jj) repositories are supported too (the
   marks show the current change, `@`); non-colocated ones and secondary jj

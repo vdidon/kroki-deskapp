@@ -32,6 +32,10 @@ pub struct Changes {
     pub removed: bool,
     /// The file is in `HEAD` but no longer on disk.
     pub deleted: bool,
+    /// The file is not in `HEAD` (untracked, staged only, repository without
+    /// a commit): no line is listed — all of them are new, which the tab's dot
+    /// says on its own instead of painting the whole document green.
+    pub created: bool,
 }
 
 /// Repositories already discovered, keyed by the document's folder. Only
@@ -64,7 +68,7 @@ fn non_colocated_jj_root(dir: &Path) -> Option<&Path> {
 fn repo_for(dir: &Path) -> Option<gix::Repository> {
     // Without this stop, discovery would climb past the jj repository and
     // land on an enclosing git repository, comparing the document with a
-    // repository that does not version it (wholly green, or a stale copy).
+    // repository that does not version it (flagged new, or a stale copy).
     // Checked before the cache: cheap (a few stats), and a folder turned into
     // a jj workspace afterwards must not keep serving the outer repository.
     if non_colocated_jj_root(dir).is_some() {
@@ -98,7 +102,7 @@ pub fn git_dir_for(path: &Path) -> Option<PathBuf> {
 /// repository, bare repository, ignored file, unreadable file, LFS pointer,
 /// file gone from disk that `HEAD` does not know either.
 /// A file absent from `HEAD` (untracked, staged only, or repository without a
-/// commit) is entirely added; a file of `HEAD` gone from disk is `deleted`.
+/// commit) is `created`; a file of `HEAD` gone from disk is `deleted`.
 pub fn changes(path: &Path) -> Option<Changes> {
     // A deleted file cannot be canonicalized: its folder still can.
     let (path, exists) = match dunce::canonicalize(path) {
@@ -116,12 +120,6 @@ pub fn changes(path: &Path) -> Option<Changes> {
     if rel.as_os_str().is_empty() || rel.starts_with(".git") {
         return None;
     }
-    let current = if exists {
-        Some(normalize(&std::fs::read(&path).ok()?))
-    } else {
-        None
-    };
-
     let head_blob = match repo.head_tree() {
         Ok(tree) => match tree.lookup_entry_by_path(&rel).ok()? {
             Some(entry) if entry.mode().is_blob() => Some(entry.object().ok()?.detach().data),
@@ -132,23 +130,31 @@ pub fn changes(path: &Path) -> Option<Changes> {
         // Unborn HEAD (repository without a commit): everything is new.
         Err(_) => None,
     };
-    match (head_blob, current) {
-        (Some(_), None) => Some(Changes {
+    // The file on disk is only read when there is something to compare it
+    // with: a new file lists no line, opening it is enough.
+    match (head_blob, exists) {
+        (Some(_), false) => Some(Changes {
             deleted: true,
             ..Changes::default()
         }),
-        (None, None) => None,
-        (Some(blob), Some(current)) => {
+        (None, false) => None,
+        (Some(blob), true) => {
             if is_lfs_pointer(&blob) {
                 return None;
             }
+            let current = normalize(&std::fs::read(&path).ok()?);
             Some(diff_lines(&normalize(&blob), &current))
         }
-        (None, Some(current)) => {
+        (None, true) => {
             if is_ignored(&repo, &rel) {
                 return None;
             }
-            Some(whole_file_added(&current))
+            // Unreadable file: no marks, as when it is compared.
+            std::fs::File::open(&path).ok()?;
+            Some(Changes {
+                created: true,
+                ..Changes::default()
+            })
         }
     }
 }
@@ -188,18 +194,6 @@ fn is_lfs_pointer(blob: &[u8]) -> bool {
     blob.len() < 1024 && blob.starts_with(b"version https://git-lfs.github.com/spec/")
 }
 
-fn whole_file_added(current: &str) -> Changes {
-    let lines = current.lines().count() as u32;
-    Changes {
-        added: if lines > 0 {
-            vec![[0, lines]]
-        } else {
-            Vec::new()
-        },
-        ..Changes::default()
-    }
-}
-
 fn diff_lines(before: &str, after: &str) -> Changes {
     let input = InternedInput::new(before, after);
     let mut diff = Diff::compute(Algorithm::Histogram, &input);
@@ -229,7 +223,11 @@ mod tests {
 
     impl Changes {
         fn is_empty(&self) -> bool {
-            self.added.is_empty() && self.modified.is_empty() && !self.removed && !self.deleted
+            self.added.is_empty()
+                && self.modified.is_empty()
+                && !self.removed
+                && !self.deleted
+                && !self.created
         }
     }
 
@@ -251,12 +249,6 @@ mod tests {
         let before = normalize(b"a\nb\n");
         assert!(diff_lines(&before, &normalize(b"a\r\nb\r\n")).is_empty());
         assert!(diff_lines(&before, &normalize(b"a\nb")).is_empty());
-    }
-
-    #[test]
-    fn fichier_neuf_entierement_ajoute() {
-        assert_eq!(whole_file_added("x\ny\n").added, vec![[0, 2]]);
-        assert!(whole_file_added("").is_empty());
     }
 
     #[test]
@@ -310,7 +302,14 @@ mod tests {
         let c = changes(&root.join("doc.md")).unwrap();
         assert_eq!(c.modified, vec![[2, 4]]);
         assert!(c.added.is_empty());
-        assert_eq!(changes(&root.join("neuf.md")).unwrap().added, vec![[0, 2]]);
+        // A new file lists no line: the tab's dot alone says it is new.
+        assert_eq!(
+            changes(&root.join("neuf.md")),
+            Some(Changes {
+                created: true,
+                ..Changes::default()
+            })
+        );
         assert_eq!(changes(&root.join("ignore.md")), None);
         assert!(git_dir_for(&root.join("doc.md")).is_some());
 
@@ -322,7 +321,7 @@ mod tests {
 
         // jj repository nested in the git one. Non-colocated (`.jj` alone):
         // no marks, instead of comparing with the enclosing repository where
-        // the file is untracked (it would come out wholly green).
+        // the file is untracked (it would come out flagged new).
         let jj = root.join("jj");
         std::fs::create_dir_all(jj.join(".jj").join("repo")).unwrap();
         std::fs::create_dir_all(jj.join("sub")).unwrap();
@@ -334,7 +333,7 @@ mod tests {
         std::fs::create_dir_all(colo.join(".jj")).unwrap();
         gix::init(&colo).unwrap();
         std::fs::write(colo.join("doc.md"), "x\n").unwrap();
-        assert_eq!(changes(&colo.join("doc.md")).unwrap().added, vec![[0, 1]]);
+        assert!(changes(&colo.join("doc.md")).unwrap().created);
 
         // Outside any repository.
         let outside =
