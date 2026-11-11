@@ -14,7 +14,7 @@ import { invoke, state, isHtmlPath } from "./app.js";
 import { t, getLocale, onLocaleChange } from "./i18n.js";
 import { scrollToLine } from "./render.js";
 import { collectMatchRanges } from "./textmatch.js";
-import { buildMatcher, initSearchToggles, iterMatches } from "./searchopts.js";
+import { buildMatcher, initSearchToggles, iterMatches, selectionQuery } from "./searchopts.js";
 
 /** @typedef {import("../../types/app").View} View */
 /** @typedef {import("../../types/ipc").TabInfo} TabInfo */
@@ -369,9 +369,14 @@ export function isGlobalSearchOpen() {
 }
 
 export function openGlobalSearch() {
+  // Read first: onBeforeOpen closes the Ctrl+F bar, which refocuses the view.
+  const picked = selectionQuery();
+  const changed = !!picked && picked !== input.value;
+  if (changed) input.value = picked;
   if (!panel.hidden) {
     input.focus();
     input.select();
+    if (changed) scheduleSearch(0);
     return;
   }
   onBeforeOpen?.();

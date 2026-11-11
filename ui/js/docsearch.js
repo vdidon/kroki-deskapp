@@ -25,7 +25,7 @@
 import { state } from "./app.js";
 import { t, onLocaleChange } from "./i18n.js";
 import { collectMatchRanges } from "./textmatch.js";
-import { buildMatcher, initSearchToggles } from "./searchopts.js";
+import { buildMatcher, initSearchToggles, selectionQuery } from "./searchopts.js";
 
 /** @typedef {import("../../types/app").View} View */
 /** @typedef {import("./searchopts.js").SearchOptions} SearchOptions */
@@ -33,7 +33,6 @@ import { buildMatcher, initSearchToggles } from "./searchopts.js";
 const ALL_NAME = "find-occurrences";
 const CURRENT_NAME = "find-current";
 const DEBOUNCE_MS = 120;
-const MAX_SEED_LEN = 120; // selection taken as the query on open
 const RULER_MIN_W = 8; // marker width without a classic scrollbar
 
 const hlSupported =
@@ -331,17 +330,13 @@ export function isDocSearchOpen() {
 
 export function openDocSearch() {
   if (!bar) return;
+  // Read first: onBeforeOpen closes the global panel, which refocuses the view.
+  const picked = selectionQuery();
   if (bar.hidden) {
     onBeforeOpen?.();
     bar.hidden = false;
   }
-  // Current selection as the query, editor-style: a single line fragment,
-  // never a whole paragraph.
-  const sel = window.getSelection();
-  const picked = sel && !sel.isCollapsed ? sel.toString().trim() : "";
-  if (picked && picked.length <= MAX_SEED_LEN && !/[\r\n]/.test(picked)) {
-    input.value = picked;
-  }
+  if (picked) input.value = picked;
   input.focus();
   input.select();
   run();

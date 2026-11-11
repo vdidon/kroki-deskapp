@@ -31,6 +31,24 @@ const LOOKBEHIND = (() => {
   }
 })();
 
+const MAX_SEED_LEN = 120;
+
+/**
+ * Current selection as a search query, editor-style: a single line fragment,
+ * never a whole paragraph. Read it **before** anything moves the focus.
+ * @returns {string} "" when there is nothing usable
+ */
+export function selectionQuery() {
+  // Chromium reports the selection of a focused field as the document's: the
+  // text already in a search box is not a new query (and would turn
+  // Ctrl+Shift+F's toggle into a re-open).
+  const focused = document.activeElement;
+  if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return "";
+  const sel = window.getSelection();
+  const picked = sel && !sel.isCollapsed ? sel.toString().trim() : "";
+  return picked.length <= MAX_SEED_LEN && !/[\r\n]/.test(picked) ? picked : "";
+}
+
 /**
  * @param {unknown} s
  * @returns {string}

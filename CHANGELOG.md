@@ -32,6 +32,10 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   Jujutsu repositories work the same way (the marks show the current change,
   `@`); a non-colocated one or a secondary jj workspace shows no marks rather
   than wrong ones. On by default, can be turned off in the Settings.
+- **Search across documents starts from the selection**: `Ctrl+Shift+F`
+  fills the search box with the selected text, as `Ctrl+F` already did
+  (a fragment of a single line). With the panel already open, a new
+  selection replaces the query instead of closing the panel.
 
 ## [3.30.0] — 2026-10-28
 

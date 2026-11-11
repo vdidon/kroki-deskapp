@@ -28,7 +28,7 @@ import { initI18n, loadLocale, onLocaleChange, t } from "./i18n.js";
 import { initFindWord } from "./findword.js";
 import {
   initGlobalSearch,
-  toggleGlobalSearch,
+  openGlobalSearch,
   closeGlobalSearch,
   isGlobalSearchOpen,
   refreshGlobalSearch,
@@ -42,6 +42,7 @@ import {
   refreshDocSearch,
   findNext,
 } from "./docsearch.js";
+import { selectionQuery } from "./searchopts.js";
 import { remapLine } from "./anchors.js";
 import {
   initPlugins,
@@ -877,7 +878,9 @@ function initShortcuts() {
       invoke("new_window");
     } else if (ctrl && e.shiftKey && e.key.toLowerCase() === "f") {
       e.preventDefault();
-      toggleGlobalSearch();
+      // A fresh selection re-seeds an open panel instead of closing it.
+      if (isGlobalSearchOpen() && !selectionQuery()) closeGlobalSearch();
+      else openGlobalSearch();
       // Ctrl+F / F3 / Ctrl+G would trigger the webview's native search bar
       // (unthemed, outside our tab model): we neutralize it by taking over
       // the three shortcuts.
