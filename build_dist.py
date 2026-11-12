@@ -70,7 +70,8 @@ Examples:
     python build_dist.py --skip-msi --skip-deb      # without the installers
     python build_dist.py --skip-native --skip-appimage --skip-msi --skip-deb
                                                     # just the bare Linux binary
-    python build_dist.py --native-only              # just the native binary (no Docker)
+    python build_dist.py --list                     # available steps, builds nothing
+    python build_dist.py --native-only              # just the native binary (no Docker; alias --exe-only)
     python build_dist.py --plugins-only             # just the .kdext (neither cargo nor Docker)
     python build_dist.py --skill-only               # just the .skill (neither cargo nor Docker)
     python build_dist.py --msi-only                 # just the .kdext + the MSI (no Docker)
@@ -299,7 +300,12 @@ def main() -> None:
                         help="do not pack the Claude Code skill (.skill)")
     parser.add_argument("--skip-plugins", action="store_true",
                         help="do not (re)pack the plugins' .kdext; the MSI and the .deb then reuse those already in dist/")
-    parser.add_argument("--skip-native", action="store_true",
+    # --exe-only / --skip-exe / --list: aliases of the build_dist contract shared
+    # by every repo (same command and options everywhere, see the other repos'
+    # build_dist.py); --native-only stays the canonical name here.
+    parser.add_argument("--list", action="store_true",
+                        help="list the available steps and exit")
+    parser.add_argument("--skip-native", "--skip-exe", action="store_true",
                         help="do not build the host's native binary")
     parser.add_argument("--skip-msi", action="store_true",
                         help="do not build the MSI installer (no effect outside Windows, where it is always skipped)")
@@ -311,7 +317,7 @@ def main() -> None:
                         help="do not build the Debian/Ubuntu .deb package")
     parser.add_argument("--skill-only", action="store_true",
                         help="pack only the Claude Code skill (no cargo, no Docker)")
-    parser.add_argument("--native-only", action="store_true",
+    parser.add_argument("--native-only", "--exe-only", action="store_true",
                         help="build only the host's native binary (no Docker required)")
     parser.add_argument("--plugins-only", action="store_true",
                         help="pack only the plugins (no cargo, no Docker)")
@@ -326,6 +332,12 @@ def main() -> None:
     parser.add_argument("--test", action="store_true",
                         help="after the build, headless runtime test on the AppImage (or the bare binary if --skip-appimage)")
     args = parser.parse_args()
+
+    if args.list:
+        say(f"{REPO_ROOT.name} {project_version()}")
+        for step in STEPS:
+            print(f"  {step}")
+        return
 
     # Recorded before the --*-only options force the other skips, so that the
     # "skipped" messages name the option actually typed.
