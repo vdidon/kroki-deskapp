@@ -189,11 +189,20 @@ What the overlay carries, and why:
   re-run if the icon changes.
 - **A single multilingual MSI** (en-US base + de-DE, es-ES, fr-FR, it-IT,
   ja-JP, ko-KR, pt-BR, zh-CN; 3.25.0, nine languages since 3.27.0):
-  `wix.language` maps each language to its `.wxl` (`src-tauri/wix/locales/`:
+  each language has its `.wxl` (`src-tauri/wix/locales/`:
   our dialog and ProgID texts as `!(loc.Kd…)`, plus Tauri's `LaunchApp`…
   redefined to be translated — no `Kd…` Id may contain one of Tauri's, the
-  bundler tests them by substring), so `tauri build` produces one MSI per
-  language. `xtask/src/msi_lang.rs` then merges them: `torch -t language`
+  bundler tests them by substring). `wix.language` lists **en-US alone**:
+  tauri-bundler links its languages one after the other (full cab compression
+  + ICE validation each, ~9× the cost), so `tauri build` only produces the
+  base and `msi_lang::build_localized` links the eight others **in parallel**
+  from the `.wixobj` left in `target/release/wix/x64/`, with tauri-bundler's
+  arguments plus `-sval` (ICE run once, on the base) and `-dcl:none` (those
+  MSIs only feed `torch`, their cab never ships). It injects
+  `TauriLanguage`/`TauriCodepage` (`Lang::lcid`/`codepage`, values of
+  tauri-bundler's `languages.json`) like the bundler does, and fails if a
+  `.wxl` lacks one of Tauri's other strings. `xtask/src/msi_lang.rs` then
+  merges them: `torch -t language`
   computes the en-US → fr-FR transform, which goes into the base's
   `_Storages` table under its LCID (`1036`), and the summary's *Template*
   lists every language (`x64;1033,1036`). The base gets a transform too
@@ -221,8 +230,8 @@ What the overlay carries, and why:
   the upgrade chain. `msi.dll` is called directly (`windows`
   crate), not the SDK's `WiSubStg.vbs`. To replay only the merge on the
   per-language MSIs of the last build (seconds, no cargo nor WiX):
-  `cargo run --manifest-path xtask/Cargo.toml -- msi-merge`. Adding a language = a `.wxl`, a
-  `wix.language` entry and a `msi_lang::OTHERS` entry.
+  `cargo run --manifest-path xtask/Cargo.toml -- msi-merge`. Adding a language = a `.wxl` and a
+  `msi_lang::OTHERS` entry (LCID + codepage).
 - **`webviewInstallMode: skip`**: WebView2 is preinstalled since Windows 10
   2004. The other modes download at install time (filtered network) or
   add 127 to 180 MB.

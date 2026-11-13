@@ -1,10 +1,16 @@
 //! Multilingual MSI: **a single** `.msi` that displays in the Windows
 //! display language.
 //!
-//! Tauri can produce one MSI per language (`wix.language` in
-//! tauri.msi.conf.json, one `light` pass per language with its `.wxl`).
-//! We keep English as the base and **embed** the difference to every other
-//! language into it:
+//! `tauri build` only produces the English base (`wix.language` in
+//! tauri.msi.conf.json lists en-US alone): its loop runs one `light` pass per
+//! language **sequentially**, each a full 44 MB cab compression plus ICE
+//! validation, and cannot be parallelized (shared `locale.wxl`/`output.msi`).
+//! `build_localized` then links the other languages itself, **in parallel**,
+//! from the `.wixobj` that Tauri's `candle` left in `target/release/wix/x64/`,
+//! with `-sval` (ICE validated once, on the base) and `-dcl:none` (stored
+//! cab): those MSIs only feed `torch`, which diffs tables — their cab never
+//! reaches the final MSI. We keep English as the base and **embed** the
+//! difference to every other language into it:
 //!
 //! 1. `torch -t language base.msi fr.msi` → `.mst` transform;
 //! 2. the transform goes into the base MSI's `_Storages` table, under the
@@ -32,6 +38,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, Instant};
 
 use windows::core::{HSTRING, PCWSTR, PWSTR};
 use windows::Win32::System::ApplicationInstallationAndServicing::{
@@ -44,10 +51,13 @@ use windows::Win32::System::ApplicationInstallationAndServicing::{
 
 use crate::die;
 
-/// Language of an MSI produced by Tauri: file suffix and LCID.
+/// Language of a per-language MSI: file suffix, LCID and database codepage
+/// (values of tauri-bundler's `languages.json`, injected into the `.wxl` as
+/// `TauriLanguage`/`TauriCodepage`, read by main.wxs).
 pub struct Lang {
     pub tag: &'static str,
     pub lcid: u32,
+    pub codepage: u32,
 }
 
 /// Base of the final MSI: the fallback language, applied when no transform
@@ -55,10 +65,11 @@ pub struct Lang {
 pub const BASE: Lang = Lang {
     tag: "en-US",
     lcid: 1033,
+    codepage: 1252,
 };
 
-/// Languages embedded as transforms — mirror of the `wix.language` keys in
-/// tauri.msi.conf.json, base excluded. The CJK languages change the database
+/// Languages embedded as transforms, base excluded — linked by
+/// `build_localized` from `src-tauri/wix/locales/<tag>.wxl`. The CJK languages change the database
 /// codepage (932, 936, 949): `torch -t language` marks their transform as
 /// suppressing the `ChangeCodepage` error, which is enough for Windows
 /// Installer (prototype validated on 2026-10-19 — texts re-read identical to
@@ -67,36 +78,233 @@ pub const OTHERS: &[Lang] = &[
     Lang {
         tag: "de-DE",
         lcid: 1031,
+        codepage: 1252,
     },
     Lang {
         tag: "es-ES",
         lcid: 3082,
+        codepage: 1252,
     },
     Lang {
         tag: "fr-FR",
         lcid: 1036,
+        codepage: 1252,
     },
     Lang {
         tag: "it-IT",
         lcid: 1040,
+        codepage: 1252,
     },
     Lang {
         tag: "ja-JP",
         lcid: 1041,
+        codepage: 932,
     },
     Lang {
         tag: "ko-KR",
         lcid: 1042,
+        codepage: 949,
     },
     Lang {
         tag: "pt-BR",
         lcid: 1046,
+        codepage: 1252,
     },
     Lang {
         tag: "zh-CN",
         lcid: 2052,
+        codepage: 936,
     },
 ];
+
+/// Links the MSI of every `OTHERS` language in parallel, next to the base
+/// `base` produced by `tauri build` (same name, `_<tag>.msi` instead of
+/// `_en-US.msi`), from the `.wixobj` of `wix_dir`. `locales` = folder of the
+/// `.wxl`, `sources` = folders of the `.wxs` (scanned for WiX extensions).
+pub fn build_localized(wix_dir: &Path, locales: &Path, sources: &[&Path], base: &Path) {
+    let tools = wix_tools();
+    let light = tools.join("light.exe");
+    let extensions = wix_extensions(&tools, wix_dir, sources);
+    let base_name = base
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    let stem = base_name
+        .strip_suffix(&format!("_{}.msi", BASE.tag))
+        .unwrap_or_else(|| {
+            die(&format!(
+                "build-msi: {} does not end with _{}.msi",
+                base.display(),
+                BASE.tag
+            ))
+        });
+    let dir = base.parent().unwrap_or(Path::new("."));
+
+    let start = Instant::now();
+    let results: Vec<(&Lang, Result<Duration, String>)> = std::thread::scope(|s| {
+        let handles: Vec<_> = OTHERS
+            .iter()
+            .map(|lang| {
+                let out = dir.join(format!("{stem}_{}.msi", lang.tag));
+                let (light, extensions) = (&light, &extensions);
+                (
+                    lang,
+                    s.spawn(move || link(light, extensions, wix_dir, locales, lang, &out)),
+                )
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|(lang, h)| {
+                let r = h
+                    .join()
+                    .unwrap_or_else(|_| Err("link thread panicked".into()));
+                (lang, r)
+            })
+            .collect()
+    });
+
+    let mut failed = false;
+    for (lang, r) in &results {
+        match r {
+            Ok(d) => eprintln!("xtask: light {} ({:.1} s)", lang.tag, d.as_secs_f64()),
+            Err(e) => {
+                failed = true;
+                eprintln!("build-msi: light {} failed:\n{e}", lang.tag);
+            }
+        }
+    }
+    if failed {
+        std::process::exit(1);
+    }
+    eprintln!(
+        "xtask: {} localized MSIs linked in parallel in {:.1} s",
+        OTHERS.len(),
+        start.elapsed().as_secs_f64()
+    );
+}
+
+/// One `light` pass: same arguments as tauri-bundler (`-cultures`, `-loc`,
+/// `-ext`, `*.wixobj` expanded by light, cleared environment), plus `-sval`
+/// `-dcl:none` `-spdb` (see the module comment). Own `.wxl` and output per
+/// language: the passes share only the `.wixobj`, read-only.
+fn link(
+    light: &Path,
+    extensions: &[PathBuf],
+    wix_dir: &Path,
+    locales: &Path,
+    lang: &Lang,
+    out: &Path,
+) -> Result<Duration, String> {
+    let src = locales.join(format!("{}.wxl", lang.tag));
+    let text =
+        std::fs::read_to_string(&src).map_err(|e| format!("cannot read {}: {e}", src.display()))?;
+    let loc = wix_dir.join(format!("locale-{}.wxl", lang.tag));
+    std::fs::write(&loc, localize(&text, lang)?)
+        .map_err(|e| format!("cannot write {}: {e}", loc.display()))?;
+
+    let mut cmd = Command::new(light);
+    for ext in extensions {
+        cmd.arg("-ext").arg(ext);
+    }
+    cmd.arg("-nologo")
+        .arg("-o")
+        .arg(out)
+        .arg(format!("-cultures:{};en-US", lang.tag.to_lowercase()))
+        .arg("-loc")
+        .arg(&loc)
+        .args(["-sval", "-dcl:none", "-spdb", "*.wixobj"])
+        .current_dir(wix_dir);
+    // Same environment as tauri-bundler's `clear_env_for_wix`.
+    cmd.env_clear();
+    for (k, v) in std::env::vars_os() {
+        let k = k.to_ascii_uppercase();
+        let name = k.to_string_lossy();
+        if ["SYSTEMROOT", "TMP", "TEMP"].contains(&name.as_ref()) || name.starts_with("TAURI") {
+            cmd.env(&k, v);
+        }
+    }
+
+    let t = Instant::now();
+    let output = cmd.output();
+    let _ = std::fs::remove_file(&loc);
+    let output = output.map_err(|e| format!("cannot launch {}: {e}", light.display()))?;
+    if !output.status.success() {
+        return Err(format!(
+            "{}{}{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(t.elapsed())
+}
+
+/// Completes a `.wxl` like tauri-bundler does: `TauriLanguage`/`TauriCodepage`
+/// added if absent. Its other default strings (`LaunchApp`…) must already be
+/// there — ours redefine them translated; a missing one is an error rather
+/// than an English text substituted silently.
+fn localize(wxl: &str, lang: &Lang) -> Result<String, String> {
+    for id in [
+        "LaunchApp",
+        "DowngradeErrorMessage",
+        "PathEnvVarFeature",
+        "InstallAppFeature",
+    ] {
+        if !wxl.contains(&format!("Id=\"{id}\"")) {
+            return Err(format!("{}.wxl lacks the string {id}", lang.tag));
+        }
+    }
+    let mut extra = String::new();
+    for (id, value) in [
+        ("TauriLanguage", lang.lcid),
+        ("TauriCodepage", lang.codepage),
+    ] {
+        if !wxl.contains(&format!("Id=\"{id}\"")) {
+            extra.push_str(&format!("  <String Id=\"{id}\">{value}</String>\n"));
+        }
+    }
+    if !wxl.contains("</WixLocalization>") {
+        return Err(format!("{}.wxl: no </WixLocalization>", lang.tag));
+    }
+    Ok(wxl.replacen(
+        "</WixLocalization>",
+        &format!("{extra}</WixLocalization>"),
+        1,
+    ))
+}
+
+/// `-ext` of tauri-bundler: WixUI + WixUtil, plus `Wix<Name>.dll` for every
+/// `"http://schemas.microsoft.com/wix/<Name>"` namespace of the `.wxs`.
+fn wix_extensions(tools: &Path, wix_dir: &Path, sources: &[&Path]) -> Vec<PathBuf> {
+    let mut names = vec!["UIExtension".to_string(), "UtilExtension".to_string()];
+    const NS: &str = "\"http://schemas.microsoft.com/wix/";
+    for dir in std::iter::once(wix_dir).chain(sources.iter().copied()) {
+        let files = std::fs::read_dir(dir).into_iter().flatten().flatten();
+        for path in files.map(|e| e.path()) {
+            if path.extension().is_none_or(|e| e != "wxs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap_or_default();
+            for (i, _) in text.match_indices(NS) {
+                let rest = &text[i + NS.len()..];
+                let end = rest
+                    .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+                    .unwrap_or(rest.len());
+                if end > 0
+                    && rest[end..].starts_with('"')
+                    && !names.iter().any(|n| n == &rest[..end])
+                {
+                    names.push(rest[..end].to_string());
+                }
+            }
+        }
+    }
+    names
+        .iter()
+        .map(|n| tools.join(format!("Wix{n}.dll")))
+        .collect()
+}
 
 const PID_TEMPLATE: u32 = 7;
 const VT_LPSTR: u32 = 30;
@@ -171,19 +379,24 @@ pub fn merge(bundle_dir: &Path, version: &str, find: impl Fn(&str) -> PathBuf) -
     out
 }
 
-/// `torch.exe` of the WiX 3 that Tauri downloads (`%LOCALAPPDATA%\tauri\WixTools314`).
+/// `torch.exe` of the WiX 3 that Tauri downloads.
 fn torch_exe() -> PathBuf {
+    wix_tools().join("torch.exe")
+}
+
+/// Folder of the WiX 3 that Tauri downloads (`%LOCALAPPDATA%\tauri\WixTools314`).
+fn wix_tools() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(|| die("build-msi: LOCALAPPDATA not set"));
-    let torch = base.join("tauri").join("WixTools314").join("torch.exe");
-    if !torch.is_file() {
+    let tools = base.join("tauri").join("WixTools314");
+    if !tools.join("light.exe").is_file() {
         die(&format!(
-            "build-msi: {} not found (WiX 3 is downloaded by tauri build)",
-            torch.display()
+            "build-msi: WiX 3 not found in {} (downloaded by tauri build)",
+            tools.display()
         ));
     }
-    torch
+    tools
 }
 
 /// MSI handle closed when it goes out of scope.

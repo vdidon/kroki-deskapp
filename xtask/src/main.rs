@@ -226,6 +226,26 @@ fn build_msi(extra: &[String]) {
         "build-msi: bundling failed",
     );
 
+    // tauri build only linked the English base: the other languages are
+    // linked here in parallel from its .wixobj (see msi_lang.rs).
+    #[cfg(windows)]
+    {
+        let version = read_version(&repo);
+        let release = target_dir(&repo).join("release");
+        let base = find_bundle(
+            &release.join("bundle/msi"),
+            &version,
+            &format!("_{}.msi", msi_lang::BASE.tag),
+        );
+        let wix_src = repo.join("src-tauri/wix");
+        msi_lang::build_localized(
+            &release.join("wix/x64"),
+            &wix_src.join("locales"),
+            &[&wix_src],
+            &base,
+        );
+    }
+
     merge_msi();
 }
 
