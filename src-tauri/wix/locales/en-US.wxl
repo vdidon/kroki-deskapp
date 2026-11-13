@@ -18,4 +18,6 @@
   <String Id="KdProgIdSession">Kroki Desk session</String>
   <String Id="KdProgIdPlugin">Kroki Desk plugin</String>
   <String Id="KdProgIdDocument">Kroki Desk document</String>
+  <String Id="KdProgIdText">Kroki Desk text document</String>
+  <String Id="KdProgIdHtml">Kroki Desk HTML document</String>
 </WixLocalization>

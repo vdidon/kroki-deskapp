@@ -85,6 +85,14 @@ Desk only appears as a suggestion. Shared native formats (Markdown,
 text, HTML) are never claimed: Kroki Desk is only added to "Open
 with", without touching your default applications.
 
+Each format has its own icon in the Explorer — session, plugin, Markdown,
+text, HTML, and the formats of the plugins (TeX for `.tex`/`.latex`, a
+generic document icon for a plugin that ships none). Windows shows the icon
+of a file's **default** application: a Markdown, text or HTML file only gets
+Kroki Desk's icon once you choose Kroki Desk to open that format by default.
+If the Explorer still shows the previous icons right after installing, it is
+its icon cache: signing out and back in refreshes it.
+
 ### Installer language
 
 The MSI is a single file in nine languages — English, German, Spanish,
@@ -159,6 +167,11 @@ standard MIME type (`.tex` `.latex`), without displacing your default applicatio
 declared candidate: double-clicking opens it directly. Nothing is forced —
 on Linux, the default application is a user choice
 (`~/.config/mimeapps.list`) that a package should not write.
+
+`.kdws`, `.kdext` and the formats specific to an installed plugin get their
+own icon in the file manager (hicolor theme). Formats with a standard MIME
+type (Markdown, HTML, `.tex`…) keep the icon of your desktop theme: the
+package does not own those types.
 
 Two differences from the MSI, by design:
 

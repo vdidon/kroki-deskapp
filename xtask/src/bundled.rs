@@ -18,22 +18,28 @@
 //! Everything else is read from the `manifest.json` of each
 //! `dist/<id>.kdext` archive — and not from `plugins/<id>/`, which may be a
 //! junction to another repo, unresolvable in the .deb build container. The
-//! displayed name comes from `name`, the file associations from `extensions`.
+//! displayed name comes from `name`, the file associations from `extensions`,
+//! their icons from `fileIcons` (PNG inside the archive; generic `document`
+//! icon for an extension it does not list).
 //!
-//! Three outputs, all gitignored and regenerated on every build:
+//! Four outputs, all gitignored and regenerated on every build:
 //! - `src-tauri/bundled-plugins/`: the retained archives (see `stage`);
+//! - `src-tauri/file-icons/`: the file-type icons, native and plugins, as
+//!   `.ico` (MSI) and hicolor PNGs (.deb) (see `stage_icons`, `icons.rs`);
 //! - `src-tauri/wix/plugins.generated.wxs`: `PLUGIN_*` properties, components
 //!   of the archives and of their associations, selection page (see `wix_fragment`);
 //! - `src-tauri/tauri.deb.generated.json` + `src-tauri/linux/kroki-desk.generated.xml`:
 //!   the complete .deb overlay and the shared-mime-info package (see `deb_overlay`).
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use ico::IconImage;
 use serde_json::{json, Value};
 
-use crate::die;
+use crate::{die, icons};
 
 const STRATEGY: &str = "bundled-plugins.txt";
 const STRATEGY_DEFAULT: &str = "bundled-plugins.default.txt";
@@ -53,6 +59,22 @@ const STANDARD_MIME: &[(&str, &str)] = &[
     ("tsv", "text/tab-separated-values"),
 ];
 
+/// MIME type under which the .deb associates `ext`, and whether it is a Kroki
+/// Desk-specific one (declared in the generated shared-mime-info package, with
+/// our icon) rather than a standard type, whose icon belongs to the theme.
+fn mime_of(ext: &str) -> (String, bool) {
+    match STANDARD_MIME.iter().find(|(e, _)| *e == ext) {
+        Some((_, m)) => (m.to_string(), false),
+        None => (format!("text/x-kroki-desk-{ext}"), true),
+    }
+}
+
+/// freedesktop icon name of a MIME type: `text/x-foo` → `text-x-foo` (the
+/// name the spec derives when `<icon>` is absent — written explicitly anyway).
+fn mime_icon_name(mime: &str) -> String {
+    mime.replace('/', "-")
+}
+
 pub struct Plugin {
     pub id: String,
     /// Checked by default (MSI) / installed at first launch (.deb).
@@ -60,11 +82,44 @@ pub struct Plugin {
     pub name: String,
     /// Extensions served, without the dot, lowercase.
     pub extensions: Vec<String>,
+    /// The same extensions grouped by icon, in manifest order: one Windows
+    /// ProgID per group, since a ProgID carries a single `DefaultIcon`.
+    pub groups: Vec<IconGroup>,
+}
+
+pub struct IconGroup {
+    pub extensions: Vec<String>,
+    /// Master declared by `fileIcons` (path inside the archive, decoded
+    /// image); `None` = the generic `document` icon.
+    pub icon: Option<(String, IconImage)>,
 }
 
 impl Plugin {
     fn archive(&self) -> String {
         format!("{}.kdext", self.id)
+    }
+    /// ProgID of group `i`. The first keeps the historical `KrokiDesk.<Camel>`
+    /// (a user's `UserChoice` may name it: renaming it would reset their
+    /// choice); the others are suffixed with their first extension.
+    fn progid(&self, i: usize) -> String {
+        match i {
+            0 => format!("KrokiDesk.{}", self.camel()),
+            _ => format!(
+                "KrokiDesk.{}.{}",
+                self.camel(),
+                self.groups[i].extensions[0]
+            ),
+        }
+    }
+    /// Stem of the `.ico` of group `i` under `[FileIconsDir]`: its own when
+    /// the plugin ships one, the generic native otherwise. Prefixed, so that a
+    /// plugin id can never collide with a native icon.
+    fn icon_stem(&self, i: usize) -> String {
+        match (&self.groups[i].icon, i) {
+            (None, _) => "document".to_string(),
+            (Some(_), 0) => format!("plugin-{}", self.id),
+            (Some(_), _) => format!("plugin-{}-{}", self.id, self.groups[i].extensions[0]),
+        }
     }
     /// `latex-doc` → `LatexDoc`: WiX identifiers and ProgID.
     fn camel(&self) -> String {
@@ -147,19 +202,25 @@ pub fn load(repo: &Path, cmd: &str) -> Vec<Plugin> {
                 n + 1
             ));
         }
-        let (name, extensions) =
-            read_manifest(&repo.join("dist").join(format!("{id}.kdext")), id, cmd);
+        let kdext = repo.join("dist").join(format!("{id}.kdext"));
+        let (name, extensions, groups) = read_manifest(&kdext, id, cmd);
         plugins.push(Plugin {
             id: id.to_string(),
             on,
             name,
             extensions,
+            groups,
         });
     }
     plugins
 }
 
-fn read_manifest(kdext: &Path, id: &str, cmd: &str) -> (String, Vec<String>) {
+/// `.tex` / `TEX` → `tex`.
+fn normalize_ext(e: &str) -> String {
+    e.trim().trim_start_matches('.').to_ascii_lowercase()
+}
+
+fn read_manifest(kdext: &Path, id: &str, cmd: &str) -> (String, Vec<String>, Vec<IconGroup>) {
     let file = fs::File::open(kdext).unwrap_or_else(|_| {
         die(&format!(
             "{cmd}: {} missing — build the shipped plugins first:\n    \
@@ -167,18 +228,26 @@ fn read_manifest(kdext: &Path, id: &str, cmd: &str) -> (String, Vec<String>) {
             kdext.display()
         ))
     });
-    let mut text = String::new();
-    zip::ZipArchive::new(file)
-        .and_then(|mut z| {
-            z.by_name("manifest.json")?.read_to_string(&mut text)?;
-            Ok(())
-        })
-        .unwrap_or_else(|e| {
-            die(&format!(
-                "{cmd}: unreadable manifest.json in {}: {e}",
-                kdext.display()
-            ))
-        });
+    let mut zip = zip::ZipArchive::new(file)
+        .unwrap_or_else(|e| die(&format!("{cmd}: {} is not a zip: {e}", kdext.display())));
+    let mut read = |path: &str| -> Vec<u8> {
+        let mut bytes = Vec::new();
+        zip.by_name(path)
+            .and_then(|mut f| Ok(f.read_to_end(&mut bytes)?))
+            .unwrap_or_else(|e| {
+                die(&format!(
+                    "{cmd}: {path} unreadable in {}: {e}",
+                    kdext.display()
+                ))
+            });
+        bytes
+    };
+    let text = String::from_utf8(read("manifest.json")).unwrap_or_else(|_| {
+        die(&format!(
+            "{cmd}: manifest.json of {} is not UTF-8",
+            kdext.display()
+        ))
+    });
     let m: Value = serde_json::from_str(&text).unwrap_or_else(|e| {
         die(&format!(
             "{cmd}: invalid manifest.json in {}: {e}",
@@ -193,15 +262,67 @@ fn read_manifest(kdext: &Path, id: &str, cmd: &str) -> (String, Vec<String>) {
         ));
     }
     let name = m["name"].as_str().unwrap_or(id).to_string();
-    let extensions = m["extensions"]
+    let extensions: Vec<String> = m["extensions"]
         .as_array()
         .into_iter()
         .flatten()
         .filter_map(Value::as_str)
-        .map(|e| e.trim().trim_start_matches('.').to_ascii_lowercase())
+        .map(normalize_ext)
         .filter(|e| !e.is_empty())
         .collect();
-    (name, extensions)
+
+    // fileIcons: { ".tex": "icons/tex.png" }. Strict, unlike the host (which
+    // ignores this field): a typo here would silently ship the generic icon.
+    let mut declared: BTreeMap<String, String> = BTreeMap::new();
+    if let Some(v) = m.get("fileIcons") {
+        let obj = v.as_object().unwrap_or_else(|| {
+            die(&format!(
+                "{cmd}: {}: fileIcons must be an object {{\".ext\": \"path.png\"}}",
+                kdext.display()
+            ))
+        });
+        for (k, p) in obj {
+            let ext = normalize_ext(k);
+            if !extensions.contains(&ext) {
+                die(&format!(
+                    "{cmd}: {}: fileIcons names \"{k}\", absent from extensions",
+                    kdext.display()
+                ));
+            }
+            let path = p.as_str().unwrap_or_else(|| {
+                die(&format!(
+                    "{cmd}: {}: fileIcons[\"{k}\"] must be a path",
+                    kdext.display()
+                ))
+            });
+            declared.insert(ext, path.to_string());
+        }
+    }
+
+    let mut groups: Vec<IconGroup> = Vec::new();
+    let mut decoded: BTreeMap<String, IconImage> = BTreeMap::new();
+    for ext in &extensions {
+        let path = declared.get(ext);
+        if let Some(g) = groups
+            .iter_mut()
+            .find(|g| g.icon.as_ref().map(|(p, _)| p) == path)
+        {
+            g.extensions.push(ext.clone());
+            continue;
+        }
+        let icon = path.map(|p| {
+            let img = decoded.entry(p.clone()).or_insert_with(|| {
+                let what = format!("{}: {p}", kdext.display());
+                icons::decode(&read(p), &what, cmd)
+            });
+            (p.clone(), img.clone())
+        });
+        groups.push(IconGroup {
+            extensions: vec![ext.clone()],
+            icon,
+        });
+    }
+    (name, extensions, groups)
 }
 
 /// Copies the retained archives from dist/ to src-tauri/bundled-plugins/
@@ -227,6 +348,63 @@ pub fn stage(repo: &Path, plugins: &[Plugin], cmd: &str) {
         fs::copy(repo.join("dist").join(&kdext), payload.join(&kdext))
             .unwrap_or_else(|e| die(&format!("{cmd}: cannot copy {kdext}: {e}")));
     }
+    stage_icons(repo, plugins, cmd);
+}
+
+/// Writes every file-type icon under `src-tauri/file-icons/` (gitignored,
+/// emptied first): the `.ico` the MSI declares — native ones from
+/// `installer.wxs`, the plugins' from the generated fragment, both through
+/// `$(sys.SOURCEFILEDIR)..\file-icons\` — and the hicolor PNGs the .deb
+/// overlay lists. Both sets on every platform: a few milliseconds, and a
+/// single function for both installers.
+pub fn stage_icons(repo: &Path, plugins: &[Plugin], cmd: &str) {
+    let dir = repo.join("src-tauri/file-icons");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir)
+        .unwrap_or_else(|e| die(&format!("{cmd}: cannot create {}: {e}", dir.display())));
+    for name in icons::NATIVE {
+        icons::write_ico(&icons::read_native(repo, name, cmd), &dir, name, cmd);
+    }
+    for p in plugins {
+        for (i, g) in p.groups.iter().enumerate() {
+            if let Some((_, img)) = &g.icon {
+                icons::write_ico(img, &dir, &p.icon_stem(i), cmd);
+            }
+        }
+    }
+    for (name, img) in linux_icons(repo, plugins, cmd) {
+        icons::write_hicolor(&img, &dir, &name, cmd);
+    }
+}
+
+/// Icons the .deb installs, by freedesktop name: the application's two own
+/// types, then one per extension of an installed (`on`) plugin that gets a
+/// Kroki Desk-specific MIME type. Standard types (`text/x-tex`,
+/// `text/markdown`…) keep the theme's icon: the package does not own them.
+fn linux_icons(repo: &Path, plugins: &[Plugin], cmd: &str) -> Vec<(String, IconImage)> {
+    let mut out = vec![
+        (
+            "application-x-kroki-desk-session".to_string(),
+            icons::read_native(repo, "session", cmd),
+        ),
+        (
+            "application-x-kroki-desk-plugin".to_string(),
+            icons::read_native(repo, "plugin", cmd),
+        ),
+    ];
+    let generic = icons::read_native(repo, "document", cmd);
+    for p in plugins.iter().filter(|p| p.on) {
+        for g in &p.groups {
+            for ext in &g.extensions {
+                let (mime, own) = mime_of(ext);
+                if own {
+                    let img = g.icon.as_ref().map_or(&generic, |(_, i)| i);
+                    out.push((mime_icon_name(&mime), img.clone()));
+                }
+            }
+        }
+    }
+    out
 }
 
 // --------------------------------------------------------------------------- //
@@ -255,6 +433,8 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
         stable_guid("kroki-desk/bundled-plugins-folder")
     );
     let mut assocs = String::new();
+    let mut icons = String::new();
+    let mut icon_files = String::new();
     let mut checkboxes = String::new();
     let mut file_refs = String::from("      <ComponentRef Id=\"BundledPluginsFolder\" />\n");
     let mut assoc_refs = String::new();
@@ -278,29 +458,58 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
         if !p.extensions.is_empty() {
             // Registry key as KeyPath: fixed GUID mandatory (no auto-GUID under
             // HKMU), derived from the id to stay stable from one build to the next.
-            let progid = format!("KrokiDesk.{camel}");
-            let mut values = String::new();
-            for ext in &p.extensions {
-                values.push_str(&format!(
-                    "        <RegistryValue Root=\"HKMU\" Key=\"Software\\Classes\\.{ext}\" Type=\"string\" Value=\"{progid}\" />\n        \
-                     <RegistryValue Root=\"HKMU\" Key=\"Software\\Classes\\.{ext}\\OpenWithProgids\"\n                       \
-                     Name=\"{progid}\" Type=\"string\" Value=\"\" />\n"
+            // One ProgID per icon group (a ProgID has a single DefaultIcon).
+            let mut keys = String::new();
+            for (i, g) in p.groups.iter().enumerate() {
+                let progid = p.progid(i);
+                keys.push_str(&format!(
+                    "        <RegistryKey Root=\"HKMU\" Key=\"Software\\Classes\\{progid}\" ForceDeleteOnUninstall=\"yes\">\n          \
+                     <RegistryValue Type=\"string\" Value=\"{name}\" />\n          \
+                     <RegistryValue Key=\"DefaultIcon\" Type=\"string\" Value=\"[FileIconsDir]{stem}.ico\" />\n          \
+                     <RegistryValue Key=\"shell\\open\\command\" Type=\"string\"\n                         \
+                     Value=\"&quot;{exe}&quot; &quot;%1&quot;\" />\n        </RegistryKey>\n",
+                    name = xml_escape(&p.name),
+                    stem = p.icon_stem(i),
                 ));
+                for ext in &g.extensions {
+                    keys.push_str(&format!(
+                        "        <RegistryValue Root=\"HKMU\" Key=\"Software\\Classes\\.{ext}\" Type=\"string\" Value=\"{progid}\" />\n        \
+                         <RegistryValue Root=\"HKMU\" Key=\"Software\\Classes\\.{ext}\\OpenWithProgids\"\n                       \
+                         Name=\"{progid}\" Type=\"string\" Value=\"\" />\n"
+                    ));
+                }
+                if g.icon.is_some() {
+                    // Auto-GUID needs a file as KeyPath: the first one.
+                    let key = if icon_files.is_empty() {
+                        " KeyPath=\"yes\""
+                    } else {
+                        ""
+                    };
+                    icon_files.push_str(&format!(
+                        "          <File Id=\"Icon{camel}{i}\" Name=\"{stem}.ico\"{key}\n                \
+                         Source=\"$(sys.SOURCEFILEDIR)..\\file-icons\\{stem}.ico\" />\n",
+                        stem = p.icon_stem(i),
+                    ));
+                }
             }
             assocs.push_str(&format!(
                 "      <Component Id=\"Assoc{camel}\" Guid=\"{guid}\">\n        {cond}\n        \
                  <RegistryValue Root=\"HKMU\" Key=\"Software\\Kroki Desk\\FileAssociations\"\n                       \
-                 Name=\"plugin-{id}\" Type=\"integer\" Value=\"1\" KeyPath=\"yes\" />\n        \
-                 <RegistryKey Root=\"HKMU\" Key=\"Software\\Classes\\{progid}\" ForceDeleteOnUninstall=\"yes\">\n          \
-                 <RegistryValue Type=\"string\" Value=\"{name}\" />\n          \
-                 <RegistryValue Key=\"DefaultIcon\" Type=\"string\" Value=\"{exe},0\" />\n          \
-                 <RegistryValue Key=\"shell\\open\\command\" Type=\"string\"\n                         \
-                 Value=\"&quot;{exe}&quot; &quot;%1&quot;\" />\n        </RegistryKey>\n{values}      </Component>\n",
+                 Name=\"plugin-{id}\" Type=\"integer\" Value=\"1\" KeyPath=\"yes\" />\n{keys}      </Component>\n",
                 guid = stable_guid(&format!("kroki-desk/assoc/{}", p.id)),
                 id = p.id,
-                name = xml_escape(&p.name),
             ));
             assoc_refs.push_str(&format!("      <ComponentRef Id=\"Assoc{camel}\" />\n"));
+            // The plugin's own icons follow it, like its associations. Distinct
+            // component: a file lands in its component's directory, and the
+            // association component sits under TARGETDIR.
+            if !icon_files.is_empty() {
+                icons.push_str(&format!(
+                    "        <Component Id=\"Icons{camel}\" Guid=\"*\">\n          {cond}\n{icon_files}        </Component>\n"
+                ));
+                icon_files.clear();
+                assoc_refs.push_str(&format!("      <ComponentRef Id=\"Icons{camel}\" />\n"));
+            }
         }
 
         checkboxes.push_str(&format!(
@@ -383,6 +592,10 @@ fn wix_fragment(plugins: &[Plugin], cmd: &str) -> String {
       <Directory Id="BundledPluginsDir" Name="bundled-plugins">
 {files}      </Directory>
     </DirectoryRef>
+
+    <!-- Declared by installer.wxs, with the native icons. -->
+    <DirectoryRef Id="FileIconsDir">
+{icons}    </DirectoryRef>
 
     <DirectoryRef Id="TARGETDIR">
 {assocs}    </DirectoryRef>
@@ -490,19 +703,16 @@ pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf 
             continue;
         }
         for ext in &p.extensions {
-            let mime = match STANDARD_MIME.iter().find(|(e, _)| e == ext) {
-                Some((_, m)) => m.to_string(),
-                None => {
-                    let m = format!("text/x-kroki-desk-{ext}");
-                    own_types.push_str(&format!(
-                        "\n  <mime-type type=\"{m}\">\n    <comment>{name}</comment>\n    \
-                         <sub-class-of type=\"text/plain\"/>\n    <glob pattern=\"*.{ext}\"/>\n    \
-                         <icon name=\"kroki_deskapp\"/>\n  </mime-type>\n",
-                        name = xml_escape(&p.name)
-                    ));
-                    m
-                }
-            };
+            let (mime, own) = mime_of(ext);
+            if own {
+                own_types.push_str(&format!(
+                    "\n  <mime-type type=\"{mime}\">\n    <comment>{name}</comment>\n    \
+                     <sub-class-of type=\"text/plain\"/>\n    <glob pattern=\"*.{ext}\"/>\n    \
+                     <icon name=\"{icon}\"/>\n  </mime-type>\n",
+                    name = xml_escape(&p.name),
+                    icon = mime_icon_name(&mime),
+                ));
+            }
             assocs.push(json!({ "ext": [ext], "name": p.name, "mimeType": mime }));
         }
     }
@@ -526,8 +736,17 @@ pub fn write_deb_overlay(repo: &Path, plugins: &[Plugin], cmd: &str) -> PathBuf 
     let mime_out = tauri.join("linux/kroki-desk.generated.xml");
     fs::write(&mime_out, generated)
         .unwrap_or_else(|e| die(&format!("{cmd}: cannot write {}: {e}", mime_out.display())));
-    conf["bundle"]["linux"]["deb"]["files"]["/usr/share/mime/packages/kroki-desk.xml"] =
-        json!("linux/kroki-desk.generated.xml");
+    let files = &mut conf["bundle"]["linux"]["deb"]["files"];
+    files["/usr/share/mime/packages/kroki-desk.xml"] = json!("linux/kroki-desk.generated.xml");
+    // Icons of our own MIME types (written by `stage_icons`), in the hicolor
+    // theme: the `<icon name>` of the package above resolves there, and
+    // postinst refreshes its cache.
+    for (name, img) in linux_icons(repo, plugins, cmd) {
+        for n in icons::HICOLOR_SIZES.iter().filter(|&&n| n <= img.width()) {
+            files[format!("/usr/share/icons/hicolor/{n}x{n}/mimetypes/{name}.png")] =
+                json!(format!("file-icons/linux/{n}x{n}/{name}.png"));
+        }
+    }
 
     let out = tauri.join("tauri.deb.generated.json");
     let text = serde_json::to_string_pretty(&conf).expect("serializing the .deb overlay");
@@ -547,6 +766,7 @@ mod tests {
             on: true,
             name: "x".into(),
             extensions: vec![],
+            groups: vec![],
         };
         assert_eq!(p.camel(), "LatexDoc");
         assert_eq!(p.property(), "PLUGIN_LATEX_DOC");
@@ -560,6 +780,79 @@ mod tests {
         assert_eq!(g.len(), 36);
         assert_eq!(&g[14..15], "5");
         assert!(matches!(&g[19..20], "8" | "9" | "A" | "B"));
+    }
+
+    /// `.kdext` in the temp folder, with the given manifest and latex-doc's
+    /// icon at `icons/tex.png`.
+    fn kdext(name: &str, manifest: &str) -> PathBuf {
+        use std::io::Write;
+        let png = fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../plugins/latex-doc/icons/tex.png"),
+        )
+        .expect("plugins/latex-doc/icons/tex.png (uv run scripts/file_icons.py)");
+        let path = std::env::temp_dir().join(format!("kd-{name}-{}.kdext", std::process::id()));
+        let mut z = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+        let opts = zip::write::SimpleFileOptions::default();
+        z.start_file("manifest.json", opts).unwrap();
+        z.write_all(manifest.as_bytes()).unwrap();
+        z.start_file("icons/tex.png", opts).unwrap();
+        z.write_all(&png).unwrap();
+        z.finish().unwrap();
+        path
+    }
+
+    #[test]
+    fn extensions_groupees_par_icone() {
+        let path = kdext(
+            "groups",
+            r#"{"id": "doc", "name": "Doc", "extensions": [".tex", ".LATEX", ".sty"],
+                "fileIcons": {".tex": "icons/tex.png", "latex": "icons/tex.png"}}"#,
+        );
+        let (_, exts, groups) = read_manifest(&path, "doc", "test");
+        let _ = fs::remove_file(&path);
+        assert_eq!(exts, ["tex", "latex", "sty"]);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].extensions, ["tex", "latex"]);
+        assert_eq!(groups[0].icon.as_ref().unwrap().1.width(), 256);
+        assert_eq!(groups[1].extensions, ["sty"]);
+        assert!(groups[1].icon.is_none());
+
+        let p = Plugin {
+            id: "doc".into(),
+            on: true,
+            name: "Doc".into(),
+            extensions: exts,
+            groups,
+        };
+        assert_eq!(p.progid(0), "KrokiDesk.Doc");
+        assert_eq!(p.progid(1), "KrokiDesk.Doc.sty");
+        assert_eq!(p.icon_stem(0), "plugin-doc");
+        assert_eq!(p.icon_stem(1), "document");
+        let wxs = wix_fragment(&[p], "test");
+        assert!(wxs.contains(r#"Value="[FileIconsDir]plugin-doc.ico""#));
+        assert!(wxs.contains(r#"Value="[FileIconsDir]document.ico""#));
+        assert!(wxs.contains(r#"<File Id="IconDoc0" Name="plugin-doc.ico" KeyPath="yes""#));
+        assert!(!wxs.contains("IconDoc1"), "no file for the generic icon");
+    }
+
+    #[test]
+    fn sans_file_icons_un_seul_progid_historique() {
+        let path = kdext("plain", r#"{"id": "csv", "extensions": [".csv", ".tsv"]}"#);
+        let (_, _, groups) = read_manifest(&path, "csv", "test");
+        let _ = fs::remove_file(&path);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].extensions, ["csv", "tsv"]);
+        assert!(groups[0].icon.is_none());
+    }
+
+    #[test]
+    fn mime_propre_ou_standard() {
+        assert_eq!(mime_of("tex"), ("text/x-tex".into(), false));
+        assert_eq!(mime_of("dsl"), ("text/x-kroki-desk-dsl".into(), true));
+        assert_eq!(
+            mime_icon_name("text/x-kroki-desk-dsl"),
+            "text-x-kroki-desk-dsl"
+        );
     }
 
     #[test]

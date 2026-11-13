@@ -99,6 +99,7 @@ host ignores it (unknown-fields rule, § 3); it is not part of the protocol.
 | `highlights` |  | Highlighting languages claimed. Requires `highlight:code`. The name `<ext>-source` (or `<ext>`) is the one the host requests for the "source code" view of a document served by this plugin (§6.4). |
 | `capabilities` | ✔ | List of strings, see § 4. A capability unknown to the host is **ignored** (forward compatibility); a capability that is known but not implemented makes the plugin inert, with the message « requiert une version plus récente de Kroki Desk » ("requires a newer version of Kroki Desk"). |
 | `siblingExtensions` |  | Allowlist of extensions for `host/readFile` (default: none). Shown in the trust dialog. |
+| `fileIcons` |  | File-type icons, `{".ext": "path.png"}`: for each extension of `extensions`, a PNG inside the archive (listed in `packInclude` when present), **square, 48 px at least, 256 recommended**, transparent background. Used only by the installers (§ 9.5), which convert it (multi-size `.ico`, hicolor PNGs); an extension it omits gets a generic document icon. The host itself ignores this field. |
 
 Compatibility rule: **every unknown manifest field is ignored** — a manifest
 written for a newer host remains loadable by an older host as long as
@@ -532,6 +533,14 @@ Three rules bound the mechanism:
 Since the plugins folder is per-user (§ 9.1) while the installer is
 per-machine, the installation cannot be done by the installer itself: it takes
 place at the first launch that follows, for each user session.
+
+The installers also associate the extensions of the shipped plugins, with the
+icons of `fileIcons` (§ 3): on Windows, one ProgID per distinct icon (a ProgID
+carries a single icon) — the first keeps `KrokiDesk.<Plugin>`, the others are
+suffixed with their first extension; on Linux, only the extensions without a
+standard MIME type get an icon, the others keep the theme's. A plugin
+installed from the § 9.4 dialog gets neither association nor icon: those are
+written by a per-machine installer.
 
 Without an installer (portable executable, AppImage, development build), the
 folder is absent and the host falls back on the one archive compiled into the

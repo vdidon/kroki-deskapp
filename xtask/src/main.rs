@@ -33,6 +33,7 @@ use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
 
 mod bundled;
+mod icons;
 #[cfg(windows)]
 mod msi_lang;
 
@@ -61,15 +62,17 @@ fn main() {
 }
 
 /// `cargo run --manifest-path xtask/Cargo.toml -- bundled`: generates only the
-/// files derived from the plugin bundling strategy (WiX fragment, .deb overlay
-/// and MIME package), without bundling anything — to re-read them.
+/// files derived from the plugin bundling strategy (WiX fragment, .deb overlay,
+/// MIME package and file-type icons), without bundling anything — to re-read
+/// them.
 fn gen_bundled() {
     let repo = repo_root();
     let plugins = bundled::load(&repo, "bundled");
+    bundled::stage_icons(&repo, &plugins, "bundled");
     bundled::write_wix_fragment(&repo, &plugins, "bundled");
     let overlay = bundled::write_deb_overlay(&repo, &plugins, "bundled");
     eprintln!(
-        "bundled: src-tauri/wix/plugins.generated.wxs + {}",
+        "bundled: src-tauri/wix/plugins.generated.wxs + {} + src-tauri/file-icons/",
         overlay.display()
     );
 }

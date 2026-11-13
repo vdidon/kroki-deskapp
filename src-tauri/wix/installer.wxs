@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  File associations for the native formats and the App Paths key. The
+  File associations for the native formats, their file-type icons and the
+  App Paths key. The
   embedded plugins — archives, associations for their formats and selection
   page — are in the neighboring fragment plugins.generated.wxs (gitignored),
   which the xtask generates on every build from the bundling strategy
@@ -111,28 +112,46 @@
     <DirectoryRef Id="TARGETDIR">
 
       <!-- The ProgIDs themselves, shared by several components. A ProgID
-           with no associated extension is inert. -->
-      <Component Id="AssocProgIds" Guid="11F8BC6C-85C4-45AD-987F-89BE6DF7E36F">
+           with no associated extension is inert. One per format family:
+           Explorer takes a file's icon from the DefaultIcon of the ProgID that
+           holds the extension's default, so formats sharing a ProgID share an
+           icon. KrokiDesk.Document stays the Markdown one, as before the
+           split — a user's UserChoice may name it. -->
+      <Component Id="AssocProgIds" Guid="FB02E1D6-8DA7-4A50-8F20-164F5F2450C3">
         <RegistryValue Root="HKMU" Key="Software\Kroki Desk\FileAssociations"
                        Name="progids" Type="integer" Value="1" KeyPath="yes" />
 
         <RegistryKey Root="HKMU" Key="Software\Classes\KrokiDesk.Session" ForceDeleteOnUninstall="yes">
           <RegistryValue Type="string" Value="!(loc.KdProgIdSession)" />
-          <RegistryValue Key="DefaultIcon" Type="string" Value="[INSTALLDIR]kroki_deskapp.exe,0" />
+          <RegistryValue Key="DefaultIcon" Type="string" Value="[FileIconsDir]session.ico" />
           <RegistryValue Key="shell\open\command" Type="string"
                          Value="&quot;[INSTALLDIR]kroki_deskapp.exe&quot; &quot;%1&quot;" />
         </RegistryKey>
 
         <RegistryKey Root="HKMU" Key="Software\Classes\KrokiDesk.Plugin" ForceDeleteOnUninstall="yes">
           <RegistryValue Type="string" Value="!(loc.KdProgIdPlugin)" />
-          <RegistryValue Key="DefaultIcon" Type="string" Value="[INSTALLDIR]kroki_deskapp.exe,0" />
+          <RegistryValue Key="DefaultIcon" Type="string" Value="[FileIconsDir]plugin.ico" />
           <RegistryValue Key="shell\open\command" Type="string"
                          Value="&quot;[INSTALLDIR]kroki_deskapp.exe&quot; &quot;%1&quot;" />
         </RegistryKey>
 
         <RegistryKey Root="HKMU" Key="Software\Classes\KrokiDesk.Document" ForceDeleteOnUninstall="yes">
           <RegistryValue Type="string" Value="!(loc.KdProgIdDocument)" />
-          <RegistryValue Key="DefaultIcon" Type="string" Value="[INSTALLDIR]kroki_deskapp.exe,0" />
+          <RegistryValue Key="DefaultIcon" Type="string" Value="[FileIconsDir]markdown.ico" />
+          <RegistryValue Key="shell\open\command" Type="string"
+                         Value="&quot;[INSTALLDIR]kroki_deskapp.exe&quot; &quot;%1&quot;" />
+        </RegistryKey>
+
+        <RegistryKey Root="HKMU" Key="Software\Classes\KrokiDesk.Text" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Value="!(loc.KdProgIdText)" />
+          <RegistryValue Key="DefaultIcon" Type="string" Value="[FileIconsDir]text.ico" />
+          <RegistryValue Key="shell\open\command" Type="string"
+                         Value="&quot;[INSTALLDIR]kroki_deskapp.exe&quot; &quot;%1&quot;" />
+        </RegistryKey>
+
+        <RegistryKey Root="HKMU" Key="Software\Classes\KrokiDesk.Html" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Value="!(loc.KdProgIdHtml)" />
+          <RegistryValue Key="DefaultIcon" Type="string" Value="[FileIconsDir]html.ico" />
           <RegistryValue Key="shell\open\command" Type="string"
                          Value="&quot;[INSTALLDIR]kroki_deskapp.exe&quot; &quot;%1&quot;" />
         </RegistryKey>
@@ -165,7 +184,7 @@
       <!-- Shared formats, native to the application: "Open with" (« Ouvrir avec ») alone.
            The <.ext> key often pre-exists and belongs to someone else —
            no ForceDeleteOnUninstall, no `(Default)` value set. -->
-      <Component Id="AssocSharedFormats" Guid="271F5138-DB48-4AAD-87F7-0208A7EA8CCA">
+      <Component Id="AssocSharedFormats" Guid="6EB6A232-E24A-4A17-9901-B56AE8BD2BD7">
         <RegistryValue Root="HKMU" Key="Software\Kroki Desk\FileAssociations"
                        Name="shared" Type="integer" Value="1" KeyPath="yes" />
         <RegistryValue Root="HKMU" Key="Software\Classes\.md\OpenWithProgids"
@@ -177,13 +196,40 @@
         <RegistryValue Root="HKMU" Key="Software\Classes\.mkd\OpenWithProgids"
                        Name="KrokiDesk.Document" Type="string" Value="" />
         <RegistryValue Root="HKMU" Key="Software\Classes\.txt\OpenWithProgids"
-                       Name="KrokiDesk.Document" Type="string" Value="" />
+                       Name="KrokiDesk.Text" Type="string" Value="" />
         <RegistryValue Root="HKMU" Key="Software\Classes\.html\OpenWithProgids"
-                       Name="KrokiDesk.Document" Type="string" Value="" />
+                       Name="KrokiDesk.Html" Type="string" Value="" />
         <RegistryValue Root="HKMU" Key="Software\Classes\.htm\OpenWithProgids"
-                       Name="KrokiDesk.Document" Type="string" Value="" />
+                       Name="KrokiDesk.Html" Type="string" Value="" />
       </Component>
 
+    </DirectoryRef>
+
+    <!-- File-type icons, referenced by the DefaultIcon values above and by
+         those of the plugins (generated fragment, which adds the plugins' own
+         .ico to this folder under their condition). Separate .ico files
+         rather than icon resources in the exe: tauri-build writes the exe's
+         resource script, and a file per type is what plugins can ship too.
+         Built by the xtask from src-tauri/icons/files/*.png (bundled::
+         stage_icons) into src-tauri/file-icons/, gitignored. `document` is
+         the generic one, for a plugin format without an icon of its own. -->
+    <DirectoryRef Id="INSTALLDIR">
+      <Directory Id="FileIconsDir" Name="icons">
+        <Component Id="FileIconsNative" Guid="022D09AD-3AC6-439F-827C-885B24810F66">
+          <File Id="IconSession" Name="session.ico" KeyPath="yes"
+                Source="$(sys.SOURCEFILEDIR)..\file-icons\session.ico" />
+          <File Id="IconPlugin" Name="plugin.ico"
+                Source="$(sys.SOURCEFILEDIR)..\file-icons\plugin.ico" />
+          <File Id="IconMarkdown" Name="markdown.ico"
+                Source="$(sys.SOURCEFILEDIR)..\file-icons\markdown.ico" />
+          <File Id="IconText" Name="text.ico"
+                Source="$(sys.SOURCEFILEDIR)..\file-icons\text.ico" />
+          <File Id="IconHtml" Name="html.ico"
+                Source="$(sys.SOURCEFILEDIR)..\file-icons\html.ico" />
+          <File Id="IconDocument" Name="document.ico"
+                Source="$(sys.SOURCEFILEDIR)..\file-icons\document.ico" />
+        </Component>
+      </Directory>
     </DirectoryRef>
 
     <ComponentGroup Id="KrokiDeskAssociations">
@@ -191,6 +237,7 @@
       <ComponentRef Id="AssocProgIds" />
       <ComponentRef Id="AssocOwnFormats" />
       <ComponentRef Id="AssocSharedFormats" />
+      <ComponentRef Id="FileIconsNative" />
     </ComponentGroup>
 
   </Fragment>

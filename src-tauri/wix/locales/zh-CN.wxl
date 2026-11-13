@@ -14,4 +14,6 @@
   <String Id="KdProgIdSession">Kroki Desk 会话</String>
   <String Id="KdProgIdPlugin">Kroki Desk 插件</String>
   <String Id="KdProgIdDocument">Kroki Desk 文档</String>
+  <String Id="KdProgIdText">Kroki Desk 文本文档</String>
+  <String Id="KdProgIdHtml">Kroki Desk HTML 文档</String>
 </WixLocalization>

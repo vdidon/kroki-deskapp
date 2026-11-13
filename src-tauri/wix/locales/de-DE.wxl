@@ -14,4 +14,6 @@
   <String Id="KdProgIdSession">Kroki Desk-Sitzung</String>
   <String Id="KdProgIdPlugin">Kroki Desk-Plug-In</String>
   <String Id="KdProgIdDocument">Kroki Desk-Dokument</String>
+  <String Id="KdProgIdText">Kroki Desk-Textdokument</String>
+  <String Id="KdProgIdHtml">Kroki Desk-HTML-Dokument</String>
 </WixLocalization>

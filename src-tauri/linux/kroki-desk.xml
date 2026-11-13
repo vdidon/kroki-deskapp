@@ -10,6 +10,10 @@
   specific to the embedded plugins (cf. xtask/src/bundled.rs), and that is the
   one the package installs.
 
+  The <icon name>s point into the hicolor theme, where the package also lays
+  down the PNGs (xtask/src/icons.rs, masters src-tauri/icons/files/). Only our
+  own types carry one: a standard type's icon belongs to the desktop theme.
+
   It is indispensable: the .desktop's MimeType= only declares the types the
   application can open, it says nowhere that a `.kdws` file IS of that type.
   Without the <glob>s below, the application's own formats do not exist for the
@@ -27,7 +31,7 @@
     <comment xml:lang="fr">Session Kroki Desk</comment>
     <sub-class-of type="application/json"/>
     <glob pattern="*.kdws"/>
-    <icon name="kroki_deskapp"/>
+    <icon name="application-x-kroki-desk-session"/>
   </mime-type>
 
   <mime-type type="application/x-kroki-desk-plugin">
@@ -35,7 +39,7 @@
     <comment xml:lang="fr">Archive de plugin Kroki Desk</comment>
     <sub-class-of type="application/zip"/>
     <glob pattern="*.kdext"/>
-    <icon name="kroki_deskapp"/>
+    <icon name="application-x-kroki-desk-plugin"/>
   </mime-type>
 
   <!--

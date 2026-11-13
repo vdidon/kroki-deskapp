@@ -32,6 +32,15 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   Jujutsu repositories work the same way (the marks show the current change,
   `@`); a non-colocated one or a secondary jj workspace shows no marks rather
   than wrong ones. On by default, can be turned off in the Settings.
+- **An icon per file type**: the installers give each format Kroki Desk
+  opens its own icon in the file explorer — session, plugin, Markdown, text,
+  HTML, and the formats of the plugins (TeX for `.tex`, a generic document
+  otherwise) — with a small Kroki Desk badge, instead of the application
+  icon for all of them. On Windows, a shared format (Markdown, text, HTML)
+  shows it once Kroki Desk is its default application; on Linux, our own
+  types only (`.kdws`, `.kdext`, plugin formats without a standard type). A
+  plugin ships its icons through the new `fileIcons` manifest field (plugin
+  protocol §3).
 - **Search across documents starts from the selection**: `Ctrl+Shift+F`
   fills the search box with the selected text, as `Ctrl+F` already did
   (a fragment of a single line). With the panel already open, a new

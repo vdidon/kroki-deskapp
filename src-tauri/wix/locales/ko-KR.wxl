@@ -14,4 +14,6 @@
   <String Id="KdProgIdSession">Kroki Desk 세션</String>
   <String Id="KdProgIdPlugin">Kroki Desk 플러그인</String>
   <String Id="KdProgIdDocument">Kroki Desk 문서</String>
+  <String Id="KdProgIdText">Kroki Desk 텍스트 문서</String>
+  <String Id="KdProgIdHtml">Kroki Desk HTML 문서</String>
 </WixLocalization>

@@ -52,7 +52,8 @@ rights. The installers add a menu entry, a clean uninstall, the bundled
 plugins and **file associations**: the two formats specific to Kroki Desk —
 `.kdws` (session) and `.kdext` (plugin) — open on double-click, Kroki Desk is
 added to "Open with" for the formats it reads natively (Markdown, HTML…), and
-each installed plugin brings the associations for its own formats.
+each installed plugin brings the associations for its own formats. Each
+format gets its own icon in the file explorer.
 
 The `.deb` is installed with **apt**, which resolves dependencies (`dpkg -i`
 does not):

@@ -13,11 +13,13 @@
   "highlights": ["tex-source", "latex-source"],
   "capabilities": ["document:markdown", "fence:markdown", "highlight:code"],
   "siblingExtensions": [],
+  "fileIcons": { ".tex": "icons/tex.png", ".latex": "icons/tex.png" },
   "packInclude": [
     "main.js",
     "tex.js",
     "texhl.js",
     "vendor/unified-latex.esm.js",
+    "icons/tex.png",
     "README.md",
     "CHANGELOG.md"
   ]

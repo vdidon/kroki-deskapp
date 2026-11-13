@@ -143,6 +143,22 @@ What the overlay carries, and why:
   belongs to `MainProgram`, and MSI refuses that a registry value reference
   a file of another feature — **ICE69, a link error**, not a
   warning. Renaming the binary therefore requires editing the fragment.
+- **File-type icons** (3.31.0): one ProgID per format family
+  (`KrokiDesk.Session`/`.Plugin`/`.Document` = Markdown/`.Text`/`.Html`, per
+  plugin one per distinct icon) because Explorer reads a file's icon from the
+  `DefaultIcon` of the ProgID holding the extension's **default** — a shared
+  format (`.md`…) only shows ours once the user picks Kroki Desk as default.
+  `DefaultIcon = [FileIconsDir]<name>.ico`, files in `INSTALLDIR\icons\`
+  (`FileIconsNative` in `installer.wxs`, plugins' under their condition in the
+  generated fragment), not icon resources in the exe (tauri-build owns its
+  `.rc`). Single pipeline: tracked 256 px PNG masters
+  (`src-tauri/icons/files/`, drawn by `uv run scripts/file_icons.py`, which
+  also draws `plugins/latex-doc/icons/tex.png`) and the plugins' `fileIcons`
+  manifest field (PNG inside the `.kdext`, validated strictly by the xtask) →
+  `xtask/src/icons.rs` (area-average resize, `ico` crate) →
+  `src-tauri/file-icons/` (gitignored, `bundled::stage_icons`): multi-size
+  `.ico` for the MSI, hicolor PNGs for the `.deb`. Explorer caches icons: a
+  fresh install may need a sign-out to show them.
 - ***App Paths* key** (`AppPath` component of the same fragment,
   unconditional): makes the exe launchable by name via ShellExecute
   (`start kroki_deskapp "doc.tex#eq:x"`, `Start-Process`, Win+R) without touching
@@ -290,7 +306,10 @@ common** — most of what follows explains how.
   text): this is what keeps generic handlers available, and
   above all what makes the **glob win against content detection** — a
   `.kdext` is a zip, without this lineage sniffing would classify it as
-  `application/zip`.
+  `application/zip`. Our own types carry `<icon name="<type with - for />">`,
+  whose PNGs the overlay installs into `hicolor/<n>x<n>/mimetypes/` (same
+  masters as the MSI, see « File-type icons »); standard types keep the
+  theme's icon.
 - **Nothing is imposed as the default application, and there is nothing to
   impose.** Where Windows distinguished `(Default)` and `OpenWithProgids`, Linux
   only has `MimeType=` (= "can open"); the default is decided in the

@@ -27,6 +27,9 @@ versioning follows [semver](https://semver.org/spec/v2.0.0.html).
   booktabs table (`\toprule`…) is drawn with horizontal rules only
   (`kd-booktabs`), with no header row unless a `\midrule` follows the first
   row. An older Kroki Desk keeps the bullet and the grid.
+- **File icon**: `.tex` and `.latex` files show a TeX document icon in the
+  Windows Explorer once Kroki Desk 3.31.0 or later installs the plugin
+  (`fileIcons` manifest field).
 
 ### Fixed
 

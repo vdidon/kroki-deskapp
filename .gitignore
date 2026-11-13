@@ -4,6 +4,9 @@ xtask/target/
 # (the <File> entries of the WiX fragment read them via $(sys.SOURCEFILEDIR),
 # hence under src-tauri/ — see bundled::stage in the xtask)
 src-tauri/bundled-plugins/
+# File-type icons (.ico, hicolor PNGs) derived by the xtask from the tracked
+# masters src-tauri/icons/files/ and the plugins' fileIcons (see icons.rs)
+src-tauri/file-icons/
 # Local plugin bundling strategy (tracked default:
 # bundled-plugins.default.txt) and what the xtask generates from it (see bundled.rs)
 bundled-plugins.txt
