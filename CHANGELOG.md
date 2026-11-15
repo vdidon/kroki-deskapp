@@ -46,6 +46,11 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   (a fragment of a single line). With the panel already open, a new
   selection replaces the query instead of closing the panel.
 
+### Fixed
+- The window now talks to the application over Tauri's direct channel: the
+  content security policy blocked it, so every exchange went through the
+  slower fallback, which turns binary answers into text.
+
 ## [3.30.0] — 2026-10-28
 
 ### Added

@@ -1118,6 +1118,11 @@ satisfies the notice requirements, not the bundles.
 - The CSP allows `'unsafe-eval'` + `blob:` workers **only** because the
   WASM runtime of **d2** uses `new Function` in a module worker. Do not
   add an `eval` sink fed by document content.
+- `connect-src` must keep `ipc: http://ipc.localhost` (3.31.0). Without it
+  the CSP blocks Tauri's custom-protocol IPC and **every** command silently
+  falls back to `postMessage`: JSON only, a raw `tauri::ipc::Response`
+  arrives as an array of numbers instead of an `ArrayBuffer` (5.5 MB:
+  690 ms vs 92 ms).
 
 ## Platform constraints
 

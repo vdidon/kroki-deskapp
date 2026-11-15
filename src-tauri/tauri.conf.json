@@ -9,7 +9,7 @@
     "withGlobalTauri": true,
     "windows": [],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob: https: http:; media-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' blob: plugin: http://plugin.localhost; connect-src 'self' plugin: http://plugin.localhost; worker-src 'self' blob:; child-src 'self' blob:",
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob: https: http:; media-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' blob: plugin: http://plugin.localhost; connect-src 'self' ipc: http://ipc.localhost plugin: http://plugin.localhost; worker-src 'self' blob:; child-src 'self' blob:",
       "assetProtocol": {
         "enable": true,
         "scope": ["**"]
