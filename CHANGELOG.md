@@ -46,6 +46,16 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   (a fragment of a single line). With the panel already open, a new
   selection replaces the query instead of closing the panel.
 
+### Changed
+- **Settings reorganized into sections** — Appearance, Document, Diagram
+  rendering, Sharing with other tools, Plugins, Updates — so that a hint no
+  longer reads as part of the next setting. The rendering engine is now an
+  explicit choice, « Built-in engine » or « External Kroki server » with its
+  address, instead of an address left empty; the list of built-in types sits
+  under the built-in engine. The local Kroki API becomes « Expose the
+  built-in engine », and says that it always renders with the built-in
+  engine, even when the application uses an external server.
+
 ### Fixed
 - The window now talks to the application over Tauri's direct channel: the
   content security policy blocked it, so every exchange went through the

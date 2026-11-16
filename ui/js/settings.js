@@ -1,7 +1,8 @@
 // @ts-check
-// Settings (« Réglages »): theme, language, toolbar icons, optional external server,
-// uncommitted-change marks, local Kroki API and update check, persisted on the
-// Rust side.
+// Settings (« Réglages »), in sections: appearance (theme, language, toolbar
+// icons), document (uncommitted-change marks), diagram rendering
+// (built-in engine or external server), sharing (local Kroki API), plugins and
+// update check. Persisted on the Rust side.
 
 import { invoke } from "./app.js";
 import { applyTheme } from "./theme.js";
@@ -18,6 +19,11 @@ const themeSelect = /** @type {HTMLSelectElement} */ (document.getElementById("t
 const languageSelect = /** @type {HTMLSelectElement} */ (document.getElementById("language-select"));
 const iconsBox = /** @type {HTMLElement} */ (document.getElementById("icons-config"));
 const urlInput = /** @type {HTMLInputElement} */ (document.getElementById("kroki-url"));
+// Rendering engine: the setting is only `external_url` (empty = built-in); the
+// radio makes that choice explicit. Switching to built-in greys the URL out but
+// keeps it in the field, so switching back during the same edit loses nothing.
+const engineBuiltin = /** @type {HTMLInputElement} */ (document.getElementById("engine-builtin"));
+const engineExternal = /** @type {HTMLInputElement} */ (document.getElementById("engine-external"));
 const serverEnabled = /** @type {HTMLInputElement} */ (document.getElementById("server-enabled"));
 const serverPort = /** @type {HTMLInputElement} */ (document.getElementById("server-port"));
 const supportedHint = /** @type {HTMLElement} */ (document.getElementById("supported-hint"));
@@ -39,6 +45,17 @@ const iconBoxes = new Map(); // id -> <input type=checkbox>
 // hint if the language changes while the dialog is open.
 /** @type {SettingsInfo | null} */
 let supportedInfo = null;
+
+function syncEngine() {
+  urlInput.disabled = !engineExternal.checked;
+}
+
+/** @param {boolean} external */
+function setEngine(external) {
+  engineExternal.checked = external;
+  engineBuiltin.checked = !external;
+  syncEngine();
+}
 
 function updateServerHint() {
   serverHint.textContent = serverEnabled.checked
@@ -139,6 +156,7 @@ export async function openSettings() {
   iconWork = { ...(s.icons || {}) };
   syncIconBoxes();
   urlInput.value = s.external_url;
+  setEngine(s.external_url.trim() !== "");
   serverEnabled.checked = s.server_enabled;
   serverPort.value = String(s.server_port);
   updateCheck.checked = s.update_check;
@@ -157,6 +175,11 @@ export function initSettings(savedCallback) {
   buildLanguageUi();
   buildIconsUi();
   serverEnabled.addEventListener("change", updateServerHint);
+  engineBuiltin.addEventListener("change", syncEngine);
+  engineExternal.addEventListener("change", () => {
+    syncEngine();
+    urlInput.focus();
+  });
   serverPort.addEventListener("input", updateServerHint);
 
   // Texts written by JS (icon labels, server hints, language names): to be
@@ -181,6 +204,7 @@ export function initSettings(savedCallback) {
     iconWork = {};
     syncIconBoxes();
     urlInput.value = "";
+    setEngine(false);
     serverEnabled.checked = true;
     serverPort.value = "8442";
     updateCheck.checked = true;
@@ -192,9 +216,16 @@ export function initSettings(savedCallback) {
   });
   /** @type {HTMLElement} */ (document.getElementById("settings-form")).addEventListener("submit", async (e) => {
     e.preventDefault();
+    const external = engineExternal.checked;
+    if (external && urlInput.value.trim() === "") {
+      errorEl.textContent = t("settings.engine.url_required");
+      errorEl.hidden = false;
+      urlInput.focus();
+      return;
+    }
     try {
       await invoke("set_settings", {
-        externalUrl: urlInput.value,
+        externalUrl: external ? urlInput.value : "",
         serverEnabled: serverEnabled.checked,
         serverPort: Number(serverPort.value) || 8442,
         theme: themeSelect.value,

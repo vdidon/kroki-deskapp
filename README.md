@@ -312,8 +312,12 @@ are chosen there too.
 <details>
 <summary>Server, local API, icons, change marks, updates</summary>
 
-- **External Kroki server** (empty = built-in rendering, recommended);
-- **Local Kroki API**: enable + port (8442 by default);
+- **Diagram rendering**: the built-in engine (recommended) or an **external
+  Kroki server**, whose address is then required — it covers every type, but
+  the diagram sources are sent to it;
+- **Sharing with other tools**: expose the built-in engine as the local Kroki
+  API, + port (8442 by default). It always renders with the built-in engine,
+  even when the application itself uses an external server;
 - **Displayed icons**: which icons to keep in the window
   bar and in the document's view action stack. The setting is shared by all
   windows; only the boxes explicitly checked or unchecked are saved, the

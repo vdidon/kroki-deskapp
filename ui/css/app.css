@@ -1432,6 +1432,51 @@ body.tab-dragging * {
   margin: 8px 0 0;
 }
 
+/* Sections of the Settings dialog (« Réglages »): a rule and a small title, so
+   that a hint never reads as belonging to the setting that follows it. */
+.settings-section {
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding-top: 14px;
+}
+
+.settings-section:first-of-type {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.settings-section > h3 {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.settings-section > h3 + .settings-row {
+  margin-top: 0;
+}
+
+/* A label following a hint opens a new setting: give it air. */
+#settings-dialog .settings-hint + label {
+  margin-top: 14px;
+}
+
+/* Under a radio option: aligned with the option's text. */
+.settings-indent {
+  margin-left: 24px;
+}
+
+div.settings-indent {
+  margin-top: 8px;
+}
+
+#settings-dialog input:disabled {
+  opacity: 0.55;
+}
+
 .settings-row {
   display: flex;
   align-items: center;
@@ -1460,7 +1505,8 @@ body.tab-dragging * {
   width: 90px;
 }
 
-#settings-dialog input[type="checkbox"] {
+#settings-dialog input[type="checkbox"],
+#settings-dialog input[type="radio"] {
   width: auto;
   accent-color: var(--accent);
 }

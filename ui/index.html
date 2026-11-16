@@ -193,6 +193,8 @@
   <dialog id="settings-dialog">
     <form method="dialog" id="settings-form">
       <h2 data-i18n="settings.title">Settings</h2>
+      <section class="settings-section">
+      <h3 data-i18n="settings.section.appearance">Appearance</h3>
       <label for="theme-select" data-i18n="settings.theme.label">Theme</label>
       <select id="theme-select">
         <option value="auto" data-i18n="settings.theme.auto">Automatic (follow the system)</option>
@@ -211,6 +213,9 @@
         Setting shared by all windows. Each icon keeps its default behavior until
         you touch it; only your explicit choices are saved.
       </p>
+      </section>
+      <section class="settings-section">
+      <h3 data-i18n="settings.section.document">Document</h3>
       <div class="settings-row">
         <label class="settings-checkbox"><input type="checkbox" id="git-marks" /> <span data-i18n="settings.git_marks.label">Highlight uncommitted changes</span></label>
       </div>
@@ -221,15 +226,46 @@
         flags the tab: yellow also when lines were only deleted,
         <span class="git-swatch git-swatch-deleted"></span>&nbsp;red when the file itself was deleted.
       </p>
-      <label for="kroki-url" data-i18n="settings.server.label">External Kroki server (optional)</label>
-      <input id="kroki-url" type="text" spellcheck="false" placeholder="Empty = built-in rendering (recommended)" data-i18n-placeholder="settings.server.placeholder" />
-      <p class="settings-hint" id="supported-hint"></p>
+      </section>
+      <!-- Two sections, two directions: what renders the diagrams the application
+           displays, and what the application serves to other tools. The local API
+           always uses the built-in engine (server.rs), whatever the choice above. -->
+      <section class="settings-section" role="radiogroup" aria-labelledby="settings-rendering-title">
+      <h3 id="settings-rendering-title" data-i18n="settings.section.rendering">Diagram rendering</h3>
       <div class="settings-row">
-        <label class="settings-checkbox"><input type="checkbox" id="server-enabled" /> <span data-i18n="settings.api.label">Local Kroki API</span></label>
+        <label class="settings-checkbox"><input type="radio" name="render-engine" id="engine-builtin" value="builtin" /> <span data-i18n="settings.engine.builtin">Built-in engine (recommended)</span></label>
+      </div>
+      <p class="settings-hint settings-indent" id="supported-hint"></p>
+      <div class="settings-row">
+        <label class="settings-checkbox"><input type="radio" name="render-engine" id="engine-external" value="external" /> <span data-i18n="settings.engine.external">External Kroki server</span></label>
+      </div>
+      <div class="settings-indent">
+        <input id="kroki-url" type="text" spellcheck="false" placeholder="https://kroki.example.com" aria-labelledby="engine-external" />
+        <p class="settings-hint" data-i18n="settings.engine.external_hint">
+          Covers every diagram type, even without Java or TeX on this computer.
+          The diagram sources are sent to this server.
+        </p>
+      </div>
+      </section>
+      <section class="settings-section">
+      <h3 data-i18n="settings.section.sharing">Sharing with other tools</h3>
+      <div class="settings-row">
+        <label class="settings-checkbox"><input type="checkbox" id="server-enabled" /> <span data-i18n="settings.api.label">Expose the built-in engine</span></label>
         <label for="server-port" class="settings-inline-label" data-i18n="settings.api.port">port</label>
         <input id="server-port" type="number" min="1024" max="65535" />
       </div>
       <p class="settings-hint" id="server-hint"></p>
+      </section>
+      <section class="settings-section">
+      <h3 data-i18n="settings.plugins.label">Plugins</h3>
+      <button type="button" id="settings-plugins" class="secondary settings-plugins" data-i18n="settings.plugins.manage">Manage plugins…</button>
+      <p class="settings-hint" data-i18n-html="settings.plugins.hint">
+        Additional file formats, diagram blocks and syntax highlighting
+        (<code>.kdext</code> archives).
+      </p>
+      </section>
+      <section class="settings-section">
+      <h3 data-i18n="settings.section.updates">Updates</h3>
       <div class="settings-row">
         <label class="settings-checkbox"><input type="checkbox" id="update-check" /> <span data-i18n="settings.updates.label">Check for updates at startup</span></label>
       </div>
@@ -238,12 +274,7 @@
         Nothing is installed automatically: a notification offers the download
         matching this installation, opened in the browser.
       </p>
-      <label data-i18n="settings.plugins.label">Plugins</label>
-      <button type="button" id="settings-plugins" class="secondary settings-plugins" data-i18n="settings.plugins.manage">Manage plugins…</button>
-      <p class="settings-hint" data-i18n-html="settings.plugins.hint">
-        Additional file formats, diagram blocks and syntax highlighting
-        (<code>.kdext</code> archives).
-      </p>
+      </section>
       <p id="settings-error" class="settings-error" hidden></p>
       <div class="settings-actions">
         <button type="button" id="settings-reset" class="secondary" data-i18n="common.reset">Reset</button>
