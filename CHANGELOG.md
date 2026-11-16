@@ -68,6 +68,10 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - The window now talks to the application over Tauri's direct channel: the
   content security policy blocked it, so every exchange went through the
   slower fallback, which turns binary answers into text.
+- Dragging an inactive tab to another window, or out to a new one, now
+  leaves the source window on the tab that was shown before the drag,
+  instead of the dragged tab's right-hand neighbor. A drag released on the
+  source window outside the tab bar also returns to it.
 
 ## [3.30.0] — 2026-10-28
 

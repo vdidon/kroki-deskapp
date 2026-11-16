@@ -190,8 +190,11 @@ export interface Commands {
   close_window: { args: NoArgs; ret: void };
   set_title: { args: { title: string }; ret: void };
   focus_window: { args: { label: string }; ret: void };
-  finish_tab_drag: { args: { docId: number }; ret: void };
-  debug_finish_tab_drag_at: { args: { docId: number; x: number; y: number }; ret: void };
+  finish_tab_drag: { args: { docId: number; restoreDocId?: number | null }; ret: void };
+  debug_finish_tab_drag_at: {
+    args: { docId: number; x: number; y: number; restoreDocId?: number | null };
+    ret: void;
+  };
   get_settings: { args: NoArgs; ret: SettingsInfo };
   get_runtimes: { args: NoArgs; ret: RuntimeGroup[] };
   get_changelog: { args: NoArgs; ret: string };

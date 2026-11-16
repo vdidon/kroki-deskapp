@@ -341,7 +341,12 @@ pub fn close_tabs_around(app: &AppHandle, label: &str, doc_id: u64, side: &str) 
 
 /// Removes a tab from a window without freeing the document (transfer in progress).
 /// Returns `None` if the tab was not there, and tells whether the window is now empty.
-fn take_tab(app: &AppHandle, label: &str, doc_id: u64) -> Option<bool> {
+///
+/// If the removed tab was the active one, `restore` (still in the window)
+/// becomes active, otherwise its right-hand neighbor. A drag activates the
+/// dragged tab on press: `restore` is the tab that was active before, which
+/// must come back once the drag has taken the tab elsewhere.
+fn take_tab(app: &AppHandle, label: &str, doc_id: u64, restore: Option<u64>) -> Option<bool> {
     let st = app.state::<AppState>();
     let mut st = st.0.lock().unwrap();
     let ids = st.tabs.get_mut(label)?;
@@ -352,7 +357,9 @@ fn take_tab(app: &AppHandle, label: &str, doc_id: u64) -> Option<bool> {
         if ids_now.is_empty() {
             st.active.remove(label);
         } else {
-            let next = ids_now[idx.min(ids_now.len() - 1)];
+            let next = restore
+                .filter(|r| ids_now.contains(r))
+                .unwrap_or(ids_now[idx.min(ids_now.len() - 1)]);
             st.active.insert(label.to_string(), next);
         }
     }
@@ -372,8 +379,8 @@ fn give_tab(app: &AppHandle, label: &str, doc_id: u64) -> bool {
 }
 
 /// Transfers a tab from one window to another. Closes the source if it becomes empty.
-pub fn transfer_tab(app: &AppHandle, from: &str, to: &str, doc_id: u64) {
-    let Some(from_empty) = take_tab(app, from, doc_id) else {
+pub fn transfer_tab(app: &AppHandle, from: &str, to: &str, doc_id: u64, restore: Option<u64>) {
+    let Some(from_empty) = take_tab(app, from, doc_id, restore) else {
         return;
     };
     if !give_tab(app, to, doc_id) {
@@ -401,10 +408,11 @@ pub fn detach_to_new_window(
     source: &WebviewWindow,
     doc_id: u64,
     cursor: PhysicalPosition<f64>,
+    restore: Option<u64>,
 ) {
     let scale = source.scale_factor().unwrap_or(1.0);
     let pos = PhysicalPosition::new(cursor.x - 120.0 * scale, cursor.y - 16.0 * scale);
-    move_tab_to_new_window(app, source, doc_id, pos);
+    move_tab_to_new_window(app, source, doc_id, pos, restore);
 }
 
 /// Tab context menu: detaches the tab into a new window of the same
@@ -423,7 +431,7 @@ pub fn detach_tab(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
     if !detachable {
         return;
     }
-    move_tab_to_new_window(app, source, doc_id, cascade_position(source));
+    move_tab_to_new_window(app, source, doc_id, cascade_position(source), None);
 }
 
 /// Tab context menu: reopens the tab's document in a new window (same size,
@@ -463,6 +471,7 @@ fn move_tab_to_new_window(
     source: &WebviewWindow,
     doc_id: u64,
     pos: PhysicalPosition<f64>,
+    restore: Option<u64>,
 ) {
     let size = source.inner_size().ok();
     let label = match create_window(app, Some(pos), size) {
@@ -473,7 +482,7 @@ fn move_tab_to_new_window(
         }
     };
     let from = source.label().to_string();
-    if take_tab(app, &from, doc_id).is_none() {
+    if take_tab(app, &from, doc_id, restore).is_none() {
         return;
     }
     let _ = give_tab(app, &label, doc_id);
@@ -515,11 +524,13 @@ pub fn window_under_cursor(_app: &AppHandle, _pos: PhysicalPosition<f64>) -> Opt
 }
 
 /// End of a tab drag out of the bar: transfer, detach or move.
-pub fn finish_tab_drag(app: &AppHandle, source: &WebviewWindow, doc_id: u64) {
+/// `restore` = tab active in the source before the press activated the
+/// dragged one (`None` if it was already active): it becomes active again.
+pub fn finish_tab_drag(app: &AppHandle, source: &WebviewWindow, doc_id: u64, restore: Option<u64>) {
     let Ok(cursor) = app.cursor_position() else {
         return;
     };
-    finish_tab_drag_at(app, source, doc_id, cursor);
+    finish_tab_drag_at(app, source, doc_id, cursor, restore);
 }
 
 /// Same logic with a supplied position (entry point for automated tests).
@@ -528,14 +539,28 @@ pub fn finish_tab_drag_at(
     source: &WebviewWindow,
     doc_id: u64,
     cursor: PhysicalPosition<f64>,
+    restore: Option<u64>,
 ) {
     let source_label = source.label().to_string();
     match window_under_cursor(app, cursor) {
         Some(target) if target.label() != source_label => {
-            transfer_tab(app, &source_label, target.label(), doc_id);
+            transfer_tab(app, &source_label, target.label(), doc_id, restore);
         }
         Some(_) => {
-            // Released on the source window, outside the tab bar: cancel.
+            // Released on the source window, outside the tab bar: cancel —
+            // including the activation the press caused.
+            let restored = restore.is_some_and(|r| {
+                let st = app.state::<AppState>();
+                let mut st = st.0.lock().unwrap();
+                let present = st.tabs.get(&source_label).is_some_and(|t| t.contains(&r));
+                if present {
+                    st.active.insert(source_label.clone(), r);
+                }
+                present
+            });
+            if restored {
+                sync_window(app, &source_label);
+            }
         }
         None => {
             let only_tab = {
@@ -551,7 +576,7 @@ pub fn finish_tab_drag_at(
                 let _ = source.set_position(pos);
                 let _ = source.set_focus();
             } else {
-                detach_to_new_window(app, source, doc_id, cursor);
+                detach_to_new_window(app, source, doc_id, cursor, restore);
             }
         }
     }

@@ -21,6 +21,7 @@ const hintEl = /** @type {HTMLElement} */ (document.getElementById("drag-hint"))
  * by `beginReorder` and only read in the `reorder`/`tear` phases.
  * @typedef {object} DragState
  * @property {number} docId
+ * @property {number | null} restoreDocId tab active before the press, if the press changed it
  * @property {HTMLElement} el
  * @property {string} title
  * @property {number} pointerId
@@ -190,9 +191,18 @@ export function initTearDrag() {
     const tab = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".tab"));
     if (!tab) return;
     const docId = Number(tab.dataset.id);
-    if (!tab.classList.contains("active")) invoke("activate_tab", { docId });
+    // The press activates the tab; the one active before comes back if the
+    // drag takes the tab out of the window (or is cancelled outside the bar).
+    /** @type {number | null} */
+    let restoreDocId = null;
+    if (!tab.classList.contains("active")) {
+      const prev = /** @type {HTMLElement | null} */ (tabsEl.querySelector(".tab.active"));
+      if (prev) restoreDocId = Number(prev.dataset.id);
+      invoke("activate_tab", { docId });
+    }
     drag = /** @type {DragState} */ ({
       docId,
+      restoreDocId,
       el: tab,
       title: tab.querySelector(".tab-title")?.textContent ?? "",
       pointerId: e.pointerId,
@@ -242,7 +252,7 @@ export function initTearDrag() {
       invoke("reorder_tab", { docId: d.docId, index: d.curIndex });
     } else if (d.phase === "tear") {
       suppressNextClick();
-      invoke("finish_tab_drag", { docId: d.docId });
+      invoke("finish_tab_drag", { docId: d.docId, restoreDocId: d.restoreDocId });
     }
   });
 

@@ -308,8 +308,13 @@ pub fn focus_window(app: AppHandle, label: String) {
 }
 
 #[tauri::command]
-pub async fn finish_tab_drag(app: AppHandle, window: WebviewWindow, doc_id: u64) {
-    manager::finish_tab_drag(&app, &window, doc_id);
+pub async fn finish_tab_drag(
+    app: AppHandle,
+    window: WebviewWindow,
+    doc_id: u64,
+    restore_doc_id: Option<u64>,
+) {
+    manager::finish_tab_drag(&app, &window, doc_id, restore_doc_id);
 }
 
 /// Test variant (debug builds only): release position supplied
@@ -322,9 +327,16 @@ pub async fn debug_finish_tab_drag_at(
     doc_id: u64,
     x: f64,
     y: f64,
+    restore_doc_id: Option<u64>,
 ) {
     #[cfg(debug_assertions)]
-    manager::finish_tab_drag_at(&app, &window, doc_id, tauri::PhysicalPosition::new(x, y));
+    manager::finish_tab_drag_at(
+        &app,
+        &window,
+        doc_id,
+        tauri::PhysicalPosition::new(x, y),
+        restore_doc_id,
+    );
 }
 
 #[derive(Serialize)]
