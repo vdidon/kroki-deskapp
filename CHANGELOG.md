@@ -55,6 +55,10 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   under the built-in engine. The local Kroki API becomes « Expose the
   built-in engine », and says that it always renders with the built-in
   engine, even when the application uses an external server.
+- **The shortcut sheet of the empty window lists both zooms**: text zoom
+  (Ctrl + +/−, or Ctrl + wheel) and page zoom (Shift + wheel, which keeps
+  the layout), side by side in the View section; Ctrl + 0 resets both.
+  When several shortcuts do the same thing, they are separated by commas.
 
 ### Fixed
 - The window now talks to the application over Tauri's direct channel: the

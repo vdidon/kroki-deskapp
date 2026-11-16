@@ -140,7 +140,7 @@
       <div class="empty-title" data-i18n="welcome.title">Drag and drop a Markdown file</div>
       <div class="empty-hint" data-i18n-html="welcome.open_hint">or <button id="btn-open-empty" class="linklike">open a file</button></div>
       <!-- Shortcut cheat sheet: a mirror of `initShortcuts` (js/main.js),
-           of the middle-click in js/tabs.js and of the Ctrl+wheel on #content.
+           of the middle-click in js/tabs.js and of the Ctrl/Shift+wheel on #content.
            Any shortcut added there must be declared here. -->
       <div class="empty-shortcuts">
         <section>
@@ -160,22 +160,23 @@
           <dl>
             <dt><kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>F</kbd></dt><dd data-i18n="shortcut.find">Search in the document</dd>
             <dt><kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd>F</kbd></dt><dd data-i18n="shortcut.find_all">Search in all tabs</dd>
-            <dt><kbd>F3</kbd> <kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>G</kbd> <kbd data-i18n="shortcut.key_enter">Enter</kbd></dt><dd data-i18n="shortcut.next_match">Next match</dd>
-            <dt><kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd>F3</kbd> <kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd data-i18n="shortcut.key_enter">Enter</kbd></dt><dd data-i18n="shortcut.prev_match">Previous match</dd>
+            <dt><kbd>F3</kbd>, <kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>G</kbd>, <kbd data-i18n="shortcut.key_enter">Enter</kbd></dt><dd data-i18n="shortcut.next_match">Next match</dd>
+            <dt><kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd>F3</kbd>, <kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd data-i18n="shortcut.key_enter">Enter</kbd></dt><dd data-i18n="shortcut.prev_match">Previous match</dd>
             <dt><kbd data-i18n="shortcut.key_esc">Esc</kbd></dt><dd data-i18n="shortcut.close_search">Close the search or the table of contents</dd>
           </dl>
         </section>
         <section>
           <h3 data-i18n="welcome.section_view">View</h3>
           <dl>
-            <dt><kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>+</kbd></dt><dd data-i18n="shortcut.zoom_in">Zoom in</dd>
-            <dt><kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>-</kbd></dt><dd data-i18n="shortcut.zoom_out">Zoom out</dd>
-            <dt><kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>0</kbd></dt><dd data-i18n="shortcut.zoom_reset">Actual size</dd>
-            <dt><kbd>F5</kbd> <kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>R</kbd></dt><dd data-i18n="shortcut.reload">Reload the document</dd>
+            <dt><kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>+</kbd>, <kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd><span data-i18n="shortcut.key_wheel">Wheel</span> ↑</kbd></dt><dd data-i18n="shortcut.zoom_in">Text zoom in</dd>
+            <dt><kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>-</kbd>, <kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd><span data-i18n="shortcut.key_wheel">Wheel</span> ↓</kbd></dt><dd data-i18n="shortcut.zoom_out">Text zoom out</dd>
+            <dt><kbd data-i18n="shortcut.key_shift">Shift</kbd>+<kbd data-i18n="shortcut.key_wheel">Wheel</kbd></dt><dd data-i18n="shortcut.zoom_page">Page zoom, layout unchanged</dd>
+            <dt><kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>0</kbd></dt><dd data-i18n="shortcut.zoom_reset">Actual size (text and page)</dd>
+            <dt><kbd>F5</kbd>, <kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+<kbd>R</kbd></dt><dd data-i18n="shortcut.reload">Reload the document</dd>
           </dl>
         </section>
       </div>
-      <div class="empty-mouse" data-i18n-html="welcome.mouse">Mouse: <kbd data-i18n="shortcut.key_ctrl">Ctrl</kbd>+wheel to zoom · middle-click a tab to close it · drag a tab out of the bar to detach it</div>
+      <div class="empty-mouse" data-i18n-html="welcome.mouse">Mouse: middle-click a tab to close it · drag a tab out of the bar to detach it</div>
     </div>
     <!-- Loading overlay (cf. js/loading.js): shown once a render exceeds 180 ms.
          The spinner is animated with `transform`, the only property the
