@@ -5,7 +5,7 @@ All notable changes to Kroki Desk are recorded in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.31.0] — 2026-11-04
+## [3.31.0] — 2026-11-16
 
 ### Added
 - **LaTeX documents closer to the PDF**: a list item labelled by its author
@@ -1059,7 +1059,7 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
 - Single-instance **CLI** and **local Kroki API** (HTTP `127.0.0.1`), plus
   support for an optional external Kroki server.
 
-[3.31.0]: #3310--2026-11-04
+[3.31.0]: #3310--2026-11-16
 [3.30.0]: #3300--2026-10-28
 [3.29.0]: #3290--2026-10-22
 [3.28.1]: #3281--2026-10-22
