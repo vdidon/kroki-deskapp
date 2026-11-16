@@ -581,6 +581,9 @@ function buildToc(headings) {
     item.textContent = label;
     item.title = label;
     item.addEventListener("click", () => {
+      // A TOC jump is a navigation like a link: back returns to the position left.
+      const place = currentPlace();
+      if (place) pushBack(place);
       gotoHeading(h);
       closeToc();
     });

@@ -59,6 +59,10 @@ and the project follows [semantic versioning](https://semver.org/spec/v2.0.0.htm
   (Ctrl + +/−, or Ctrl + wheel) and page zoom (Shift + wheel, which keeps
   the layout), side by side in the View section; Ctrl + 0 resets both.
   When several shortcuts do the same thing, they are separated by commas.
+- **Back / forward also covers the table of contents**: a jump to a heading
+  from the table of contents (« Sommaire ») is a navigation like a link —
+  the mouse back button (or `Alt+←`) returns to the position left, and
+  forward redoes the jump.
 
 ### Fixed
 - The window now talks to the application over Tauri's direct channel: the
