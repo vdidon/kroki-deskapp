@@ -1105,7 +1105,11 @@ runtime, ClojureScript). It lives in `ui/` so Tauri embeds it compressed;
 `uv run scripts/third_party_notices.py` (cargo + npm + network) **after any
 change to `Cargo.lock`, a vendor, a jar or the `latex-doc` bundle** — and when
 updating a vendor, bump its pinned version in the script's `NPM` list (the
-vendors carry no version record of their own; the script is it). A new
+vendors carry no version record of their own; the script is it) **and move
+`NPM_BEFORE` to the day of the run**. The vendors' dependency trees are resolved
+with `npm install --before=NPM_BEFORE`: without it, every run (a crate change
+included) picked up whatever npm had published since, and the npm section
+drifted further from the bundles' real contents at each regeneration. A new
 embedded thing that npm and cargo cannot see goes into `EXTRAS`. The esbuild
 bundles strip legal comments (`--legal-comments=none`): this file is what
 satisfies the notice requirements, not the bundles.
